@@ -6,6 +6,9 @@ export const Route = createLazyFileRoute('/signup')({
 })
 
 function Signup() {
+  const [showOtpModal, setShowOtpModal] = useState(false)
+  const [otpCode, setOtpCode] = useState('')
+
   const [form, setForm] = useState({
     firstName: '',
     middleName: '',
@@ -40,7 +43,26 @@ function Signup() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
+
+    // You can add form validation or API call here first
     console.log('Form submitted:', form)
+
+    // Simulate sending OTP
+    setShowOtpModal(true)
+  }
+
+  const closeOtpModal = () => {
+    setShowOtpModal(false)
+    setOtpCode('')
+  }
+
+  const verifyOtp = () => {
+    if (otpCode === '123456') { // Replace with actual validation
+      alert('OTP verified successfully!')
+      closeOtpModal()
+    } else {
+      alert('Invalid OTP, please try again.')
+    }
   }
 
   return (
@@ -269,6 +291,48 @@ function Signup() {
           </div>
         </div>
       </footer>
+
+      {showOtpModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4 shadow-xl">
+            <h2 className="text-xl font-semibold text-gray-800 mb-4">Enter OTP Code</h2>
+            <p className="text-gray-600 mb-4">
+              We've sent a verification code to your current mobile number. Please enter it below to continue.
+            </p>
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-600 mb-2">OTP Code</label>
+              <input
+                type="text"
+                value={otpCode}
+                onChange={(e) => setOtpCode(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent text-center text-lg tracking-widest"
+                placeholder="123456"
+                maxLength={6}
+                onKeyDown={(e) => e.key === 'Enter' && verifyOtp()}
+              />
+            </div>
+            <div className="text-center mb-4">
+              <button className="text-[#964B00] text-sm hover:underline">
+                Resend OTP
+              </button>
+            </div>
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={closeOtpModal}
+                className="px-4 py-2 text-gray-600 bg-gray-200 rounded-md hover:bg-gray-300 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={verifyOtp}
+                className="px-4 py-2 bg-[#964B00] text-yellow-400 rounded-md hover:bg-[#7a3d00] transition-colors"
+              >
+                Verify OTP
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

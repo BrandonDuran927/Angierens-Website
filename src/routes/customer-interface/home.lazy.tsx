@@ -143,7 +143,7 @@ function RouteComponent() {
     { name: 'HOME', route: '/customer-interface/home', active: true },
     { name: 'MENU', route: '/customer-interface/', active: false },
     { name: 'ORDER', route: '/customer-interface/order', active: false },
-    { name: 'FEEDBACK', route: '/customer-interface/feedback', active: false },
+    { name: 'REVIEW', route: '/customer-interface/feedback', active: false },
     { name: 'MY INFO', route: '/customer-interface/my-info', active: false },
   ];
 
@@ -307,10 +307,12 @@ function RouteComponent() {
               </div>
 
               {/* Logout Button */}
-              <button className="bg-[#964B00] text-yellow-400 font-semibold py-1 sm:py-2 px-2 sm:px-3 md:px-4 text-xs sm:text-sm md:text-base rounded-full shadow-md border-2 border-yellow-400 hover:bg-yellow-400 hover:text-[#964B00] transition-colors whitespace-nowrap">
-                <span className="hidden sm:inline">LOG OUT</span>
-                <span className="sm:hidden">OUT</span>
-              </button>
+              <Link to="/login">
+                <button className="bg-[#964B00] text-yellow-400 font-semibold py-1 sm:py-2 px-2 sm:px-3 md:px-4 text-xs sm:text-sm md:text-base rounded-full shadow-md border-2 border-yellow-400 hover:bg-yellow-400 hover:text-[#964B00] transition-colors whitespace-nowrap">
+                  <span className="hidden sm:inline">LOG OUT</span>
+                  <span className="sm:hidden">OUT</span>
+                </button>
+              </Link>
             </div>
           </div>
         </div>
@@ -429,27 +431,7 @@ function RouteComponent() {
                   {/* Reviews text at the top */}
                   <span className="text-lg sm:text-xl font-bold text-white pb-2 block">Reviews</span>
 
-                  {/* Profile circles in the middle */}
-                  <div className="flex items-center justify-center lg:justify-start -space-x-2 sm:-space-x-3 pt-1">
-                    <div className="w-8 h-8 sm:w-12 sm:h-12 bg-yellow-400 rounded-full border-2 border-white flex items-center justify-center">
-                      <span className="text-xs font-bold text-amber-800">👤</span>
-                    </div>
-                    <div className="w-8 h-8 sm:w-12 sm:h-12 bg-blue-400 rounded-full border-2 border-white flex items-center justify-center">
-                      <span className="text-xs font-bold text-white">👤</span>
-                    </div>
-                    <div className="w-8 h-8 sm:w-12 sm:h-12 bg-green-400 rounded-full border-2 border-white flex items-center justify-center">
-                      <span className="text-xs font-bold text-white">👤</span>
-                    </div>
-                    <div className="w-8 h-8 sm:w-12 sm:h-12 bg-red-400 rounded-full border-2 border-white flex items-center justify-center">
-                      <span className="text-xs font-bold text-white">👤</span>
-                    </div>
-                    <div className="w-8 h-8 sm:w-12 sm:h-12 bg-purple-400 rounded-full border-2 border-white flex items-center justify-center">
-                      <span className="text-xs font-bold text-white">👤</span>
-                    </div>
-                    <div className="w-8 h-8 sm:w-12 sm:h-12 bg-gray-600 rounded-full border-2 border-white flex items-center justify-center">
-                      <span className="text-xs font-bold text-white">60+</span>
-                    </div>
-                  </div>
+
 
                   {/* Stars at the bottom */}
                   <div className="flex items-center justify-center lg:justify-start gap-1">
@@ -549,13 +531,17 @@ function RouteComponent() {
           <div className="bg-amber-800 mx-3 sm:mx-4 rounded-lg p-4 sm:p-6">
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
               {[
-                { title: "3 in 1 Bilao Bilao (Panlasang)", price: "₱999" },
-                { title: "4 in 1 Bilao Bilao (Panlasang)", price: "₱1,299" },
-                { title: "5 in 1 Bilao Bilao (Panlasang)", price: "₱1,599" },
-                { title: "6 in 1 Bilao Bilao (Panlasang)", price: "₱1,899" }
+                { title: "3 in 1 Bilao Bilao (Panlasang)", price: "₱999", src: "/home-page menu-img/1.png" },
+                { title: "4 in 1 Bilao Bilao (Panlasang)", price: "₱1,299", src: "/home-page menu-img/2.png" },
+                { title: "5 in 1 Bilao Bilao (Panlasang)", price: "₱1,599", src: "/home-page menu-img/3.png" },
+                { title: "6 in 1 Bilao Bilao (Panlasang)", price: "₱1,899", src: "/home-page menu-img/4.png" }
               ].map((item, index) => (
                 <div key={index} className="bg-white rounded-lg p-4 text-center">
-                  <div className="w-16 h-16 sm:w-20 sm:h-20 lg:w-24 lg:h-24 bg-blue-500 rounded-full mx-auto mb-3 sm:mb-4"></div>
+                  <img
+                    src={item.src}
+                    alt={item.title}
+                    className="w-16 h-16 sm:w-20 sm:h-20 lg:w-24 lg:h-24 rounded-full mx-auto mb-3 sm:mb-4 object-cover"
+                  />
                   <h3 className="font-semibold text-sm mb-2">{item.title}</h3>
                   <p className="text-xs text-gray-600 mb-2">
                     A hearty and flavorful blend of authentic Filipino dishes, perfectly portioned for sharing and celebrating with family and friends.
@@ -580,32 +566,30 @@ function RouteComponent() {
               OUR AWESOME SERVICES
             </div>
           </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 px-3 sm:px-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 px-3 sm:px-4 justify-items-center">
             {[
               {
                 title: "Quality Food",
                 description: "We use only the freshest ingredients to create delicious, high-standard meals that you'll love.",
-                bgColor: "bg-green-400"
-              },
-              {
-                title: "Serve Hot",
-                description: "Your food arrives hot and ready for you to enjoy — no cold deliveries from our kitchen to your table.",
-                bgColor: "bg-orange-400"
+                src: "/home-page service-img/1.png"
               },
               {
                 title: "Cook like a Chef",
                 description: "Expertly prepared with a touch of culinary artistry in every dish, taste and flavoring a picture perfect meal.",
-                bgColor: "bg-blue-400"
+                src: "/home-page service-img/2.png"
               },
               {
                 title: "Made with Love",
                 description: "Each meal is prepared with passion, care, and a deep love for cooking to bring joy to your dining experience.",
-                bgColor: "bg-red-400"
+                src: "/home-page service-img/3.png"
               }
             ].map((service, index) => (
               <div key={index} className="bg-white rounded-lg p-4 sm:p-6 text-center">
-                <div className={`w-12 h-12 sm:w-16 sm:h-16 ${service.bgColor} rounded-full mx-auto mb-3 sm:mb-4`}></div>
+                <img
+                  src={service.src}
+                  alt={service.title}
+                  className='w-12 h-12 sm:w-16 sm:h-16 rounded-full mx-auto mb-3 sm:mb-4'
+                />
                 <h3 className="font-semibold text-base sm:text-lg mb-2 sm:mb-3">{service.title}</h3>
                 <p className="text-sm text-gray-600 leading-relaxed">{service.description}</p>
               </div>

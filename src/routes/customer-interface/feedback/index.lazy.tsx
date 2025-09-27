@@ -82,7 +82,7 @@ function RouteComponent() {
     { name: 'HOME', route: '/customer-interface/home', active: false },
     { name: 'MENU', route: '/customer-interface/', active: false },
     { name: 'ORDER', route: '/customer-interface/order', active: false },
-    { name: 'FEEDBACK', route: '/customer-interface/feedback', active: true },
+    { name: 'REVIEW', route: '/customer-interface/feedback', active: true },
     { name: 'MY INFO', route: '/customer-interface/my-info', active: false },
   ]
 
@@ -281,10 +281,12 @@ function RouteComponent() {
               </div>
 
               {/* Logout Button */}
-              <button className="bg-[#964B00] text-yellow-400 font-semibold py-1 sm:py-2 px-2 sm:px-3 md:px-4 text-xs sm:text-sm md:text-base rounded-full shadow-md border-2 border-yellow-400 hover:bg-yellow-400 hover:text-[#964B00] transition-colors whitespace-nowrap">
-                <span className="hidden sm:inline">LOG OUT</span>
-                <span className="sm:hidden">OUT</span>
-              </button>
+              <Link to="/login">
+                <button className="bg-[#964B00] text-yellow-400 font-semibold py-1 sm:py-2 px-2 sm:px-3 md:px-4 text-xs sm:text-sm md:text-base rounded-full shadow-md border-2 border-yellow-400 hover:bg-yellow-400 hover:text-[#964B00] transition-colors whitespace-nowrap">
+                  <span className="hidden sm:inline">LOG OUT</span>
+                  <span className="sm:hidden">OUT</span>
+                </button>
+              </Link>
             </div>
           </div>
         </div>
@@ -337,7 +339,7 @@ function RouteComponent() {
 
       {/* Main */}
       <div className="w-full max-w-7xl mx-auto p-4 sm:p-6">
-        <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-800 mb-2">My Feedback</h1>
+        <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-800 mb-2">My Review</h1>
         <p className="text-sm sm:text-base text-gray-600 mb-4 sm:mb-6">This is where you can write your feedback</p>
 
         {/* Search and Filter */}

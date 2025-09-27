@@ -454,7 +454,7 @@ function RouteComponent() {
                             </div>
                         </div>
 
-                        <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200">
+                        <button className="bg-white rounded-xl p-6 shadow-sm border border-gray-200 hover:shadow-md hover:border-gray-300 transition-all duration-200 w-full text-left cursor-pointer">
                             <div className="flex items-center gap-4">
                                 <div className="w-12 h-12 bg-amber-100 rounded-lg flex items-center justify-center">
                                     <Download className="h-6 w-6 text-amber-600" />
@@ -463,7 +463,7 @@ function RouteComponent() {
                                     <p className="text-gray-600 text-sm">Download Report</p>
                                 </div>
                             </div>
-                        </div>
+                        </button>
                     </div>
 
                     {/* Charts */}
@@ -581,14 +581,7 @@ function RouteComponent() {
                                             <td className="px-3 sm:px-4 lg:px-6 py-4 whitespace-nowrap text-xs sm:text-sm text-gray-900">{order.fulfillmentType}</td>
                                             <td className="px-3 sm:px-4 lg:px-6 py-4 whitespace-nowrap text-xs sm:text-sm text-gray-900">{order.paymentMethod}</td>
                                             <td className="px-3 sm:px-4 lg:px-6 py-4 whitespace-nowrap">
-                                                <div className="flex gap-1 sm:gap-2">
-                                                    <button className="bg-red-500 text-white px-2 sm:px-3 py-1 rounded text-xs hover:bg-red-600 transition-colors">
-                                                        Reject
-                                                    </button>
-                                                    <button className="bg-green-500 text-white px-2 sm:px-3 py-1 rounded text-xs hover:bg-green-600 transition-colors">
-                                                        Accept
-                                                    </button>
-                                                </div>
+                                                For Approval
                                             </td>
                                             <td className="px-3 sm:px-4 lg:px-6 py-4 whitespace-nowrap">
                                                 <button className="text-gray-600 hover:text-gray-800 transition-colors">

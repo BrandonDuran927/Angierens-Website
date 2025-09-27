@@ -37,7 +37,7 @@ interface Notification {
 }
 
 interface MenuItem {
-    id: string
+    id: number
     name: string
     image: string
     inclusions: string[]
@@ -95,62 +95,74 @@ function RouteComponent() {
 
     const [menuItems, setMenuItems] = useState<MenuItem[]>([
         {
-            id: '1',
-            name: '5 in 1 Mix in Bilao (Palabok)',
-            image: '/api/placeholder/300/200',
+            id: 1,
+            name: '5 in 1 Mix in Bilao (PALABOK)',
+            available: true,
             inclusions: [
-                '60 pcs. Pork Shanghai',
+                '40 pcs. Pork Shanghai',
                 '12 pcs. Pork BBQ',
                 '30 pcs. Pork Shanghai',
-                '30 slices Gordon Bleu'
+                '30 slices Cordon Bleu'
             ],
-            available: true
+            image: "/public/menu-page img/pancit malabonbon.png"
         },
         {
-            id: '2',
-            name: '5 in 1 Mix in Bilao (Palabok)',
-            image: '/api/placeholder/300/200',
+            id: 2,
+            name: '5 in 1 Mix in Bilao (SPAGHETTI)',
+            available: true,
             inclusions: [
-                '60 pcs. Pork Shanghai',
+                '40 pcs. Pork Shanghai',
                 '12 pcs. Pork BBQ',
                 '30 pcs. Pork Shanghai',
-                '30 slices Gordon Bleu'
+                '30 slices Cordon Bleu'
             ],
-            available: true
+            image: "/public/menu-page img/spaghetto.png"
         },
         {
-            id: '3',
-            name: '5 in 1 Mix in Bilao (Palabok)',
-            image: '/api/placeholder/300/200',
+            id: 3,
+            name: '5 in 1 Mix in Bilao (VALENCIANA)',
+            available: true,
             inclusions: [
-                '60 pcs. Pork Shanghai',
+                '40 pcs. Pork Shanghai',
                 '12 pcs. Pork BBQ',
                 '30 pcs. Pork Shanghai',
-                '30 slices Gordon Bleu'
+                '30 slices Cordon Bleu'
             ],
-            available: true
+            image: "/public/menu-page img/valencia.png"
         },
         {
-            id: '4',
-            name: '5 in 1 Mix in Bilao (Palabok)',
-            image: '/api/placeholder/300/200',
+            id: 4,
+            name: '5 in 1 Mix in Bilao (SOTANGHON GUISADO)',
+            available: true,
             inclusions: [
-                '60 pcs. Pork Shanghai',
+                '40 pcs. Pork Shanghai',
                 '12 pcs. Pork BBQ',
                 '30 pcs. Pork Shanghai',
-                '30 slices Gordon Bleu'
+                '30 slices Cordon Bleu'
             ],
-            available: true
+            image: "/public/menu-page img/sotanghonney.png"
         },
         {
-            id: '5',
-            name: '5 in 1 Mix in Bilao (Palabok)',
-            image: '/api/placeholder/300/200',
+            id: 5,
+            name: '5 in 1 BAKEDMAC',
+            available: true,
             inclusions: [
-                '60 pcs. Pork Shanghai',
+                '40 pcs. Pork Shanghai',
+                '12 pcs. Pork BBQ',
+                '30 pcs. Buttered Puto',
+                '30 slices Cordon Bleu'
+            ],
+            image: "/public/menu-page img/baked mac.png"
+        },
+        {
+            id: 6,
+            name: '5 in 1 Mix in Bilao (SPECIAL PANSIT MALABON)',
+            image: '/public/menu-page img/special.png',
+            inclusions: [
+                '40 pcs. Pork Shanghai',
                 '12 pcs. Pork BBQ',
                 '30 pcs. Pork Shanghai',
-                '30 slices Gordon Bleu'
+                '30 slices Cordon Bleu'
             ],
             available: true
         }
@@ -174,7 +186,7 @@ function RouteComponent() {
         }
     }
 
-    const toggleAvailability = (id: string) => {
+    const toggleAvailability = (id: number) => {
         setMenuItems(prev => prev.map(item =>
             item.id === id ? { ...item, available: !item.available } : item
         ))
@@ -189,7 +201,7 @@ function RouteComponent() {
         description: '',
         price: '',
         inclusions: [] as string[],
-        image: null as File | null
+        image: null as string | null
     })
     const [inclusionForm, setInclusionForm] = useState({
         name: '',
@@ -205,7 +217,7 @@ function RouteComponent() {
                 description: '',
                 price: '',
                 inclusions: [...item.inclusions],
-                image: null
+                image: item.image
             })
         } else {
             setSelectedMenuItem(null)
@@ -265,7 +277,7 @@ function RouteComponent() {
     const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0]
         if (file) {
-            setMenuForm(prev => ({ ...prev, image: file }))
+            // setMenuForm(prev => ({ ...prev, image: string })) TODO: Change this
         }
     }
 
@@ -565,18 +577,14 @@ function RouteComponent() {
                                 {/* Clickable area for editing */}
                                 <div onClick={() => openMenuModal(item)} className="cursor-pointer">
                                     {/* Food Image */}
-                                    <div className="relative h-64 bg-gradient-to-br from-green-100 to-amber-100 flex items-center justify-center">
-                                        <div className="w-48 h-48 bg-green-600 rounded-full flex items-center justify-center relative overflow-hidden">
-                                            {/* Mock food image representation */}
-                                            <div className="absolute inset-4 bg-gradient-to-br from-red-400 to-orange-400 rounded-full"></div>
-                                            <div className="absolute inset-6 bg-gradient-to-br from-yellow-200 to-orange-200 rounded-full"></div>
-                                            <div className="absolute inset-8 bg-gradient-to-br from-green-400 to-lime-300 rounded-full"></div>
-                                            {/* Food elements */}
-                                            <div className="absolute top-12 left-12 w-8 h-8 bg-red-600 rounded-full"></div>
-                                            <div className="absolute top-16 right-14 w-6 h-6 bg-orange-400 rounded-full"></div>
-                                            <div className="absolute bottom-14 left-16 w-4 h-8 bg-amber-600 rounded-full"></div>
-                                            <div className="absolute bottom-12 right-12 w-6 h-6 bg-lime-400 rounded-full"></div>
-                                        </div>
+                                    <div className="relative h-64 overflow-hidden">
+                                        <img
+                                            src={item.image || "/path/to/default-food-image.jpg"}
+                                            alt={item.name}
+                                            className="w-full h-full object-cover"
+                                        />
+                                        {/* Optional overlay for better visual effect */}
+                                        <div className="absolute inset-0 bg-gradient-to-br from-transparent to-black/10"></div>
                                     </div>
 
                                     {/* Item Details */}
@@ -643,10 +651,11 @@ function RouteComponent() {
                             {/* Header with food image */}
                             <div className="relative h-48 bg-gradient-to-br from-green-100 to-amber-100 flex items-center justify-center rounded-t-2xl">
                                 <div className="w-32 h-32 bg-green-600 rounded-full flex items-center justify-center relative overflow-hidden">
-                                    {/* Mock food image */}
-                                    <div className="absolute inset-2 bg-gradient-to-br from-red-400 to-orange-400 rounded-full"></div>
-                                    <div className="absolute inset-3 bg-gradient-to-br from-yellow-200 to-orange-200 rounded-full"></div>
-                                    <div className="absolute inset-4 bg-gradient-to-br from-green-400 to-lime-300 rounded-full"></div>
+                                    <img
+                                        src={selectedMenuItem?.image || "/path/to/default-food-image.jpg"}
+                                        alt={selectedMenuItem?.name || "Food item"}
+                                        className="w-full h-full object-cover"
+                                    />
                                 </div>
 
                                 {/* File upload overlay */}
@@ -946,6 +955,6 @@ function RouteComponent() {
                     </div>
                 )}
             </div>
-        </div>
+        </div >
     )
 }

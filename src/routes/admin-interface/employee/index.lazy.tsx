@@ -76,15 +76,6 @@ function RouteComponent() {
     const [isTrackModalOpen, setIsTrackModalOpen] = useState(false)
     const [selectedEmployeeForTrack, setSelectedEmployeeForTrack] = useState<Employee | null>(null)
 
-    const handleEmployeeClick = (employeeId: string) => {
-        navigate({ to: `/admin-interface/employee/${employeeId}` })
-    }
-
-    const handleTrackEmployee = (employee: Employee) => {
-        setSelectedEmployeeForTrack(employee)
-        setIsTrackModalOpen(true)
-    }
-
     const availableOrders = [
         {
             id: '#022',
@@ -578,28 +569,6 @@ function RouteComponent() {
 
                 {/* Employee Content */}
                 <main className="flex-1 p-6 overflow-y-auto">
-                    {/* Status Cards Row */}
-                    <div className="grid grid-cols-4 gap-6 mb-8">
-                        <div className="bg-white rounded-xl p-6 shadow-sm border-2 border-yellow-400">
-                            <h3 className="text-lg font-medium text-gray-700 mb-2">Available Riders</h3>
-                            <p className="text-3xl font-bold text-gray-800">{statusCounts.available}</p>
-                        </div>
-
-                        <div className="bg-white rounded-xl p-6 shadow-sm border-2 border-yellow-400">
-                            <h3 className="text-lg font-medium text-gray-700 mb-2">On Delivery Riders</h3>
-                            <p className="text-3xl font-bold text-gray-800">{statusCounts.onDelivery}</p>
-                        </div>
-
-                        <div className="bg-white rounded-xl p-6 shadow-sm border-2 border-yellow-400">
-                            <h3 className="text-lg font-medium text-gray-700 mb-2">Waiting for Pick-up</h3>
-                            <p className="text-3xl font-bold text-gray-800">{statusCounts.waitingPickup}</p>
-                        </div>
-
-                        <div className="bg-white rounded-xl p-6 shadow-sm border-2 border-yellow-400">
-                            <h3 className="text-lg font-medium text-gray-700 mb-2">Awaiting Riders</h3>
-                            <p className="text-3xl font-bold text-gray-800">{statusCounts.awaiting}</p>
-                        </div>
-                    </div>
 
                     {/* Filter and Create Employee Section */}
                     <div className="bg-white rounded-xl p-6 shadow-sm border-2 border-yellow-400">
@@ -655,7 +624,7 @@ function RouteComponent() {
                                         <th className="px-6 py-4 text-left font-medium">STATUS</th>
                                         <th className="px-6 py-4 text-left font-medium">CURRENT TASK</th>
                                         <th className="px-6 py-4 text-left font-medium">ASSIGNED ORDERS</th>
-                                        <th className="px-6 py-4 text-left font-medium">ACTION BUTTONS</th>
+                                        <th className="px-6 py-4 text-center font-medium">ACTION BUTTONS</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-gray-200">
@@ -685,27 +654,13 @@ function RouteComponent() {
                                                 </button>
                                             </td>
                                             <td className="px-6 py-4">
-                                                <div className="flex gap-2">
-                                                    <Link
-                                                        to="/admin-interface/employee/$employeeId"
-                                                        params={{ employeeId: employee.id.toString() }}
-                                                        className="bg-yellow-400 hover:bg-yellow-500 text-black px-3 py-1 rounded text-sm font-medium inline-block text-center"
-                                                    >
-                                                        VIEW
-                                                    </Link>
-                                                    <button
-                                                        onClick={() => handleAssignEmployee(employee)}
-                                                        className="bg-yellow-400 hover:bg-yellow-500 text-black px-3 py-1 rounded text-sm font-medium"
-                                                    >
-                                                        ASSIGN
-                                                    </button>
-                                                    <button
-                                                        onClick={() => handleTrackEmployee(employee)}
-                                                        className="bg-yellow-400 hover:bg-yellow-500 text-black px-3 py-1 rounded text-sm font-medium"
-                                                    >
-                                                        TRACK
-                                                    </button>
+                                                <div
+                                                    className="flex justify-center cursor-pointer bg-yellow-500 text-white px-4 py-2 rounded hover:bg-yellow-600"
+                                                    onClick={() => handleViewEmployee(employee)} // pass employee object here
+                                                >
+                                                    VIEW
                                                 </div>
+
                                             </td>
                                         </tr>
                                     ))}

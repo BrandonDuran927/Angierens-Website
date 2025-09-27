@@ -1,4 +1,4 @@
-import { createLazyFileRoute } from '@tanstack/react-router'
+import { createLazyFileRoute, Link } from '@tanstack/react-router'
 import { useState } from 'react';
 
 export const Route = createLazyFileRoute('/login')({
@@ -96,12 +96,12 @@ function RouteComponent() {
               </div>
 
               {/* Login Button */}
-              <button
-                type="submit"
-                className="bg-[#964B00] text-white font-semibold py-2 rounded-full shadow-md hover:bg-[#7b3f00]"
+              <Link
+                to="/customer-interface/home"
+                className="bg-[#964B00] text-white font-semibold py-2 rounded-full shadow-md hover:bg-[#7b3f00] text-center block"
               >
                 LOGIN
-              </button>
+              </Link>
 
               {/* Account link */}
               <p className="text-sm text-center">

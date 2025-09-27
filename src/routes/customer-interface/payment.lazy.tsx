@@ -341,10 +341,12 @@ function RouteComponent() {
                             </div>
 
                             {/* Logout Button */}
-                            <button className="bg-[#964B00] text-yellow-400 font-semibold py-1 sm:py-2 px-2 sm:px-3 md:px-4 text-xs sm:text-sm md:text-base rounded-full shadow-md border-2 border-yellow-400 hover:bg-yellow-400 hover:text-[#964B00] transition-colors whitespace-nowrap">
-                                <span className="hidden sm:inline">LOG OUT</span>
-                                <span className="sm:hidden">OUT</span>
-                            </button>
+                            <Link to="/login">
+                                <button className="bg-[#964B00] text-yellow-400 font-semibold py-1 sm:py-2 px-2 sm:px-3 md:px-4 text-xs sm:text-sm md:text-base rounded-full shadow-md border-2 border-yellow-400 hover:bg-yellow-400 hover:text-[#964B00] transition-colors whitespace-nowrap">
+                                    <span className="hidden sm:inline">LOG OUT</span>
+                                    <span className="sm:hidden">OUT</span>
+                                </button>
+                            </Link>
                         </div>
                     </div>
                 </div>

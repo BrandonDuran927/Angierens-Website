@@ -586,17 +586,12 @@ function RouteComponent() {
             <div className="flex gap-3 pt-4">
               {selectedRefund.confirmation === 'Pending' ? (
                 <>
-                  <button
-                    onClick={handleApproveRefund}
-                    className="flex-1 bg-green-500 text-white py-3 rounded-lg font-medium hover:bg-green-600 transition-colors"
-                  >
-                    Approve
-                  </button>
+
                   <button
                     onClick={handleRejectRefund}
-                    className="flex-1 bg-red-500 text-white py-3 rounded-lg font-medium hover:bg-red-600 transition-colors"
+                    className="flex-1 border-black border-2 text-black py-3 rounded-lg font-medium transition-colors"
                   >
-                    Cancel
+                    Close
                   </button>
                 </>
               ) : (

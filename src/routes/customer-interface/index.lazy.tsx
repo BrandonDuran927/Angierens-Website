@@ -11,7 +11,8 @@ interface MenuItem {
   image: string
   category: string
   description: string
-  inclusions: string[]
+  inclusions: string[],
+  src: string
 }
 
 interface AddOnOption {
@@ -142,7 +143,8 @@ function RouteComponent() {
         '12 pcs. Pork BBQ',
         '30 pcs. Pork Shanghai',
         '30 slices Cordon Bleu'
-      ]
+      ],
+      src: "/public/menu-page img/pancit malabonbon.png"
     },
     {
       id: 2,
@@ -156,7 +158,8 @@ function RouteComponent() {
         '12 pcs. Pork BBQ',
         '30 pcs. Pork Shanghai',
         '30 slices Cordon Bleu'
-      ]
+      ],
+      src: "/public/menu-page img/spaghetto.png"
     },
     {
       id: 3,
@@ -170,7 +173,8 @@ function RouteComponent() {
         '12 pcs. Pork BBQ',
         '30 pcs. Pork Shanghai',
         '30 slices Cordon Bleu'
-      ]
+      ],
+      src: "/public/menu-page img/valencia.png"
     },
     {
       id: 4,
@@ -184,7 +188,8 @@ function RouteComponent() {
         '12 pcs. Pork BBQ',
         '30 pcs. Pork Shanghai',
         '30 slices Cordon Bleu'
-      ]
+      ],
+      src: "/public/menu-page img/sotanghonney.png"
     },
     {
       id: 5,
@@ -198,7 +203,8 @@ function RouteComponent() {
         '12 pcs. Pork BBQ',
         '30 pcs. Buttered Puto',
         '30 slices Cordon Bleu'
-      ]
+      ],
+      src: "/public/menu-page img/baked mac.png"
     },
     {
       id: 6,
@@ -212,7 +218,8 @@ function RouteComponent() {
         '12 pcs. Pork BBQ',
         '30 pcs. Pork Shanghai',
         '30 slices Cordon Bleu'
-      ]
+      ],
+      src: "/public/menu-page img/special.png"
     }
   ]
 
@@ -266,7 +273,7 @@ function RouteComponent() {
     { name: 'HOME', route: '/customer-interface/home', active: false },
     { name: 'MENU', route: '/customer-interface/', active: true },
     { name: 'ORDER', route: '/customer-interface/order', active: false },
-    { name: 'FEEDBACK', route: '/customer-interface/feedback', active: false },
+    { name: 'REVIEW', route: '/customer-interface/feedback', active: false },
     { name: 'MY INFO', route: '/customer-interface/my-info', active: false },
   ];
 
@@ -423,10 +430,12 @@ function RouteComponent() {
               </div>
 
               {/* Logout Button */}
-              <button className="bg-[#964B00] text-yellow-400 font-semibold py-1 sm:py-2 px-2 sm:px-3 md:px-4 text-xs sm:text-sm md:text-base rounded-full shadow-md border-2 border-yellow-400 hover:bg-yellow-400 hover:text-[#964B00] transition-colors whitespace-nowrap">
-                <span className="hidden sm:inline">LOG OUT</span>
-                <span className="sm:hidden">OUT</span>
-              </button>
+              <Link to="/login">
+                <button className="bg-[#964B00] text-yellow-400 font-semibold py-1 sm:py-2 px-2 sm:px-3 md:px-4 text-xs sm:text-sm md:text-base rounded-full shadow-md border-2 border-yellow-400 hover:bg-yellow-400 hover:text-[#964B00] transition-colors whitespace-nowrap">
+                  <span className="hidden sm:inline">LOG OUT</span>
+                  <span className="sm:hidden">OUT</span>
+                </button>
+              </Link>
             </div>
           </div>
         </div>
@@ -528,12 +537,14 @@ function RouteComponent() {
                 </div>
 
                 {/* Food Image Container */}
-                <div className="relative h-48 sm:h-64 bg-gradient-to-br from-green-600 to-green-700 flex items-center justify-center">
-                  <div className="w-32 h-32 sm:w-48 sm:h-48 bg-amber-100 rounded-full flex items-center justify-center">
-                    <div className="w-28 h-28 sm:w-40 sm:h-40 bg-white rounded-full flex items-center justify-center">
-                      <span className="text-4xl sm:text-6xl">🍽️</span>
-                    </div>
-                  </div>
+                <div className="relative h-48 sm:h-64 overflow-hidden">
+                  <img
+                    src={item.src}
+                    alt={item.name}
+                    className="w-full h-full object-cover"
+                  />
+                  {/* Optional overlay for better price tag visibility */}
+                  <div className="absolute inset-0 bg-black/10"></div>
                 </div>
               </div>
 

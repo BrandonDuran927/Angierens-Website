@@ -1,4 +1,4 @@
-// TODO: Manage add-ons and add menu
+// Owner View-Only Menu Interface - No editing capabilities
 
 import React, { useState } from 'react'
 import { createLazyFileRoute, Link, useLocation } from '@tanstack/react-router'
@@ -14,8 +14,7 @@ import {
     Bell,
     Heart,
     Star,
-    LucideCalendar,
-    Plus
+    LucideCalendar
 } from 'lucide-react'
 
 export const Route = createLazyFileRoute('/admin-interface/menu')({
@@ -32,7 +31,7 @@ interface Notification {
 }
 
 interface MenuItem {
-    id: string
+    id: number
     name: string
     image: string
     inclusions: string[]
@@ -130,70 +129,92 @@ function RouteComponent() {
         }
     ])
 
-    const [menuItems, setMenuItems] = useState<MenuItem[]>([
+    const [menuItems] = useState<MenuItem[]>([
         {
-            id: '1',
-            name: '5 in 1 Mix in Bilao (Palabok)',
-            image: '/api/placeholder/300/200',
+            id: 1,
+            name: '5 in 1 Mix in Bilao (PALABOK)',
+            available: true,
             inclusions: [
-                '60 pcs. Pork Shanghai',
+                '40 pcs. Pork Shanghai',
                 '12 pcs. Pork BBQ',
                 '30 pcs. Pork Shanghai',
-                '30 slices Gordon Bleu'
+                '30 slices Cordon Bleu'
             ],
-            available: true
+            image: "/public/menu-page img/pancit malabonbon.png"
         },
         {
-            id: '2',
-            name: '5 in 1 Mix in Bilao (Palabok)',
-            image: '/api/placeholder/300/200',
+            id: 2,
+            name: '5 in 1 Mix in Bilao (SPAGHETTI)',
+            available: true,
             inclusions: [
-                '60 pcs. Pork Shanghai',
+                '40 pcs. Pork Shanghai',
                 '12 pcs. Pork BBQ',
                 '30 pcs. Pork Shanghai',
-                '30 slices Gordon Bleu'
+                '30 slices Cordon Bleu'
             ],
-            available: true
+            image: "/public/menu-page img/spaghetto.png"
         },
         {
-            id: '3',
-            name: '5 in 1 Mix in Bilao (Palabok)',
-            image: '/api/placeholder/300/200',
+            id: 3,
+            name: '5 in 1 Mix in Bilao (VALENCIANA)',
+            available: true,
             inclusions: [
-                '60 pcs. Pork Shanghai',
+                '40 pcs. Pork Shanghai',
                 '12 pcs. Pork BBQ',
                 '30 pcs. Pork Shanghai',
-                '30 slices Gordon Bleu'
+                '30 slices Cordon Bleu'
             ],
-            available: true
+            image: "/public/menu-page img/valencia.png"
         },
         {
-            id: '4',
-            name: '5 in 1 Mix in Bilao (Palabok)',
-            image: '/api/placeholder/300/200',
+            id: 4,
+            name: '5 in 1 Mix in Bilao (SOTANGHON GUISADO)',
+            available: true,
             inclusions: [
-                '60 pcs. Pork Shanghai',
+                '40 pcs. Pork Shanghai',
                 '12 pcs. Pork BBQ',
                 '30 pcs. Pork Shanghai',
-                '30 slices Gordon Bleu'
+                '30 slices Cordon Bleu'
             ],
-            available: true
+            image: "/public/menu-page img/sotanghonney.png"
         },
         {
-            id: '5',
-            name: '5 in 1 Mix in Bilao (Palabok)',
-            image: '/api/placeholder/300/200',
+            id: 5,
+            name: '5 in 1 BAKEDMAC',
+            available: true,
             inclusions: [
-                '60 pcs. Pork Shanghai',
+                '40 pcs. Pork Shanghai',
+                '12 pcs. Pork BBQ',
+                '30 pcs. Buttered Puto',
+                '30 slices Cordon Bleu'
+            ],
+            image: "/public/menu-page img/baked mac.png"
+        },
+        {
+            id: 6,
+            name: '5 in 1 Mix in Bilao (SPECIAL PANSIT MALABON)',
+            image: '/public/menu-page img/special.png',
+            inclusions: [
+                '40 pcs. Pork Shanghai',
                 '12 pcs. Pork BBQ',
                 '30 pcs. Pork Shanghai',
-                '30 slices Gordon Bleu'
+                '30 slices Cordon Bleu'
             ],
             available: true
         }
     ])
 
     const [showNotifications, setShowNotifications] = useState(false)
+    const [showMenuDetails, setShowMenuDetails] = useState(false)
+    const [selectedMenuItem, setSelectedMenuItem] = useState<MenuItem | null>(null)
+
+    // View-only addons data
+    const [addons] = useState([
+        { id: '1', name: 'Puto', quantity: 2, available: true },
+        { id: '2', name: 'Sapin-sapin', quantity: 2, available: true }
+    ])
+
+    const [showAddonsModal, setShowAddonsModal] = useState(false)
 
     const markAllAsRead = () => {
         setNotifications(prev => prev.map(notif => ({ ...notif, read: true })))
@@ -212,120 +233,15 @@ function RouteComponent() {
         }
     }
 
-    const toggleAvailability = (id: string) => {
-        setMenuItems(prev => prev.map(item =>
-            item.id === id ? { ...item, available: !item.available } : item
-        ))
+    const openMenuDetails = (item: MenuItem) => {
+        setSelectedMenuItem(item)
+        setShowMenuDetails(true)
     }
 
-    const [showMenuModal, setShowMenuModal] = useState(false)
-    const [showInclusionModal, setShowInclusionModal] = useState(false)
-    const [selectedMenuItem, setSelectedMenuItem] = useState<MenuItem | null>(null)
-    const [isEditMode, setIsEditMode] = useState(false)
-    const [menuForm, setMenuForm] = useState({
-        name: '',
-        description: '',
-        price: '',
-        inclusions: [] as string[],
-        image: null as File | null
-    })
-    const [inclusionForm, setInclusionForm] = useState({
-        name: '',
-        quantity: ''
-    })
-
-    const openMenuModal = (item?: MenuItem) => {
-        if (item) {
-            setSelectedMenuItem(item)
-            setIsEditMode(true)
-            setMenuForm({
-                name: item.name,
-                description: '',
-                price: '',
-                inclusions: [...item.inclusions],
-                image: null
-            })
-        } else {
-            setSelectedMenuItem(null)
-            setIsEditMode(false)
-            setMenuForm({
-                name: '',
-                description: '',
-                price: '',
-                inclusions: [],
-                image: null
-            })
-        }
-        setShowMenuModal(true)
-    }
-
-    const closeMenuModal = () => {
-        setShowMenuModal(false)
+    const closeMenuDetails = () => {
+        setShowMenuDetails(false)
         setSelectedMenuItem(null)
-        setIsEditMode(false)
-        setMenuForm({
-            name: '',
-            description: '',
-            price: '',
-            inclusions: [],
-            image: null
-        })
     }
-
-    const openInclusionModal = () => {
-        setInclusionForm({ name: '', quantity: '' })
-        setShowInclusionModal(true)
-    }
-
-    const closeInclusionModal = () => {
-        setShowInclusionModal(false)
-        setInclusionForm({ name: '', quantity: '' })
-    }
-
-    const addInclusion = () => {
-        if (inclusionForm.name && inclusionForm.quantity) {
-            const newInclusion = `${inclusionForm.quantity} ${inclusionForm.name}`
-            setMenuForm(prev => ({
-                ...prev,
-                inclusions: [...prev.inclusions, newInclusion]
-            }))
-            closeInclusionModal()
-        }
-    }
-
-    const removeInclusion = (index: number) => {
-        setMenuForm(prev => ({
-            ...prev,
-            inclusions: prev.inclusions.filter((_, i) => i !== index)
-        }))
-    }
-
-    const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0]
-        if (file) {
-            setMenuForm(prev => ({ ...prev, image: file }))
-        }
-    }
-
-    const saveMenuItem = () => {
-        console.log('Saving menu item:', menuForm)
-        closeMenuModal()
-    }
-
-    const removeMenuItem = () => {
-        if (selectedMenuItem) {
-            setMenuItems(prev => prev.filter(item => item.id !== selectedMenuItem.id))
-            closeMenuModal()
-        }
-    }
-
-    const [showAddonsModal, setShowAddonsModal] = useState(false)
-    const [addons, setAddons] = useState([
-        { id: '1', name: 'Puto', quantity: 2, available: true },
-        { id: '2', name: 'Sapin-sapin', quantity: 2, available: true }
-    ])
-    const [showAddAddonForm, setShowAddAddonForm] = useState(false)
-    const [newAddonName, setNewAddonName] = useState('')
 
     const openAddonsModal = () => {
         setShowAddonsModal(true)
@@ -333,40 +249,6 @@ function RouteComponent() {
 
     const closeAddonsModal = () => {
         setShowAddonsModal(false)
-        setShowAddAddonForm(false)
-        setNewAddonName('')
-    }
-
-    const updateAddonQuantity = (id: string, change: number) => {
-        setAddons(prev => prev.map(addon =>
-            addon.id === id
-                ? { ...addon, quantity: Math.max(0, addon.quantity + change) }
-                : addon
-        ))
-    }
-
-    const toggleAddonAvailability = (id: string) => {
-        setAddons(prev => prev.map(addon =>
-            addon.id === id ? { ...addon, available: !addon.available } : addon
-        ))
-    }
-
-    const removeAddon = (id: string) => {
-        setAddons(prev => prev.filter(addon => addon.id !== id))
-    }
-
-    const addNewAddon = () => {
-        if (newAddonName.trim()) {
-            const newAddon = {
-                id: Date.now().toString(),
-                name: newAddonName.trim(),
-                quantity: 1,
-                available: true
-            }
-            setAddons(prev => [...prev, newAddon])
-            setNewAddonName('')
-            setShowAddAddonForm(false)
-        }
     }
 
     return (
@@ -419,7 +301,7 @@ function RouteComponent() {
                 <header className="bg-amber-800 text-white p-4 shadow-md">
                     <div className="flex justify-between items-center">
                         <div className="flex items-center gap-4">
-                            <h1 className="text-2xl font-bold">MENU MANAGEMENT</h1>
+                            <h1 className="text-2xl font-bold">MENU OVERVIEW</h1>
                         </div>
 
                         <div className="flex items-center gap-4">
@@ -491,34 +373,30 @@ function RouteComponent() {
 
                 {/* Menu Content */}
                 <main className="flex-1 p-8">
-
                     <button
                         onClick={() => openAddonsModal()}
-                        className="bg-yellow-400 hover:bg-yellow-500 text-gray-800 font-semibold px-6 py-3 rounded-lg transition-colors mb-8"
+                        className="bg-yellow-400 hover:bg-yellow-500 text-white font-semibold px-6 py-3 rounded-lg transition-colors mb-8"
                     >
-                        Manage Add-ons
+                        View Add-ons
                     </button>
 
                     {/* Menu Items Grid */}
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
                         {menuItems.map((item) => (
                             <div key={item.id} className="bg-white rounded-2xl shadow-lg overflow-hidden border-4 border-amber-200">
-                                {/* Clickable area for editing */}
-                                <div onClick={() => openMenuModal(item)} className="cursor-pointer">
+                                {/* Clickable area for viewing details */}
+                                <div onClick={() => openMenuDetails(item)} className="cursor-pointer">
                                     {/* Food Image */}
-                                    <div className="relative h-64 bg-gradient-to-br from-green-100 to-amber-100 flex items-center justify-center">
-                                        <div className="w-48 h-48 bg-green-600 rounded-full flex items-center justify-center relative overflow-hidden">
-                                            {/* Mock food image representation */}
-                                            <div className="absolute inset-4 bg-gradient-to-br from-red-400 to-orange-400 rounded-full"></div>
-                                            <div className="absolute inset-6 bg-gradient-to-br from-yellow-200 to-orange-200 rounded-full"></div>
-                                            <div className="absolute inset-8 bg-gradient-to-br from-green-400 to-lime-300 rounded-full"></div>
-                                            {/* Food elements */}
-                                            <div className="absolute top-12 left-12 w-8 h-8 bg-red-600 rounded-full"></div>
-                                            <div className="absolute top-16 right-14 w-6 h-6 bg-orange-400 rounded-full"></div>
-                                            <div className="absolute bottom-14 left-16 w-4 h-8 bg-amber-600 rounded-full"></div>
-                                            <div className="absolute bottom-12 right-12 w-6 h-6 bg-lime-400 rounded-full"></div>
-                                        </div>
+                                    <div className="relative h-64 overflow-hidden">
+                                        <img
+                                            src={item.image || "/path/to/default-food-image.jpg"}
+                                            alt={item.name}
+                                            className="w-full h-full object-cover"
+                                        />
+                                        {/* Optional overlay for better visual effect */}
+                                        <div className="absolute inset-0 bg-gradient-to-br from-transparent to-black/10"></div>
                                     </div>
+
 
                                     {/* Item Details */}
                                     <div className="p-6">
@@ -535,49 +413,27 @@ function RouteComponent() {
                                     </div>
                                 </div>
 
-                                {/* Availability Dropdown - outside clickable area */}
+                                {/* Availability Status - Read Only */}
                                 <div className="px-6 pb-6">
                                     <div className="relative">
-                                        <button
-                                            onClick={(e) => {
-                                                e.stopPropagation(); // Prevent triggering the edit modal
-                                                toggleAvailability(item.id);
-                                            }}
-                                            className={`w-full flex items-center justify-center px-4 py-2 rounded-lg font-semibold cursor-pointer ${item.available
-                                                ? 'bg-yellow-400 hover:bg-yellow-500 text-gray-800'
-                                                : 'bg-gray-300 hover:bg-gray-400 text-gray-600'
+                                        <div
+                                            className={`w-full flex items-center justify-center px-4 py-2 rounded-lg font-semibold ${item.available
+                                                ? 'bg-green-100 text-green-800 border-2 border-green-300'
+                                                : 'bg-red-100 text-red-800 border-2 border-red-300'
                                                 }`}
                                         >
-                                            <span>{item.available ? 'Available' : 'Unavailable'}</span>
-                                        </button>
+                                            <span>Status: {item.available ? 'Available' : 'Unavailable'}</span>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
                         ))}
-
-                        {/* Add New Menu Item */}
-                        <div className="bg-white rounded-2xl shadow-lg overflow-hidden border-4 border-dashed border-gray-300 hover:border-yellow-400 transition-colors">
-                            <div className="h-64 flex items-center justify-center bg-gray-50">
-                                <div className="w-32 h-32 bg-gray-200 rounded-full flex items-center justify-center">
-                                    <Plus className="h-12 w-12 text-gray-400" />
-                                </div>
-                            </div>
-
-                            <div className="p-6 text-center">
-                                <button
-                                    onClick={() => openMenuModal()}
-                                    className="w-full bg-yellow-400 hover:bg-yellow-500 text-gray-800 font-bold py-3 rounded-lg transition-colors flex items-center justify-center gap-2"
-                                >
-                                    <Plus className="h-5 w-5" />
-                                    Add menu
-                                </button>
-                            </div>
-                        </div>
                     </div>
                 </main>
             </div>
-            {/* Menu Item Modal */}
-            {showMenuModal && (
+
+            {/* Menu Item Details Modal - View Only */}
+            {showMenuDetails && selectedMenuItem && (
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
                     <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full max-h-[90vh] overflow-y-auto">
                         {/* Header with food image */}
@@ -588,112 +444,51 @@ function RouteComponent() {
                                 <div className="absolute inset-3 bg-gradient-to-br from-yellow-200 to-orange-200 rounded-full"></div>
                                 <div className="absolute inset-4 bg-gradient-to-br from-green-400 to-lime-300 rounded-full"></div>
                             </div>
-
-                            {/* File upload overlay */}
-                            <label className="absolute inset-0 cursor-pointer flex items-center justify-center bg-black bg-opacity-20 opacity-0 hover:opacity-100 transition-opacity rounded-t-2xl">
-                                <div className="bg-white p-3 rounded-full">
-                                    <svg className="w-6 h-6 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                                    </svg>
-                                </div>
-                                <input
-                                    type="file"
-                                    accept="image/*"
-                                    onChange={handleImageUpload}
-                                    className="hidden"
-                                />
-                            </label>
                         </div>
 
-                        {/* Form Content */}
+                        {/* Details Content - Read Only */}
                         <div className="p-6 space-y-4">
                             {/* Food Name */}
                             <div>
                                 <label className="block text-sm font-semibold text-gray-700 mb-2">Food Name:</label>
-                                <input
-                                    type="text"
-                                    value={menuForm.name}
-                                    onChange={(e) => setMenuForm(prev => ({ ...prev, name: e.target.value }))}
-                                    placeholder="Enter the name of the food..."
-                                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-400 focus:border-transparent outline-none"
-                                />
-                            </div>
-
-                            {/* Description */}
-                            <div>
-                                <label className="block text-sm font-semibold text-gray-700 mb-2">Description:</label>
-                                <textarea
-                                    value={menuForm.description}
-                                    onChange={(e) => setMenuForm(prev => ({ ...prev, description: e.target.value }))}
-                                    placeholder="Enter the description of the food..."
-                                    rows={3}
-                                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-400 focus:border-transparent outline-none resize-none"
-                                />
+                                <div className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg text-gray-800">
+                                    {selectedMenuItem.name}
+                                </div>
                             </div>
 
                             {/* Inclusions */}
                             <div>
                                 <label className="block text-sm font-semibold text-gray-700 mb-2">Inclusions:</label>
-                                <div className="flex flex-wrap gap-2 mb-2">
-                                    {menuForm.inclusions.map((inclusion, idx) => (
+                                <div className="flex flex-wrap gap-2">
+                                    {selectedMenuItem.inclusions.map((inclusion, idx) => (
                                         <span
                                             key={idx}
-                                            className="inline-flex items-center bg-yellow-400 text-gray-800 px-3 py-1 rounded-full text-sm font-medium"
+                                            className="inline-flex items-center bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm font-medium"
                                         >
                                             {inclusion}
-                                            <button
-                                                onClick={() => removeInclusion(idx)}
-                                                className="ml-2 text-gray-600 hover:text-red-600"
-                                            >
-                                                ×
-                                            </button>
                                         </span>
                                     ))}
-                                    <button
-                                        onClick={openInclusionModal}
-                                        className="inline-flex items-center bg-gray-200 hover:bg-gray-300 text-gray-700 px-3 py-1 rounded-full text-sm font-medium transition-colors"
-                                    >
-                                        <Plus className="w-4 h-4 mr-1" />
-                                        Add
-                                    </button>
                                 </div>
                             </div>
 
-                            {/* Price */}
+                            {/* Availability Status */}
                             <div>
-                                <label className="block text-sm font-semibold text-gray-700 mb-2">Price:</label>
-                                <input
-                                    type="text"
-                                    value={menuForm.price}
-                                    onChange={(e) => setMenuForm(prev => ({ ...prev, price: e.target.value }))}
-                                    placeholder="Enter the price of the food..."
-                                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-400 focus:border-transparent outline-none"
-                                />
+                                <label className="block text-sm font-semibold text-gray-700 mb-2">Availability:</label>
+                                <div className={`w-full px-4 py-3 border rounded-lg font-medium ${selectedMenuItem.available
+                                    ? 'bg-green-50 border-green-200 text-green-800'
+                                    : 'bg-red-50 border-red-200 text-red-800'
+                                    }`}>
+                                    {selectedMenuItem.available ? 'Available' : 'Unavailable'}
+                                </div>
                             </div>
 
-                            {/* Remove Food Button - only show in edit mode */}
-                            {isEditMode && (
+                            {/* Close Button */}
+                            <div className="pt-4">
                                 <button
-                                    onClick={removeMenuItem}
-                                    className="w-full bg-red-500 hover:bg-red-600 text-white font-semibold py-3 rounded-lg transition-colors"
+                                    onClick={closeMenuDetails}
+                                    className="w-full bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold py-3 rounded-lg transition-colors"
                                 >
-                                    Remove Food
-                                </button>
-                            )}
-
-                            {/* Action Buttons */}
-                            <div className="flex gap-4 pt-4">
-                                <button
-                                    onClick={closeMenuModal}
-                                    className="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold py-3 rounded-lg transition-colors flex items-center justify-center"
-                                >
-                                    ✗
-                                </button>
-                                <button
-                                    onClick={saveMenuItem}
-                                    className="flex-1 bg-green-500 hover:bg-green-600 text-white font-semibold py-3 rounded-lg transition-colors flex items-center justify-center"
-                                >
-                                    ✓
+                                    Close
                                 </button>
                             </div>
                         </div>
@@ -701,66 +496,14 @@ function RouteComponent() {
                 </div>
             )}
 
-            {/* Add Inclusion Modal */}
-            {showInclusionModal && (
-                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-60 p-4">
-                    <div className="bg-white rounded-lg shadow-2xl max-w-sm w-full">
-                        <div className="p-6">
-                            <h2 className="text-2xl font-bold text-gray-800 mb-6">Add Inclusions</h2>
-
-                            <div className="space-y-4">
-                                {/* Inclusion Name */}
-                                <div>
-                                    <label className="block text-sm font-semibold text-gray-700 mb-2">Inclusion Name:</label>
-                                    <input
-                                        type="text"
-                                        value={inclusionForm.name}
-                                        onChange={(e) => setInclusionForm(prev => ({ ...prev, name: e.target.value }))}
-                                        placeholder="Enter the name of the food..."
-                                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-400 focus:border-transparent outline-none"
-                                    />
-                                </div>
-
-                                {/* Quantity */}
-                                <div>
-                                    <label className="block text-sm font-semibold text-gray-700 mb-2">Quantity:</label>
-                                    <input
-                                        type="text"
-                                        value={inclusionForm.quantity}
-                                        onChange={(e) => setInclusionForm(prev => ({ ...prev, quantity: e.target.value }))}
-                                        placeholder="Enter the quantity..."
-                                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-400 focus:border-transparent outline-none"
-                                    />
-                                </div>
-                            </div>
-
-                            {/* Action Buttons */}
-                            <div className="flex gap-4 mt-6">
-                                <button
-                                    onClick={closeInclusionModal}
-                                    className="flex-1 border-2 border-red-400 text-red-500 hover:bg-red-50 font-semibold py-2 px-4 rounded-full transition-colors"
-                                >
-                                    Cancel
-                                </button>
-                                <button
-                                    onClick={addInclusion}
-                                    className="flex-1 bg-teal-500 hover:bg-teal-600 text-white font-semibold py-2 px-4 rounded-full transition-colors"
-                                >
-                                    Confirm
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            )}
-            {/* Manage Add-ons Modal */}
+            {/* View Add-ons Modal - Read Only */}
             {showAddonsModal && (
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
                     <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[80vh] overflow-y-auto">
                         {/* Header */}
                         <div className="p-6 border-b border-gray-200">
                             <div className="flex justify-between items-center">
-                                <h2 className="text-2xl font-bold text-gray-800">Manage Add-ons</h2>
+                                <h2 className="text-2xl font-bold text-gray-800">Add-ons Overview</h2>
                                 <button
                                     onClick={closeAddonsModal}
                                     className="text-gray-500 hover:text-gray-700 text-2xl cursor-pointer"
@@ -773,104 +516,42 @@ function RouteComponent() {
                         {/* Content */}
                         <div className="p-6">
                             {/* Table Header */}
-                            <div className="grid grid-cols-4 gap-4 mb-4 text-lg font-semibold text-gray-700">
+                            <div className="grid grid-cols-3 gap-4 mb-4 text-lg font-semibold text-gray-700">
                                 <div>Item name</div>
-                                <div className="text-center">QTY</div>
+                                <div className="text-center">Quantity</div>
                                 <div className="text-center">Availability</div>
-                                <div></div>
                             </div>
 
-                            {/* Add-ons List */}
+                            {/* Add-ons List - Read Only */}
                             <div className="space-y-3">
                                 {addons.map((addon) => (
-                                    <div key={addon.id} className="grid grid-cols-4 gap-4 items-center">
+                                    <div key={addon.id} className="grid grid-cols-3 gap-4 items-center">
                                         {/* Item Name */}
-                                        <div className="bg-yellow-400 text-black px-4 py-2 rounded-lg font-semibold">
+                                        <div className="bg-yellow-100 text-yellow-800 px-4 py-2 rounded-lg font-semibold border border-yellow-200">
                                             {addon.name}
                                         </div>
 
-                                        {/* Quantity Controls */}
-                                        <div className="flex items-center justify-center gap-2">
-                                            <button
-                                                onClick={() => updateAddonQuantity(addon.id, -1)}
-                                                className="w-8 h-8 border border-gray-400 rounded flex items-center justify-center hover:bg-gray-100"
-                                            >
-                                                −
-                                            </button>
-                                            <span className="text-lg font-semibold min-w-[20px] text-center">
+                                        {/* Quantity Display */}
+                                        <div className="flex items-center justify-center">
+                                            <span className="text-lg font-semibold bg-gray-100 px-4 py-2 rounded-lg border">
                                                 {addon.quantity}
                                             </span>
-                                            <button
-                                                onClick={() => updateAddonQuantity(addon.id, 1)}
-                                                className="w-8 h-8 border border-gray-400 rounded flex items-center justify-center hover:bg-gray-100"
-                                            >
-                                                +
-                                            </button>
                                         </div>
 
-                                        {/* Availability Toggle */}
+                                        {/* Availability Status */}
                                         <div className="flex justify-center">
-                                            <button
-                                                onClick={() => toggleAddonAvailability(addon.id)}
-                                                className={`px-4 py-2 rounded-lg font-semibold min-w-[80px] cursor-pointer ${addon.available
-                                                    ? 'bg-yellow-400 text-black'
-                                                    : 'bg-gray-300 text-gray-600'
+                                            <div
+                                                className={`px-4 py-2 rounded-lg font-semibold min-w-[80px] text-center border-2 ${addon.available
+                                                    ? 'bg-green-100 text-green-800 border-green-300'
+                                                    : 'bg-red-100 text-red-800 border-red-300'
                                                     }`}
                                             >
-                                                {addon.available ? 'Yes' : 'No'}
-                                            </button>
-                                        </div>
-
-                                        {/* Delete Button */}
-                                        <div className="flex justify-center">
-                                            <button
-                                                onClick={() => removeAddon(addon.id)}
-                                                className="w-10 h-10 border-2 border-red-400 text-red-500 rounded-lg hover:bg-red-50 flex items-center justify-center"
-                                            >
-                                                🗑
-                                            </button>
+                                                {addon.available ? 'Available' : 'Unavailable'}
+                                            </div>
                                         </div>
                                     </div>
                                 ))}
                             </div>
-
-                            {/* Add New Addon Section */}
-                            {showAddAddonForm ? (
-                                <div className="mt-6 p-4 border-2 border-dashed border-gray-300 rounded-lg">
-                                    <div className="flex gap-2">
-                                        <input
-                                            type="text"
-                                            value={newAddonName}
-                                            onChange={(e) => setNewAddonName(e.target.value)}
-                                            placeholder="Enter add-on name..."
-                                            className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-400 focus:border-transparent outline-none"
-                                            onKeyPress={(e) => e.key === 'Enter' && addNewAddon()}
-                                        />
-                                        <button
-                                            onClick={addNewAddon}
-                                            className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg"
-                                        >
-                                            Add
-                                        </button>
-                                        <button
-                                            onClick={() => {
-                                                setShowAddAddonForm(false)
-                                                setNewAddonName('')
-                                            }}
-                                            className="bg-gray-300 hover:bg-gray-400 text-gray-700 px-4 py-2 rounded-lg"
-                                        >
-                                            Cancel
-                                        </button>
-                                    </div>
-                                </div>
-                            ) : (
-                                <button
-                                    onClick={() => setShowAddAddonForm(true)}
-                                    className="w-full mt-6 bg-yellow-400 hover:bg-yellow-500 text-black font-semibold py-3 rounded-lg transition-colors"
-                                >
-                                    Add another item
-                                </button>
-                            )}
                         </div>
 
                         {/* Footer */}
