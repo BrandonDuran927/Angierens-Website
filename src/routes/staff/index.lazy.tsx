@@ -289,12 +289,12 @@ function RouteComponent() {
 
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-amber-50 to-orange-100 flex overflow-x-hidden">
+        <div className="min-h-screen bg-gradient-to-br from-amber-50 to-orange-100 flex overflow-hidden">
             <div
                 className={`
-    fixed inset-y-0 left-0 z-50 w-64 bg-yellow-400 transform transition-transform duration-300 ease-in-out
-    ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}
-  `}
+                fixed inset-y-0 left-0 z-50 w-64 bg-yellow-400 transform transition-transform duration-300 ease-in-out
+                ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}
+            `}
             >
                 {/* Header */}
                 <div className="bg-amber-800 text-white px-6 py-4 relative">
@@ -325,18 +325,18 @@ function RouteComponent() {
                 </div>
 
                 {/* Navigation Menu */}
-                <nav className="flex-1 px-4 py-6 space-y-2">
+                <nav className="flex-1 px-4 py-6 space-y-2 overflow-y-auto">
                     {navigationItems.map((item) => (
                         <Link
                             key={item.name}
                             to={item.route}
                             className={`
-                flex items-center gap-3 px-4 py-3 rounded-lg text-left font-semibold transition-colors w-full
-                ${item.active
+                            flex items-center gap-3 px-4 py-3 rounded-lg text-left font-semibold transition-colors w-full
+                            ${item.active
                                     ? 'bg-amber-700 text-white shadow-lg'
                                     : 'text-amber-900 hover:bg-amber-300'
                                 }
-              `}
+                        `}
                         >
                             {item.icon}
                             {item.name}
@@ -356,16 +356,16 @@ function RouteComponent() {
             {/* Overlay for mobile */}
             {isSidebarOpen && (
                 <div
-                    className="fixed inset-0 bg-black/50 z-40"
+                    className="fixed inset-0 bg-black/50 z-40 lg:hidden"
                     onClick={() => setIsSidebarOpen(false)}
                 />
             )}
 
-            <div className="flex-1 flex flex-col">
+            <div className="flex-1 flex flex-col min-h-screen">
                 {/* Header */}
-                <header className="bg-amber-800 text-white p-4 shadow-md">
+                <header className="bg-amber-800 text-white p-3 sm:p-4 shadow-md flex-shrink-0">
                     <div className="flex justify-between items-center">
-                        <div className="flex items-center gap-4">
+                        <div className="flex items-center gap-2 sm:gap-4">
                             {/* Mobile Menu Button */}
                             <button
                                 onClick={() => setIsSidebarOpen(true)}
@@ -373,82 +373,82 @@ function RouteComponent() {
                             >
                                 <Menu className="h-6 w-6" />
                             </button>
-                            <div className="flex items-center gap-2">
-                                <h1 className="text-xl lg:text-3xl font-bold">ORDERS</h1>
-                            </div>
+                            <h1 className="text-lg sm:text-xl lg:text-3xl font-bold">ORDERS</h1>
                         </div>
-                        <div className="flex items-center gap-2 lg:gap-6">
-                            <span className="text-amber-200 text-xs lg:text-lg font-semibold hidden sm:inline">Date: {getCurrentDate()}</span>
-                            <span className="text-amber-200 text-xs lg:text-lg font-semibold hidden sm:inline">Time: {getCurrentTime()}</span>
-                            <div className="w-10 h-10 bg-yellow-400 rounded-full flex items-center justify-center">
-                                <div className="relative">
-                                    <button
-                                        onClick={() => setIsNotificationOpen(!isNotificationOpen)}
-                                        className="relative p-2 text-[#7a3d00] hover:bg-yellow-400 rounded-full"
-                                    >
-                                        <Bell className="h-6 w-6" />
-                                        {notificationCount > 0 && (
-                                            <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
-                                                {notificationCount}
-                                            </span>
-                                        )}
-                                    </button>
-                                    {/* Notification Dropdown */}
-                                    {isNotificationOpen && (
-                                        <div className="absolute right-0 mt-2 w-96 bg-white rounded-lg shadow-lg border border-gray-200 z-50">
-                                            <div className="p-4 border-b border-gray-200">
-                                                <h3 className="text-lg font-semibold text-gray-800">Notifications</h3>
-                                            </div>
+                        <div className="flex items-center gap-2 sm:gap-4 lg:gap-6">
+                            <span className="text-amber-200 text-xs lg:text-sm font-semibold hidden md:inline">
+                                {getCurrentDate()}
+                            </span>
+                            <span className="text-amber-200 text-xs lg:text-sm font-semibold hidden md:inline">
+                                {getCurrentTime()}
+                            </span>
+                            <div className="relative">
+                                <button
+                                    onClick={() => setIsNotificationOpen(!isNotificationOpen)}
+                                    className="relative p-2 bg-yellow-400 text-amber-900 hover:bg-yellow-500 rounded-full"
+                                >
+                                    <Bell className="h-5 w-5 sm:h-6 sm:w-6" />
+                                    {notificationCount > 0 && (
+                                        <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
+                                            {notificationCount}
+                                        </span>
+                                    )}
+                                </button>
+                                {/* Notification Dropdown */}
+                                {isNotificationOpen && (
+                                    <div className="absolute right-0 mt-2 w-80 sm:w-96 bg-white rounded-lg shadow-lg border border-gray-200 z-50 max-h-96">
+                                        <div className="p-4 border-b border-gray-200">
+                                            <h3 className="text-lg font-semibold text-gray-800">Notifications</h3>
+                                        </div>
 
-                                            <div className="max-h-80 overflow-y-auto">
-                                                {notifications.map((notification, index) => (
-                                                    <div
-                                                        key={notification.id}
-                                                        className={`p-4 border-b border-gray-100 hover:bg-gray-50 cursor-pointer ${index === notifications.length - 1 ? 'border-b-0' : ''
-                                                            }`}
-                                                    >
-                                                        <div className="flex items-start gap-3">
-                                                            <div className="flex-shrink-0 w-10 h-10 bg-yellow-400 rounded-full flex items-center justify-center text-black">
-                                                                {getNotificationIcon(notification.icon)}
-                                                            </div>
-                                                            <div className="flex-1 min-w-0">
-                                                                <p className="text-sm text-gray-800 leading-relaxed">
-                                                                    {notification.title}
-                                                                </p>
-                                                                <p className="text-xs text-gray-500 mt-1">
-                                                                    {notification.time}
-                                                                </p>
-                                                            </div>
+                                        <div className="max-h-64 overflow-y-auto">
+                                            {notifications.map((notification, index) => (
+                                                <div
+                                                    key={notification.id}
+                                                    className={`p-4 border-b border-gray-100 hover:bg-gray-50 cursor-pointer ${index === notifications.length - 1 ? 'border-b-0' : ''
+                                                        }`}
+                                                >
+                                                    <div className="flex items-start gap-3">
+                                                        <div className="flex-shrink-0 w-10 h-10 bg-yellow-400 rounded-full flex items-center justify-center text-black">
+                                                            {getNotificationIcon(notification.icon)}
+                                                        </div>
+                                                        <div className="flex-1 min-w-0">
+                                                            <p className="text-sm text-gray-800 leading-relaxed">
+                                                                {notification.title}
+                                                            </p>
+                                                            <p className="text-xs text-gray-500 mt-1">
+                                                                {notification.time}
+                                                            </p>
                                                         </div>
                                                     </div>
-                                                ))}
-                                            </div>
-
-                                            <div className="p-4 border-t border-gray-200">
-                                                <button
-                                                    onClick={markAllAsRead}
-                                                    className="w-full bg-yellow-400 text-black py-2 px-4 rounded-lg font-medium hover:bg-yellow-500 transition-colors flex items-center justify-center gap-2"
-                                                >
-                                                    <Bell className="h-4 w-4" />
-                                                    Mark all as read
-                                                </button>
-                                            </div>
+                                                </div>
+                                            ))}
                                         </div>
-                                    )}
-                                </div>
+
+                                        <div className="p-4 border-t border-gray-200">
+                                            <button
+                                                onClick={markAllAsRead}
+                                                className="w-full bg-yellow-400 text-black py-2 px-4 rounded-lg font-medium hover:bg-yellow-500 transition-colors flex items-center justify-center gap-2"
+                                            >
+                                                <Bell className="h-4 w-4" />
+                                                Mark all as read
+                                            </button>
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                         </div>
                     </div>
                 </header>
 
                 {/* Time Tabs */}
-                <div className="bg-white border-b border-gray-200 px-6 pt-4">
-                    <div className="flex gap-2">
+                <div className="bg-white border-b border-gray-200 px-3 sm:px-6 pt-3 sm:pt-4 flex-shrink-0">
+                    <div className="flex gap-2 overflow-x-auto">
                         {['Today', 'Scheduled'].map((tab) => (
                             <button
                                 key={tab}
                                 onClick={() => setActiveTimeTab(tab)}
-                                className={`px-6 py-2 rounded-t-lg font-medium transition-colors ${activeTimeTab === tab
+                                className={`px-4 sm:px-6 py-2 rounded-t-lg font-medium transition-colors whitespace-nowrap ${activeTimeTab === tab
                                     ? 'bg-yellow-400 text-amber-800'
                                     : 'text-gray-600 hover:text-gray-800 hover:bg-gray-100'
                                     }`}
@@ -460,13 +460,13 @@ function RouteComponent() {
                 </div>
 
                 {/* Status Tabs */}
-                <div className="bg-white px-6 py-4 border-b border-gray-200">
-                    <div className="flex gap-2">
+                <div className="bg-white px-3 sm:px-6 py-3 sm:py-4 border-b border-gray-200 flex-shrink-0">
+                    <div className="flex gap-2 overflow-x-auto mb-3 sm:mb-4">
                         {['New Orders', 'In Process', 'Completed'].map((tab) => (
                             <button
                                 key={tab}
                                 onClick={() => setActiveTab(tab)}
-                                className={`px-6 py-2 rounded-lg font-medium transition-colors ${activeTab === tab
+                                className={`px-4 sm:px-6 py-2 rounded-lg font-medium transition-colors whitespace-nowrap ${activeTab === tab
                                     ? 'bg-yellow-400 text-amber-800'
                                     : 'text-gray-600 hover:text-gray-800 hover:bg-gray-100'
                                     }`}
@@ -476,41 +476,109 @@ function RouteComponent() {
                         ))}
                     </div>
 
-                    <div className="flex justify-between items-center mt-4">
-                        <div className="relative">
+                    <div className="flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-3">
+                        <div className="relative flex-1 max-w-full sm:max-w-xs">
                             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
                             <input
                                 type="text"
                                 placeholder="Search order by ID..."
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
-                                className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500 w-64"
+                                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500"
                             />
                         </div>
-                        <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-2 sm:gap-3">
                             <button
                                 onClick={() => setIsFilterOpen(true)}
-                                className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                                className="flex items-center gap-2 px-3 sm:px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors text-sm"
                             >
                                 <Filter className="h-4 w-4" />
-                                Filter
+                                <span className="hidden sm:inline">Filter</span>
                             </button>
                             <button
                                 onClick={() => setIsAddOrderModalOpen(true)}
-                                className="flex items-center gap-2 bg-amber-500 text-white px-4 py-2 rounded-lg hover:bg-amber-600 transition-colors"
+                                className="flex items-center gap-2 bg-amber-500 text-white px-3 sm:px-4 py-2 rounded-lg hover:bg-amber-600 transition-colors text-sm whitespace-nowrap"
                             >
                                 <Plus className="h-4 w-4" />
-                                Add Order Manually
+                                <span className="hidden sm:inline">Add Order</span>
+                                <span className="sm:hidden">Add</span>
                             </button>
                         </div>
                     </div>
                 </div>
 
-                {/* Main Content */}
-                <main className="flex-1 p-6">
-                    <div className="bg-white rounded-xl shadow-sm border border-gray-200">
-                        {/* Orders Header */}
-                        <div className="bg-yellow-400 text-amber-800 p-4 rounded-t-xl">
+                {/* Main Content - Mobile First */}
+                <main className="flex-1 p-3 sm:p-4 lg:p-6 overflow-y-auto">
+                    {/* Mobile Card View (Default) */}
+                    <div className="space-y-3 sm:space-y-4 lg:hidden">
+                        <div className="bg-yellow-400 p-4 rounded-xl sticky top-0 z-10 shadow-sm">
+                            <div className="flex justify-between items-center">
+                                <h2 className="text-base sm:text-lg font-bold">New Orders Today</h2>
+                                <span className="text-lg sm:text-xl font-bold">{filteredOrders.length}</span>
+                            </div>
+                        </div>
+
+                        {currentOrders.map((order) => (
+                            <div key={order.id} className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
+                                <div className="flex justify-between items-start mb-3">
+                                    <div>
+                                        <h3 className="text-base sm:text-lg font-bold text-gray-900">{order.id}</h3>
+                                        <p className="text-sm text-gray-600">{order.customerName}</p>
+                                    </div>
+                                    <button
+                                        onClick={() => openOrderDetails(order)}
+                                        className="text-gray-600 hover:text-gray-800 active:text-gray-900 p-1"
+                                        aria-label="View order details"
+                                    >
+                                        <Eye className="h-5 w-5" />
+                                    </button>
+                                </div>
+
+                                <div className="grid grid-cols-2 gap-3 mb-4 text-sm">
+                                    <div>
+                                        <p className="text-gray-500 text-xs mb-1">Date</p>
+                                        <p className="font-medium">{order.date}</p>
+                                    </div>
+                                    <div>
+                                        <p className="text-gray-500 text-xs mb-1">Time</p>
+                                        <p className="font-medium">{order.time}</p>
+                                    </div>
+                                    <div>
+                                        <p className="text-gray-500 text-xs mb-1">Price</p>
+                                        <p className="font-medium">{order.price}</p>
+                                    </div>
+                                    <div>
+                                        <p className="text-gray-500 text-xs mb-1">Fulfillment</p>
+                                        <p className="font-medium">{order.fulfillmentType}</p>
+                                    </div>
+                                    <div className="col-span-2">
+                                        <p className="text-gray-500 text-xs mb-1">Payment</p>
+                                        <p className="font-medium">{order.paymentMethod}</p>
+                                    </div>
+                                </div>
+
+                                <div className="flex gap-2">
+                                    <button
+                                        onClick={() => handleRejectOrder(order.id)}
+                                        className="flex-1 px-4 py-2.5 text-sm font-medium bg-red-500 text-white rounded-lg hover:bg-red-600 active:bg-red-700 transition-colors"
+                                    >
+                                        Reject
+                                    </button>
+                                    <button
+                                        onClick={() => handleAcceptOrder(order.id)}
+                                        className="flex-1 px-4 py-2.5 text-sm font-medium bg-green-500 text-white rounded-lg hover:bg-green-600 active:bg-green-700 transition-colors"
+                                    >
+                                        Accept
+                                    </button>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+
+                    {/* Desktop Table View */}
+                    <div className="hidden lg:block bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                        {/* Table Header */}
+                        <div className="bg-yellow-400 p-6 border-b border-gray-200">
                             <div className="flex justify-between items-center">
                                 <h2 className="text-xl font-bold">New Orders Today</h2>
                                 <span className="text-2xl font-bold">{filteredOrders.length} Orders</span>
@@ -527,45 +595,43 @@ function RouteComponent() {
                                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
                                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Time</th>
                                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Price</th>
-                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fulfillment Type</th>
-                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Payment Method</th>
-                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fulfillment</th>
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Payment</th>
                                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Action</th>
                                     </tr>
                                 </thead>
                                 <tbody className="bg-white divide-y divide-gray-200">
                                     {currentOrders.map((order) => (
-                                        <tr key={order.id} className="hover:bg-gray-50">
+                                        <tr key={order.id} className="hover:bg-gray-50 transition-colors">
                                             <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{order.id}</td>
                                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{order.customerName}</td>
-                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{order.date}</td>
-                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{order.time}</td>
-                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{order.price}</td>
-                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{order.fulfillmentType}</td>
-                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{order.paymentMethod}</td>
-                                            <td className="px-6 py-4 whitespace-nowrap">
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{order.date}</td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{order.time}</td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{order.price}</td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{order.fulfillmentType}</td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{order.paymentMethod}</td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm">
                                                 <div className="flex gap-2">
                                                     <button
                                                         onClick={() => handleRejectOrder(order.id)}
-                                                        className="px-3 py-1 text-xs font-medium bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors"
+                                                        className="px-3 py-1.5 text-xs font-medium bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors"
                                                     >
                                                         Reject
                                                     </button>
                                                     <button
                                                         onClick={() => handleAcceptOrder(order.id)}
-                                                        className="px-3 py-1 text-xs font-medium bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors"
+                                                        className="px-3 py-1.5 text-xs font-medium bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors"
                                                     >
                                                         Accept
                                                     </button>
+                                                    <button
+                                                        onClick={() => openOrderDetails(order)}
+                                                        className="text-gray-600 hover:text-gray-800 transition-colors p-1"
+                                                        aria-label="View order details"
+                                                    >
+                                                        <Eye className="h-5 w-5" />
+                                                    </button>
                                                 </div>
-                                            </td>
-                                            <td className="px-6 py-4 whitespace-nowrap">
-                                                <button
-                                                    onClick={() => openOrderDetails(order)}
-                                                    className="text-gray-600 hover:text-gray-800 transition-colors"
-                                                >
-                                                    <Eye className="h-6 w-6" />
-                                                </button>
                                             </td>
                                         </tr>
                                     ))}
@@ -574,9 +640,11 @@ function RouteComponent() {
                         </div>
                     </div>
                 </main>
+            </div>
 
-                {/* Add Order Modal */}
-                {isAddOrderModalOpen && (
+            {/* Add Order Modal */}
+            {
+                isAddOrderModalOpen && (
                     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
                         <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl mx-4 max-h-[90vh] overflow-y-auto">
                             {/* Modal Header */}
@@ -798,10 +866,12 @@ function RouteComponent() {
                             </div>
                         </div>
                     </div>
-                )}
+                )
+            }
 
-                {/* Order Details Modal */}
-                {isOrderDetailsModalOpen && selectedOrder && (
+            {/* Order Details Modal */}
+            {
+                isOrderDetailsModalOpen && selectedOrder && (
                     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
                         <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto">
                             {/* Modal Header */}
@@ -894,10 +964,12 @@ function RouteComponent() {
                             </div>
                         </div>
                     </div>
-                )}
+                )
+            }
 
-                {/* Order Back View Modal */}
-                {showOrderBackView && selectedOrder && (
+            {/* Order Back View Modal */}
+            {
+                showOrderBackView && selectedOrder && (
                     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
                         <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto">
                             {/* Modal Header */}
@@ -988,10 +1060,12 @@ function RouteComponent() {
                             </div>
                         </div>
                     </div>
-                )}
+                )
+            }
 
-                {/* Filter Modal */}
-                {isFilterOpen && (
+            {/* Filter Modal */}
+            {
+                isFilterOpen && (
                     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
                         <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto">
                             {/* Modal Header */}
@@ -1133,8 +1207,8 @@ function RouteComponent() {
                             </div>
                         </div>
                     </div>
-                )}
-            </div>
-        </div>
+                )
+            }
+        </div >
     )
 }

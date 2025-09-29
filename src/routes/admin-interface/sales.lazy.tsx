@@ -12,15 +12,13 @@ import {
     RefreshCw,
     LogOut,
     LucideCalendar,
-    Utensils,
-    UserCheck,
     Bell,
     Heart,
     Star,
     Eye,
     Calendar,
     ChevronDown,
-    Filter
+    MenuIcon
 } from 'lucide-react'
 
 export const Route = createLazyFileRoute('/admin-interface/sales')({
@@ -39,7 +37,6 @@ interface Notification {
 type TimeFilter = 'daily' | 'weekly' | 'monthly' | 'yearly'
 
 function RouteComponent() {
-    const [isNotificationOpen, setIsNotificationOpen] = useState(false)
     const location = useLocation()
     const [isModalOpen, setIsModalOpen] = useState(false)
     const [modalType, setModalType] = useState<'best' | 'least'>('best')
@@ -267,6 +264,9 @@ function RouteComponent() {
         { value: 'yearly', label: 'Yearly Summary' }
     ]
 
+    const [isSidebarOpen, setIsSidebarOpen] = useState(false)
+    const [isNotificationOpen, setIsNotificationOpen] = useState(false)
+
     const SalesModal = () => {
         if (!isModalOpen) return null;
 
@@ -325,9 +325,19 @@ function RouteComponent() {
     };
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-amber-50 to-orange-100 flex">
+        <div className="min-h-screen bg-gradient-to-br from-amber-50 to-orange-100 flex overflow-x-hidden">
+            {/* Sidebar - Mobile Overlay */}
+            {isSidebarOpen && (
+                <div
+                    className="fixed inset-0 bg-black/50 z-40 lg:hidden"
+                    onClick={() => setIsSidebarOpen(false)}
+                />
+            )}
             {/* Sidebar */}
-            <div className="w-64 bg-gradient-to-b from-yellow-400 to-amber-500 shadow-lg">
+            <div className={`
+                                    fixed lg:static inset-y-0 left-0 z-50 w-64 bg-gradient-to-b from-yellow-400 to-amber-500 shadow-lg transform transition-transform duration-300 ease-in-out
+                                    ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
+                                `}>
                 {/* Logo */}
                 <div className="p-6 border-b border-amber-600">
                     <div className="flex justify-center items-center gap-3">
@@ -340,12 +350,14 @@ function RouteComponent() {
                     {sidebarItems.map((item, index) => {
                         const Icon = item.icon
                         const isActive = location.pathname === item.route ||
-                            (location.pathname === '/admin-interface/sales' && item.route === '/admin-interface/sales')
+                            (location.pathname === '/admin-interface' && item.route === '/admin-interface/') ||
+                            (location.pathname === '/admin-interface/' && item.route === '/admin-interface/')
 
                         return (
                             <Link
                                 key={index}
                                 to={item.route}
+                                onClick={() => setIsSidebarOpen(false)} // Close sidebar on mobile when link is clicked
                                 className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left transition-all ${isActive
                                     ? 'bg-amber-800 text-yellow-300 shadow-md'
                                     : 'text-amber-900 hover:bg-amber-400 hover:text-amber-800'
@@ -370,17 +382,25 @@ function RouteComponent() {
             </div>
 
             {/* Main Content */}
-            <div className="flex-1 flex flex-col">
+            <div className="flex-1 flex flex-col min-w-0">
                 {/* Top Bar */}
                 <header className="bg-amber-800 text-white p-4 shadow-md">
                     <div className="flex justify-between items-center">
-                        <div>
-                            <h2 className="text-2xl font-bold">SALES MANAGEMENT</h2>
-                            <p className="text-amber-200 mt-1">Sales statistics and performance metrics</p>
-                        </div>
                         <div className="flex items-center gap-4">
-                            <span className="text-amber-200">Date: May 16, 2025</span>
-                            <span className="text-amber-200">Time: 11:00 AM</span>
+                            {/* Mobile Menu Button */}
+                            <button
+                                onClick={() => setIsSidebarOpen(true)}
+                                className="lg:hidden p-2 text-white hover:bg-amber-700 rounded-lg"
+                            >
+                                <MenuIcon className="h-6 w-6" />
+                            </button>
+                            <div>
+                                <h2 className="text-xl lg:text-2xl font-bold">SALES</h2>
+                            </div>
+                        </div>
+                        <div className="flex items-center gap-2 lg:gap-4">
+                            <span className="text-amber-200 text-xs lg:text-sm hidden sm:inline">Date: May 16, 2025</span>
+                            <span className="text-amber-200 text-xs lg:text-sm hidden sm:inline">Time: 11:00 AM</span>
                             <div className="w-10 h-10 bg-yellow-400 rounded-full flex items-center justify-center">
                                 <div className='relative'>
                                     <button
@@ -392,7 +412,7 @@ function RouteComponent() {
                                     </button>
                                     {/* Notification Dropdown */}
                                     {isNotificationOpen && (
-                                        <div className="absolute right-0 mt-2 w-96 bg-white rounded-lg shadow-lg border border-gray-200 z-50">
+                                        <div className="absolute right-0 mt-2 w-full sm:w-96 bg-white rounded-lg shadow-lg border border-gray-200 z-50">
                                             <div className="p-4 border-b border-gray-200">
                                                 <h3 className="text-lg font-semibold text-gray-800">Notifications</h3>
                                             </div>
@@ -475,7 +495,7 @@ function RouteComponent() {
                     </div>
 
                     {/* Dynamic Stats Cards Row */}
-                    <div className="grid grid-cols-3 gap-6 mb-8">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-6 mb-8">
                         <div className="bg-white rounded-xl p-6 shadow-sm border-2 border-yellow-400">
                             <h3 className="text-lg font-medium text-gray-700 mb-2">
                                 {timeFilter.charAt(0).toUpperCase() + timeFilter.slice(1)} Revenue
@@ -560,7 +580,7 @@ function RouteComponent() {
                     </div>
 
                     {/* Charts and Analytics Row */}
-                    <div className="grid grid-cols-3 gap-6 mb-8">
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 lg:gap-6 mb-8">
                         {/* Total Revenue Chart - Takes 2 columns, positioned on left */}
                         <div className="col-span-2 bg-white rounded-xl p-6 shadow-sm border-2 border-yellow-400">
                             <h3 className="text-xl font-bold text-gray-800 mb-6">Total Revenue Trend</h3>
@@ -635,7 +655,7 @@ function RouteComponent() {
                     </div>
 
                     {/* Sales Performance Tables Row */}
-                    <div className="grid grid-cols-2 gap-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 lg:gap-6">
                         {/* Best Sales */}
                         <div className="bg-white rounded-xl p-6 shadow-sm border-2 border-yellow-400">
                             <div className="flex justify-between items-center mb-4">

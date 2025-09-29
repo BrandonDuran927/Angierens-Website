@@ -339,7 +339,7 @@ function RouteComponent() {
                                 <MenuIcon className="h-6 w-6" />
                             </button>
                             <div>
-                                <h2 className="text-xl lg:text-2xl font-bold">Dashboard</h2>
+                                <h2 className="text-xl lg:text-2xl font-bold">DASHBOARD</h2>
                             </div>
                         </div>
                         <div className="flex items-center gap-2 lg:gap-4">

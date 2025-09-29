@@ -521,7 +521,7 @@ function RouteComponent() {
     ]
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-amber-50 to-orange-100 flex">
+        <div className="min-h-screen bg-gradient-to-br from-amber-50 to-orange-100 flex overflow-x-hidden">
 
             <div
                 className={`
@@ -594,7 +594,7 @@ function RouteComponent() {
                 />
             )}
 
-            <div className="flex-1 flex flex-col">
+            <div className="flex-1 flex flex-col min-w-0">
                 {/* Top Bar */}
                 <header className="bg-amber-800 text-white p-4 shadow-md">
                     <div className="flex justify-between items-center">
@@ -675,65 +675,39 @@ function RouteComponent() {
                 </header>
 
                 {/* Main Content */}
-                <main className="flex-1 p-6 overflow-y-auto">
-                    <div className="bg-white rounded-xl shadow-sm border border-gray-200">
+                <main className="flex-1 p-3 sm:p-4 lg:p-6 overflow-y-auto overflow-x-hidden">
+                    {/* Orders Table */}
+                    <div className="bg-white rounded-xl shadow-sm border border-gray-200 min-w-0 overflow-hidden">
                         {/* Table Header */}
-                        <div className="p-6 border-b border-gray-200">
-                            <div className="flex justify-between items-center mb-4">
-                                <div className="relative">
-                                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-                                    <input
-                                        type="text"
-                                        placeholder="Search order by ID..."
-                                        value={searchQuery}
-                                        onChange={(e) => setSearchQuery(e.target.value)}
-                                        className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500 w-64"
-                                    />
-                                </div>
-                                <div className="flex items-center gap-3">
-                                    <button
-                                        onClick={() => setIsFilterOpen(true)}
-                                        className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-                                    >
-                                        <Filter className="h-4 w-4" />
-                                        Filter
-                                    </button>
-                                    <select
-                                        value={selectedRider}
-                                        onChange={(e) => setSelectedRider(e.target.value)}
-                                        className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500"
-                                    >
-                                        <option value="">Select Rider</option>
-                                        {riders.map((rider) => (
-                                            <option key={rider} value={rider}>
-                                                {rider}
-                                            </option>
-                                        ))}
-                                    </select>
-                                    <select
-                                        value={deliveryStatus}
-                                        onChange={(e) => setDeliveryStatus(e.target.value)}
-                                        className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500"
-                                    >
-                                        <option value="">Select Status</option>
-                                        {statusOptions.map((status) => (
-                                            <option key={status} value={status}>
-                                                {status}
-                                            </option>
-                                        ))}
-                                    </select>
+                        <div className="p-3 sm:p-4 lg:p-6 border-b border-gray-200">
+                            <div className="flex flex-col gap-3 sm:gap-4 mb-4">
+                                <div className="w-full">
+                                    <div className="relative">
+                                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                                        <input
+                                            type="text"
+                                            placeholder="Search order by ID..."
+                                            value={searchQuery}
+                                            onChange={(e) => setSearchQuery(e.target.value)}
+                                            className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg 
+                       focus:outline-none focus:ring-2 focus:ring-amber-500 
+                       w-full text-sm"
+                                        />
+                                    </div>
                                 </div>
                             </div>
 
                             {/* Tabs */}
-                            <div className="flex gap-2">
+                            <div className="flex gap-1 sm:gap-2 overflow-x-auto scrollbar-hide pb-1">
                                 {['All Assigned Orders', 'No Assigned Rider', 'Completed'].map((tab) => (
                                     <button
                                         key={tab}
                                         onClick={() => setActiveTab(tab)}
-                                        className={`px-4 py-2 rounded-lg font-medium transition-colors ${activeTab === tab
-                                            ? 'bg-yellow-400 text-amber-800'
-                                            : 'text-gray-600 hover:text-gray-800 hover:bg-gray-100'
+                                        className={`px-2 sm:px-3 lg:px-4 py-2 rounded-lg font-medium transition-colors 
+                      whitespace-nowrap text-xs sm:text-sm
+                      ${activeTab === tab
+                                                ? 'bg-yellow-400 text-amber-800'
+                                                : 'text-gray-600 hover:text-gray-800 hover:bg-gray-100'
                                             }`}
                                     >
                                         {tab}
@@ -742,80 +716,43 @@ function RouteComponent() {
                             </div>
                         </div>
 
-                        {/* Table */}
-                        <div className="overflow-x-auto">
-                            <table className="w-full">
+                        {/* Scrollable Table */}
+                        <div className="w-full overflow-x-auto">
+                            <table className="min-w-[800px] w-full text-sm">
                                 <thead className="bg-gray-50">
                                     <tr>
-                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                            Order ID
-                                        </th>
-                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                            Customer Name
-                                        </th>
-                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                            Assigned Rider
-                                        </th>
-                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                            Assigned Date
-                                        </th>
-                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                            Assigned Time
-                                        </th>
-                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                            Price
-                                        </th>
-                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                            Cancellation Request
-                                        </th>
-                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                            Status
-                                        </th>
-                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                            Action
-                                        </th>
+                                        <th className="px-3 sm:px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Order ID</th>
+                                        <th className="px-3 sm:px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Customer Name</th>
+                                        <th className="px-3 sm:px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Assigned Rider</th>
+                                        <th className="px-3 sm:px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Assigned Date</th>
+                                        <th className="px-3 sm:px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Assigned Time</th>
+                                        <th className="px-3 sm:px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Price</th>
+                                        <th className="px-3 sm:px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cancellation Request</th>
+                                        <th className="px-3 sm:px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                                        <th className="px-3 sm:px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Action</th>
                                     </tr>
                                 </thead>
                                 <tbody className="bg-white divide-y divide-gray-200">
                                     {currentOrders.map((order) => (
                                         <tr key={order.id} className="hover:bg-gray-50">
-                                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{order.id}</td>
-                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{order.customerName}</td>
-                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                                {order.assignedRider ? (
-                                                    order.assignedRider
-                                                ) : (
-                                                    <div className="flex items-center gap-2">
-                                                        <span className="text-gray-500">N/A</span>
-                                                        <button
-                                                            onClick={() => {
-                                                                setSelectedOrderForAssign(order)
-                                                                setIsAssignModalOpen(true)
-                                                            }}
-                                                            className="px-3 py-1 text-xs bg-blue-100 text-blue-800 rounded-full hover:bg-blue-200 transition-colors"
-                                                        >
-                                                            + Rider
-                                                        </button>
-                                                    </div>
-                                                )}
-                                            </td>
-                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{order.assignedDate}</td>
-                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{order.assignedTime}</td>
-                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-semibold">{order.price}</td>
-                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{order.cancellationRequest}</td>
-                                            <td className="px-6 py-4 whitespace-nowrap">
-                                                <span
-                                                    className={`px-2 py-1 text-xs font-medium rounded-full ${getStatusColor(order.status)}`}
-                                                >
+                                            <td className="px-3 sm:px-4 lg:px-6 py-4 whitespace-nowrap">{order.id}</td>
+                                            <td className="px-3 sm:px-4 lg:px-6 py-4 whitespace-nowrap">{order.customerName}</td>
+                                            <td className="px-3 sm:px-4 lg:px-6 py-4 whitespace-nowrap">{order.assignedRider || 'N/A'}</td>
+                                            <td className="px-3 sm:px-4 lg:px-6 py-4 whitespace-nowrap">{order.assignedDate}</td>
+                                            <td className="px-3 sm:px-4 lg:px-6 py-4 whitespace-nowrap">{order.assignedTime}</td>
+                                            <td className="px-3 sm:px-4 lg:px-6 py-4 whitespace-nowrap font-semibold">{order.price}</td>
+                                            <td className="px-3 sm:px-4 lg:px-6 py-4 whitespace-nowrap">{order.cancellationRequest}</td>
+                                            <td className="px-3 sm:px-4 lg:px-6 py-4 whitespace-nowrap">
+                                                <span className={`px-2 py-1 text-xs font-medium rounded-full ${getStatusColor(order.status)}`}>
                                                     {order.status}
                                                 </span>
                                             </td>
-                                            <td className="px-6 py-4 whitespace-nowrap">
+                                            <td className="px-3 sm:px-4 lg:px-6 py-4 whitespace-nowrap">
                                                 <button
                                                     onClick={() => openOrderDetails(order)}
                                                     className="text-gray-600 hover:text-gray-800 transition-colors"
                                                 >
-                                                    <Eye className="h-6 w-6" />
+                                                    <Eye className="h-4 w-4" />
                                                 </button>
                                             </td>
                                         </tr>
@@ -823,42 +760,8 @@ function RouteComponent() {
                                 </tbody>
                             </table>
                         </div>
-
-                        {/* Pagination Footer */}
-                        <div className="px-6 py-4 border-t border-gray-200 flex items-center justify-between">
-                            <div className="text-sm text-gray-500">
-                                Showing {startIndex + 1} to {endIndex} out of {filteredOrders.length} records
-                            </div>
-                            <div className="flex items-center gap-2">
-                                <button
-                                    onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
-                                    disabled={currentPage === 1}
-                                    className="p-2 rounded-lg border border-gray-300 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-                                >
-                                    <ChevronLeft className="h-4 w-4" />
-                                </button>
-                                {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
-                                    <button
-                                        key={page}
-                                        onClick={() => setCurrentPage(page)}
-                                        className={`px-3 py-1 rounded-lg ${page === currentPage
-                                            ? 'bg-yellow-400 text-amber-800 font-medium'
-                                            : 'text-gray-600 hover:bg-gray-100'
-                                            }`}
-                                    >
-                                        {page}
-                                    </button>
-                                ))}
-                                <button
-                                    onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
-                                    disabled={currentPage === totalPages}
-                                    className="p-2 rounded-lg border border-gray-300 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-                                >
-                                    <ChevronRight className="h-4 w-4" />
-                                </button>
-                            </div>
-                        </div>
                     </div>
+
                     {/* Rider Assignment Modal */}
                     {isAssignModalOpen && selectedOrderForAssign && (
                         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">

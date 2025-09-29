@@ -18,7 +18,8 @@ import {
     Eye,
     UserPlus,
     MapPin,
-    LucideCalendar
+    LucideCalendar,
+    MenuIcon
 } from 'lucide-react'
 
 export const Route = createLazyFileRoute('/admin-interface/employee/')({
@@ -55,7 +56,6 @@ interface FormData {
 
 function RouteComponent() {
     const navigate = useNavigate()
-    const [isNotificationOpen, setIsNotificationOpen] = useState(false)
     const [searchTerm, setSearchTerm] = useState('')
     const [filterType, setFilterType] = useState('All')
     const location = useLocation()
@@ -454,10 +454,23 @@ function RouteComponent() {
         }
     }
 
+    const [isSidebarOpen, setIsSidebarOpen] = useState(false)
+    const [isNotificationOpen, setIsNotificationOpen] = useState(false)
+
     return (
-        <div className="min-h-screen bg-gradient-to-br from-amber-50 to-orange-100 flex">
+        <div className="min-h-screen bg-gradient-to-br from-amber-50 to-orange-100 flex overflow-x-hidden">
+            {/* Sidebar - Mobile Overlay */}
+            {isSidebarOpen && (
+                <div
+                    className="fixed inset-0 bg-black/50 z-40 lg:hidden"
+                    onClick={() => setIsSidebarOpen(false)}
+                />
+            )}
             {/* Sidebar */}
-            <div className="w-64 bg-gradient-to-b from-yellow-400 to-amber-500 shadow-lg">
+            <div className={`
+                                    fixed lg:static inset-y-0 left-0 z-50 w-64 bg-gradient-to-b from-yellow-400 to-amber-500 shadow-lg transform transition-transform duration-300 ease-in-out
+                                    ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
+                                `}>
                 {/* Logo */}
                 <div className="p-6 border-b border-amber-600">
                     <div className="flex justify-center items-center gap-3">
@@ -470,12 +483,14 @@ function RouteComponent() {
                     {sidebarItems.map((item, index) => {
                         const Icon = item.icon
                         const isActive = location.pathname === item.route ||
-                            (location.pathname === '/admin-interface/employee' && item.route === '/admin-interface/employee')
+                            (location.pathname === '/admin-interface' && item.route === '/admin-interface/') ||
+                            (location.pathname === '/admin-interface/' && item.route === '/admin-interface/')
 
                         return (
                             <Link
                                 key={index}
                                 to={item.route}
+                                onClick={() => setIsSidebarOpen(false)} // Close sidebar on mobile when link is clicked
                                 className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left transition-all ${isActive
                                     ? 'bg-amber-800 text-yellow-300 shadow-md'
                                     : 'text-amber-900 hover:bg-amber-400 hover:text-amber-800'
@@ -500,60 +515,69 @@ function RouteComponent() {
             </div>
 
             {/* Main Content */}
-            <div className="flex-1 flex flex-col">
+            <div className="flex-1 flex flex-col min-w-0">
                 {/* Top Bar */}
                 <header className="bg-amber-800 text-white p-4 shadow-md">
                     <div className="flex justify-between items-center">
-                        <div>
-                            <h2 className="text-2xl font-bold">EMPLOYEE MANAGEMENT</h2>
+                        <div className="flex items-center gap-3">
+                            {/* Mobile Menu Button */}
+                            <button
+                                onClick={() => setIsSidebarOpen(true)}
+                                className="lg:hidden p-2 text-white hover:bg-amber-700 rounded-lg"
+                            >
+                                <MenuIcon className="h-6 w-6" />
+                            </button>
+                            <h2 className="text-lg sm:text-xl lg:text-2xl font-bold">EMPLOYEE</h2>
                         </div>
-                        <div className="flex items-center gap-4">
-                            <span className="text-amber-200">Date: May 16, 2025</span>
-                            <span className="text-amber-200">Time: 11:00 AM</span>
-                            <div className="w-10 h-10 bg-yellow-400 rounded-full flex items-center justify-center">
-                                <div className='relative'>
+                        <div className="flex items-center gap-2 sm:gap-3 lg:gap-4">
+                            <span className="hidden sm:inline text-amber-200 text-xs lg:text-sm">Date: May 16, 2025</span>
+                            <span className="hidden sm:inline text-amber-200 text-xs lg:text-sm">Time: 11:00 AM</span>
+                            <div className="w-9 h-9 sm:w-10 sm:h-10 bg-yellow-400 rounded-full flex items-center justify-center">
+                                <div className="relative">
                                     <button
                                         onClick={() => setIsNotificationOpen(!isNotificationOpen)}
                                         className="relative p-2 text-[#7a3d00] hover:bg-yellow-400 rounded-full"
                                     >
-                                        <Bell className="h-6 w-6" />
-                                        {notificationCount > 0 && <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">{notificationCount}</span>}
+                                        <Bell className="h-5 w-5 sm:h-6 sm:w-6" />
+                                        {notificationCount > 0 && (
+                                            <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
+                                                {notificationCount}
+                                            </span>
+                                        )}
                                     </button>
                                     {/* Notification Dropdown */}
                                     {isNotificationOpen && (
-                                        <div className="absolute right-0 mt-2 w-96 bg-white rounded-lg shadow-lg border border-gray-200 z-50">
+                                        <div className="absolute right-0 mt-2 w-80 sm:w-96 bg-white rounded-lg shadow-lg border border-gray-200 z-50">
                                             <div className="p-4 border-b border-gray-200">
-                                                <h3 className="text-lg font-semibold text-gray-800">Notifications</h3>
+                                                <h3 className="text-base sm:text-lg font-semibold text-gray-800">Notifications</h3>
                                             </div>
 
                                             <div className="max-h-80 overflow-y-auto">
                                                 {notifications.map((notification, index) => (
                                                     <div
                                                         key={notification.id}
-                                                        className={`p-4 border-b border-gray-100 hover:bg-gray-50 cursor-pointer ${index === notifications.length - 1 ? 'border-b-0' : ''
+                                                        className={`p-3 sm:p-4 border-b border-gray-100 hover:bg-gray-50 cursor-pointer ${index === notifications.length - 1 ? 'border-b-0' : ''
                                                             }`}
                                                     >
                                                         <div className="flex items-start gap-3">
-                                                            <div className="flex-shrink-0 w-10 h-10 bg-yellow-400 rounded-full flex items-center justify-center text-black">
+                                                            <div className="flex-shrink-0 w-8 h-8 sm:w-10 sm:h-10 bg-yellow-400 rounded-full flex items-center justify-center text-black">
                                                                 {getNotificationIcon(notification.icon)}
                                                             </div>
                                                             <div className="flex-1 min-w-0">
                                                                 <p className="text-sm text-gray-800 leading-relaxed">
                                                                     {notification.title}
                                                                 </p>
-                                                                <p className="text-xs text-gray-500 mt-1">
-                                                                    {notification.time}
-                                                                </p>
+                                                                <p className="text-xs text-gray-500 mt-1">{notification.time}</p>
                                                             </div>
                                                         </div>
                                                     </div>
                                                 ))}
                                             </div>
 
-                                            <div className="p-4 border-t border-gray-200">
+                                            <div className="p-3 sm:p-4 border-t border-gray-200">
                                                 <button
                                                     onClick={markAllAsRead}
-                                                    className="w-full bg-yellow-400 text-black py-2 px-4 rounded-lg font-medium hover:bg-yellow-500 transition-colors flex items-center justify-center gap-2"
+                                                    className="w-full bg-yellow-400 text-black py-2 px-3 sm:px-4 rounded-lg font-medium hover:bg-yellow-500 transition-colors flex items-center justify-center gap-2 text-sm sm:text-base"
                                                 >
                                                     <Bell className="h-4 w-4" />
                                                     Mark all as read
@@ -567,20 +591,19 @@ function RouteComponent() {
                     </div>
                 </header>
 
-                {/* Employee Content */}
-                <main className="flex-1 p-6 overflow-y-auto">
-
+                {/* Orders Content */}
+                <main className="flex-1 p-4 sm:p-6 overflow-y-auto">
                     {/* Filter and Create Employee Section */}
-                    <div className="bg-white rounded-xl p-6 shadow-sm border-2 border-yellow-400">
-                        <div className="flex justify-between items-center mb-6">
-                            <div className="flex items-center gap-4">
+                    <div className="bg-white rounded-xl p-4 sm:p-6 shadow-sm border-2 border-yellow-400">
+                        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-6">
+                            <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
                                 <div className="flex items-center gap-2">
-                                    <span className="text-lg font-medium text-gray-700">Filter Employee Type:</span>
+                                    <span className="text-sm sm:text-lg font-medium text-gray-700">Filter:</span>
                                     <div className="relative">
                                         <select
                                             value={filterType}
                                             onChange={(e) => setFilterType(e.target.value)}
-                                            className="appearance-none bg-yellow-400 text-black px-4 py-2 pr-8 rounded-lg font-medium border-0 cursor-pointer focus:outline-none focus:ring-2 focus:ring-yellow-500"
+                                            className="appearance-none bg-yellow-400 text-black px-3 py-2 pr-8 rounded-lg font-medium border-0 cursor-pointer focus:outline-none focus:ring-2 focus:ring-yellow-500 text-sm sm:text-base"
                                         >
                                             <option value="All">All</option>
                                             <option value="Riders">Riders</option>
@@ -595,72 +618,72 @@ function RouteComponent() {
                                 </div>
                                 <button
                                     onClick={() => setIsCreateModalOpen(true)}
-                                    className="bg-yellow-400 hover:bg-yellow-500 text-black px-4 py-2 rounded-lg font-medium flex items-center gap-2 transition-colors"
+                                    className="bg-yellow-400 hover:bg-yellow-500 text-black px-3 sm:px-4 py-2 rounded-lg font-medium flex items-center gap-2 transition-colors text-sm sm:text-base"
                                 >
                                     <Plus className="h-4 w-4" />
-                                    Create Employee Account
+                                    Create Employee
                                 </button>
                             </div>
 
                             <div className="relative">
-                                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
+                                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4 sm:h-5 sm:w-5" />
                                 <input
                                     type="text"
                                     placeholder="Search a name"
                                     value={searchTerm}
                                     onChange={(e) => setSearchTerm(e.target.value)}
-                                    className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-400 focus:border-transparent w-64"
+                                    className="pl-9 sm:pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-400 focus:border-transparent w-full sm:w-64 text-sm sm:text-base"
                                 />
                             </div>
                         </div>
 
                         {/* Employee Table */}
-                        <div className="overflow-hidden">
-                            <table className="w-full">
+                        <div className="overflow-x-auto">
+                            <table className="w-full min-w-[600px]">
                                 <thead>
-                                    <tr className="bg-amber-800 text-white">
-                                        <th className="px-6 py-4 text-left font-medium">EMPLOYEE TYPE</th>
-                                        <th className="px-6 py-4 text-left font-medium">NAME</th>
-                                        <th className="px-6 py-4 text-left font-medium">STATUS</th>
-                                        <th className="px-6 py-4 text-left font-medium">CURRENT TASK</th>
-                                        <th className="px-6 py-4 text-left font-medium">ASSIGNED ORDERS</th>
-                                        <th className="px-6 py-4 text-center font-medium">ACTION BUTTONS</th>
+                                    <tr className="bg-amber-800 text-white text-sm sm:text-base">
+                                        <th className="px-4 sm:px-6 py-3 sm:py-4 text-left font-medium">TYPE</th>
+                                        <th className="px-4 sm:px-6 py-3 sm:py-4 text-left font-medium">NAME</th>
+                                        <th className="px-4 sm:px-6 py-3 sm:py-4 text-left font-medium">STATUS</th>
+                                        <th className="px-4 sm:px-6 py-3 sm:py-4 text-left font-medium">TASK</th>
+                                        <th className="px-4 sm:px-6 py-3 sm:py-4 text-left font-medium">ORDERS</th>
+                                        <th className="px-4 sm:px-6 py-3 sm:py-4 text-center font-medium">ACTIONS</th>
                                     </tr>
                                 </thead>
-                                <tbody className="divide-y divide-gray-200">
+                                <tbody className="divide-y divide-gray-200 text-sm sm:text-base">
                                     {filteredEmployees.map((employee) => (
                                         <tr
                                             key={employee.id}
                                             className="border-b border-gray-100 hover:bg-gray-50 cursor-pointer transition-colors"
-                                        // onClick={() => handleEmployeeClick(employee.id)}
                                         >
-                                            <td className="px-6 py-4 text-gray-800 font-medium">{employee.type}</td>
-                                            <td className="px-6 py-4 text-gray-800 font-medium">{employee.name}</td>
-                                            <td className="px-6 py-4">
+                                            <td className="px-4 sm:px-6 py-3 sm:py-4 text-gray-800 font-medium">{employee.type}</td>
+                                            <td className="px-4 sm:px-6 py-3 sm:py-4 text-gray-800 font-medium">{employee.name}</td>
+                                            <td className="px-4 sm:px-6 py-3 sm:py-4">
                                                 <div className="flex items-center gap-2">
                                                     <div className={`w-2 h-2 rounded-full ${getStatusColor(employee.status)}`}></div>
                                                     <span className="text-gray-800">{employee.status}</span>
                                                 </div>
                                             </td>
-                                            <td className="px-6 py-4 text-gray-800">{employee.currentTask}</td>
-                                            <td className="px-6 py-4">
+                                            <td className="px-4 sm:px-6 py-3 sm:py-4 text-gray-800">{employee.currentTask}</td>
+                                            <td className="px-4 sm:px-6 py-3 sm:py-4">
                                                 <div className="flex flex-wrap gap-1">
                                                     {employee.assignedOrders.map((order, orderIndex) => (
-                                                        <span key={orderIndex} className="text-gray-800">{order}{orderIndex < employee.assignedOrders.length - 1 ? ", " : ""}</span>
+                                                        <span key={orderIndex} className="text-gray-800">
+                                                            {order}{orderIndex < employee.assignedOrders.length - 1 ? ", " : ""}
+                                                        </span>
                                                     ))}
                                                 </div>
-                                                <button className="text-amber-600 hover:text-amber-800 text-sm mt-1 underline">
+                                                <button className="text-amber-600 hover:text-amber-800 text-xs sm:text-sm mt-1 underline">
                                                     see orders
                                                 </button>
                                             </td>
-                                            <td className="px-6 py-4">
+                                            <td className="px-4 sm:px-6 py-3 sm:py-4">
                                                 <div
-                                                    className="flex justify-center cursor-pointer bg-yellow-500 text-white px-4 py-2 rounded hover:bg-yellow-600"
+                                                    className="flex justify-center cursor-pointer bg-yellow-500 text-white px-3 sm:px-4 py-1.5 sm:py-2 rounded hover:bg-yellow-600 text-sm sm:text-base"
                                                     onClick={() => handleViewEmployee(employee)} // pass employee object here
                                                 >
                                                     VIEW
                                                 </div>
-
                                             </td>
                                         </tr>
                                     ))}
@@ -670,6 +693,7 @@ function RouteComponent() {
                     </div>
                 </main>
             </div>
+
             {/* Employee Creation Modal */}
             {isCreateModalOpen && (
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">

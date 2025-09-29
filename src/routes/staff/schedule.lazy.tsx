@@ -403,29 +403,21 @@ function RouteComponent() {
           </div>
         </header>
 
-        <div className="flex-1 p-8">
+        <div className="flex-1 p-3 md:p-8">
           <div className="max-w-7xl mx-auto">
-            <div className="bg-yellow-400 rounded-2xl p-8 shadow-xl">
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <div className="bg-yellow-400 rounded-2xl p-4 md:p-8 shadow-xl">
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-8">
 
-                {/* Calendar Section */}
-                <div className="lg:col-span-2 space-y-6">
+                <div className="lg:col-span-2 space-y-3 md:space-y-6">
                   {/* Current Date Display */}
-                  <div className="text-xl font-semibold text-gray-800">
+                  <div className="text-lg md:text-xl font-semibold text-gray-800">
                     Saturday, May 24
                   </div>
 
                   {/* Month Navigation */}
-                  <div className="flex items-center justify-between border-b-2 border-gray-800 pb-4">
-                    <div className="relative">
-                      <button
-                        onClick={() => setShowMonthPicker(!showMonthPicker)}
-                        className="flex items-center gap-2 text-xl font-bold text-gray-800 hover:text-gray-600"
-                      >
-                        {selectedMonth}
-                        <ChevronUp className="w-5 h-5" />
-                        <ChevronDown className="w-5 h-5" />
-                      </button>
+                  <div className="flex items-center justify-between border-b-2 border-gray-800 pb-3 md:pb-4">
+                    <div className="text-lg md:text-xl font-bold text-gray-800">
+                      {selectedMonth}
                     </div>
                     <div className="flex gap-2">
                       <button
@@ -444,10 +436,10 @@ function RouteComponent() {
                   </div>
 
                   {/* Calendar Grid */}
-                  <div className="grid grid-cols-7 gap-2">
+                  <div className="grid grid-cols-7 gap-1 md:gap-2">
                     {/* Day Headers */}
                     {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
-                      <div key={day} className="text-center font-semibold text-gray-800 p-2">
+                      <div key={day} className="text-center font-semibold text-gray-800 p-1 md:p-2 text-xs md:text-base">
                         {day}
                       </div>
                     ))}
@@ -458,8 +450,8 @@ function RouteComponent() {
                         key={index}
                         onClick={() => setSelectedDate(day.date)}
                         className={`
-                          relative p-3 rounded-lg text-center border-2 transition-all duration-200 hover:scale-105 min-h-[80px] flex flex-col justify-between
-                          ${day.isPastMonth || day.isFutureMonth
+                                                    relative p-1.5 md:p-3 rounded-lg text-center border-2 transition-all duration-200 active:scale-95 md:hover:scale-105 min-h-[60px] md:min-h-[80px] flex flex-col justify-center gap-0.5 md:gap-1 cursor-pointer
+                                                    ${day.isPastMonth || day.isFutureMonth
                             ? 'text-gray-400 border-transparent bg-white/30'
                             : day.isSelected
                               ? 'bg-amber-600 text-white border-amber-700 shadow-lg'
@@ -467,18 +459,18 @@ function RouteComponent() {
                                 ? 'bg-white border-amber-600 text-gray-800 shadow-md'
                                 : 'bg-white border-gray-300 text-gray-800 hover:border-amber-400'
                           }
-                        `}
+                                                `}
                       >
-                        <span className="font-semibold text-lg">{day.date}</span>
+                        <span className="font-semibold text-sm md:text-lg">{day.date}</span>
                         {!day.isPastMonth && !day.isFutureMonth && (
                           <>
                             {day.isAvailable ? (
-                              <span className="text-xs text-blue-600 font-medium">
-                                {day.orders}/30 orders
+                              <span className="text-[10px] md:text-xs text-blue-600 font-medium leading-tight">
+                                {day.orders}/30
                               </span>
                             ) : (
-                              <span className="text-xs text-red-500 font-medium">
-                                Unavailable
+                              <span className="text-[10px] md:text-xs text-red-500 font-medium leading-tight">
+                                Full
                               </span>
                             )}
                           </>

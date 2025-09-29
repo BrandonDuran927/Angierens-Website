@@ -14,7 +14,8 @@ import {
     Bell,
     Heart,
     Star,
-    LucideCalendar
+    LucideCalendar,
+    MenuIcon
 } from 'lucide-react'
 
 export const Route = createLazyFileRoute('/admin-interface/menu')({
@@ -204,7 +205,6 @@ function RouteComponent() {
         }
     ])
 
-    const [showNotifications, setShowNotifications] = useState(false)
     const [showMenuDetails, setShowMenuDetails] = useState(false)
     const [selectedMenuItem, setSelectedMenuItem] = useState<MenuItem | null>(null)
 
@@ -251,10 +251,25 @@ function RouteComponent() {
         setShowAddonsModal(false)
     }
 
+    const [isSidebarOpen, setIsSidebarOpen] = useState(false)
+    const [isNotificationOpen, setIsNotificationOpen] = useState(false)
+
+
+
     return (
-        <div className="min-h-screen bg-gradient-to-br from-amber-50 to-orange-100 flex">
+        <div className="min-h-screen bg-gradient-to-br from-amber-50 to-orange-100 flex overflow-x-hidden">
+            {/* Sidebar - Mobile Overlay */}
+            {isSidebarOpen && (
+                <div
+                    className="fixed inset-0 bg-black/50 z-40 lg:hidden"
+                    onClick={() => setIsSidebarOpen(false)}
+                />
+            )}
             {/* Sidebar */}
-            <div className="w-64 bg-gradient-to-b from-yellow-400 to-amber-500 shadow-lg">
+            <div className={`
+                fixed lg:static inset-y-0 left-0 z-50 w-64 bg-gradient-to-b from-yellow-400 to-amber-500 shadow-lg transform transition-transform duration-300 ease-in-out
+                ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
+            `}>
                 {/* Logo */}
                 <div className="p-6 border-b border-amber-600">
                     <div className="flex justify-center items-center gap-3">
@@ -266,12 +281,15 @@ function RouteComponent() {
                 <nav className="p-4 space-y-2">
                     {sidebarItems.map((item, index) => {
                         const Icon = item.icon
-                        const isActive = location.pathname === item.route
+                        const isActive = location.pathname === item.route ||
+                            (location.pathname === '/admin-interface' && item.route === '/admin-interface/') ||
+                            (location.pathname === '/admin-interface/' && item.route === '/admin-interface/')
 
                         return (
                             <Link
                                 key={index}
                                 to={item.route}
+                                onClick={() => setIsSidebarOpen(false)} // Close sidebar on mobile when link is clicked
                                 className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left transition-all ${isActive
                                     ? 'bg-amber-800 text-yellow-300 shadow-md'
                                     : 'text-amber-900 hover:bg-amber-400 hover:text-amber-800'
@@ -296,35 +314,36 @@ function RouteComponent() {
             </div>
 
             {/* Main Content */}
-            <div className="flex-1 flex flex-col">
+            <div className="flex-1 flex flex-col min-w-0">
                 {/* Header */}
                 <header className="bg-amber-800 text-white p-4 shadow-md">
                     <div className="flex justify-between items-center">
                         <div className="flex items-center gap-4">
-                            <h1 className="text-2xl font-bold">MENU OVERVIEW</h1>
+                            {/* Mobile Menu Button */}
+                            <button
+                                onClick={() => setIsSidebarOpen(true)}
+                                className="lg:hidden p-2 text-white hover:bg-amber-700 rounded-lg"
+                            >
+                                <MenuIcon className="h-6 w-6" />
+                            </button>
+                            <div>
+                                <h2 className="text-xl lg:text-2xl font-bold">MENU</h2>
+                            </div>
                         </div>
-
-                        <div className="flex items-center gap-4">
-                            <span className="text-amber-200">Date: July 21, 2025</span>
-                            <span className="text-amber-200">Time: 11:00 AM</span>
-
-                            {/* Notifications */}
+                        <div className="flex items-center gap-2 lg:gap-4">
+                            <span className="text-amber-200 text-xs lg:text-sm hidden sm:inline">Date: May 16, 2025</span>
+                            <span className="text-amber-200 text-xs lg:text-sm hidden sm:inline">Time: 11:00 AM</span>
                             <div className="w-10 h-10 bg-yellow-400 rounded-full flex items-center justify-center">
                                 <div className='relative'>
                                     <button
-                                        onClick={() => setShowNotifications(!showNotifications)}
+                                        onClick={() => setIsNotificationOpen(!isNotificationOpen)}
                                         className="relative p-2 text-[#7a3d00] hover:bg-yellow-400 rounded-full"
                                     >
                                         <Bell className="h-6 w-6" />
-                                        {notificationCount > 0 && (
-                                            <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
-                                                {notificationCount}
-                                            </span>
-                                        )}
+                                        {notificationCount > 0 && <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">{notificationCount}</span>}
                                     </button>
-
                                     {/* Notification Dropdown */}
-                                    {showNotifications && (
+                                    {isNotificationOpen && (
                                         <div className="absolute right-0 mt-2 w-96 bg-white rounded-lg shadow-lg border border-gray-200 z-50">
                                             <div className="p-4 border-b border-gray-200">
                                                 <h3 className="text-lg font-semibold text-gray-800">Notifications</h3>

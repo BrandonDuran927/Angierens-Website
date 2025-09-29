@@ -36,7 +36,6 @@ function RouteComponent() {
     const [currentDate, setCurrentDate] = useState(new Date(2025, 4, 17)) // May 17, 2025
     const [selectedDate, setSelectedDate] = useState(16)
     const [selectedMonth, setSelectedMonth] = useState('May 2025')
-    const [isNotificationOpen, setIsNotificationOpen] = useState(false)
 
     const sidebarItems = [
         {
@@ -234,10 +233,23 @@ function RouteComponent() {
         setIsNotificationOpen(false)
     }
 
+    const [isSidebarOpen, setIsSidebarOpen] = useState(false)
+    const [isNotificationOpen, setIsNotificationOpen] = useState(false)
+
     return (
-        <div className="min-h-screen bg-gradient-to-br from-amber-50 to-orange-100 flex">
+        <div className="min-h-screen bg-gradient-to-br from-amber-50 to-orange-100 flex overflow-x-hidden">
+            {/* Sidebar - Mobile Overlay */}
+            {isSidebarOpen && (
+                <div
+                    className="fixed inset-0 bg-black/50 z-40 lg:hidden"
+                    onClick={() => setIsSidebarOpen(false)}
+                />
+            )}
             {/* Sidebar */}
-            <div className="w-64 bg-gradient-to-b from-yellow-400 to-amber-500 shadow-lg">
+            <div className={`
+                fixed lg:static inset-y-0 left-0 z-50 w-64 bg-gradient-to-b from-yellow-400 to-amber-500 shadow-lg transform transition-transform duration-300 ease-in-out
+                ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
+            `}>
                 {/* Logo */}
                 <div className="p-6 border-b border-amber-600">
                     <div className="flex justify-center items-center gap-3">
@@ -249,12 +261,15 @@ function RouteComponent() {
                 <nav className="p-4 space-y-2">
                     {sidebarItems.map((item, index) => {
                         const Icon = item.icon
-                        const isActive = location.pathname === item.route
+                        const isActive = location.pathname === item.route ||
+                            (location.pathname === '/admin-interface' && item.route === '/admin-interface/') ||
+                            (location.pathname === '/admin-interface/' && item.route === '/admin-interface/')
 
                         return (
                             <Link
                                 key={index}
                                 to={item.route}
+                                onClick={() => setIsSidebarOpen(false)} // Close sidebar on mobile when link is clicked
                                 className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left transition-all ${isActive
                                     ? 'bg-amber-800 text-yellow-300 shadow-md'
                                     : 'text-amber-900 hover:bg-amber-400 hover:text-amber-800'
@@ -268,7 +283,7 @@ function RouteComponent() {
                 </nav>
 
                 {/* Logout */}
-                <div className='border-t border-amber-600 mt-auto'>
+                <div className='border-t border-amber-600'>
                     <div className='w-auto mx-4'>
                         <button className="w-full flex items-center gap-3 px-4 py-3 mt-5 bg-gray-200 opacity-75 text-gray-950 rounded-lg hover:bg-amber-700 hover:text-white transition-colors">
                             <LogOut className="h-5 w-5" />
@@ -279,38 +294,37 @@ function RouteComponent() {
             </div>
 
             {/* Main Content */}
-            <div className="flex-1 flex flex-col">
-                {/* Header */}
+            <div className="flex-1 flex flex-col min-w-0">
+                {/* Top Bar */}
                 <header className="bg-amber-800 text-white p-4 shadow-md">
                     <div className="flex justify-between items-center">
                         <div className="flex items-center gap-4">
-                            <div className="flex items-center gap-2">
-                                <h1 className="text-xl lg:text-3xl font-bold">SCHEDULE OVERVIEW</h1>
+                            {/* Mobile Menu Button */}
+                            <button
+                                onClick={() => setIsSidebarOpen(true)}
+                                className="lg:hidden p-2 text-white hover:bg-amber-700 rounded-lg"
+                            >
+                                <MenuIcon className="h-6 w-6" />
+                            </button>
+                            <div>
+                                <h2 className="text-xl lg:text-2xl font-bold">SCHEDULE</h2>
                             </div>
                         </div>
-                        <div className="flex items-center gap-2 lg:gap-6">
-                            <span className="text-amber-200 text-xs lg:text-lg font-semibold hidden sm:inline">
-                                Date: {getCurrentDate()}
-                            </span>
-                            <span className="text-amber-200 text-xs lg:text-lg font-semibold hidden sm:inline">
-                                Time: {getCurrentTime()}
-                            </span>
+                        <div className="flex items-center gap-2 lg:gap-4">
+                            <span className="text-amber-200 text-xs lg:text-sm hidden sm:inline">Date: May 16, 2025</span>
+                            <span className="text-amber-200 text-xs lg:text-sm hidden sm:inline">Time: 11:00 AM</span>
                             <div className="w-10 h-10 bg-yellow-400 rounded-full flex items-center justify-center">
-                                <div className="relative">
+                                <div className='relative'>
                                     <button
                                         onClick={() => setIsNotificationOpen(!isNotificationOpen)}
                                         className="relative p-2 text-[#7a3d00] hover:bg-yellow-400 rounded-full"
                                     >
                                         <Bell className="h-6 w-6" />
-                                        {notificationCount > 0 && (
-                                            <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
-                                                {notificationCount}
-                                            </span>
-                                        )}
+                                        {notificationCount > 0 && <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">{notificationCount}</span>}
                                     </button>
                                     {/* Notification Dropdown */}
                                     {isNotificationOpen && (
-                                        <div className="absolute right-0 mt-2 w-96 bg-white rounded-lg shadow-lg border border-gray-200 z-50">
+                                        <div className="absolute right-0 mt-2 w-80 md:w-96 bg-white rounded-lg shadow-lg border border-gray-200 z-50">
                                             <div className="p-4 border-b border-gray-200">
                                                 <h3 className="text-lg font-semibold text-gray-800">Notifications</h3>
                                             </div>
@@ -357,20 +371,20 @@ function RouteComponent() {
                 </header>
 
                 {/* Schedule Content */}
-                <div className="flex-1 p-8">
+                <div className="flex-1 p-3 md:p-8">
                     <div className="max-w-7xl mx-auto">
-                        <div className="bg-yellow-400 rounded-2xl p-8 shadow-xl">
-                            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                        <div className="bg-yellow-400 rounded-2xl p-4 md:p-8 shadow-xl">
+                            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-8">
                                 {/* Calendar Section */}
-                                <div className="lg:col-span-2 space-y-6">
+                                <div className="lg:col-span-2 space-y-3 md:space-y-6">
                                     {/* Current Date Display */}
-                                    <div className="text-xl font-semibold text-gray-800">
+                                    <div className="text-lg md:text-xl font-semibold text-gray-800">
                                         Saturday, May 24
                                     </div>
 
                                     {/* Month Navigation */}
-                                    <div className="flex items-center justify-between border-b-2 border-gray-800 pb-4">
-                                        <div className="text-xl font-bold text-gray-800">
+                                    <div className="flex items-center justify-between border-b-2 border-gray-800 pb-3 md:pb-4">
+                                        <div className="text-lg md:text-xl font-bold text-gray-800">
                                             {selectedMonth}
                                         </div>
                                         <div className="flex gap-2">
@@ -390,10 +404,10 @@ function RouteComponent() {
                                     </div>
 
                                     {/* Calendar Grid */}
-                                    <div className="grid grid-cols-7 gap-2">
+                                    <div className="grid grid-cols-7 gap-1 md:gap-2">
                                         {/* Day Headers */}
                                         {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
-                                            <div key={day} className="text-center font-semibold text-gray-800 p-2">
+                                            <div key={day} className="text-center font-semibold text-gray-800 p-1 md:p-2 text-xs md:text-base">
                                                 {day}
                                             </div>
                                         ))}
@@ -404,7 +418,7 @@ function RouteComponent() {
                                                 key={index}
                                                 onClick={() => setSelectedDate(day.date)}
                                                 className={`
-                                                    relative p-3 rounded-lg text-center border-2 transition-all duration-200 hover:scale-105 min-h-[80px] flex flex-col justify-between cursor-pointer
+                                                    relative p-1.5 md:p-3 rounded-lg text-center border-2 transition-all duration-200 active:scale-95 md:hover:scale-105 min-h-[60px] md:min-h-[80px] flex flex-col justify-center gap-0.5 md:gap-1 cursor-pointer
                                                     ${day.isPastMonth || day.isFutureMonth
                                                         ? 'text-gray-400 border-transparent bg-white/30'
                                                         : day.isSelected
@@ -415,16 +429,16 @@ function RouteComponent() {
                                                     }
                                                 `}
                                             >
-                                                <span className="font-semibold text-lg">{day.date}</span>
+                                                <span className="font-semibold text-sm md:text-lg">{day.date}</span>
                                                 {!day.isPastMonth && !day.isFutureMonth && (
                                                     <>
                                                         {day.isAvailable ? (
-                                                            <span className="text-xs text-blue-600 font-medium">
-                                                                {day.orders}/30 orders
+                                                            <span className="text-[10px] md:text-xs text-blue-600 font-medium leading-tight">
+                                                                {day.orders}/30
                                                             </span>
                                                         ) : (
-                                                            <span className="text-xs text-red-500 font-medium">
-                                                                Unavailable
+                                                            <span className="text-[10px] md:text-xs text-red-500 font-medium leading-tight">
+                                                                Full
                                                             </span>
                                                         )}
                                                     </>
@@ -435,23 +449,23 @@ function RouteComponent() {
                                 </div>
 
                                 {/* Right Sidebar - View Only */}
-                                <div className="space-y-6">
+                                <div className="space-y-4 md:space-y-6">
                                     {/* Selected Date Info */}
-                                    <div className="bg-green-50 rounded-lg p-6 border border-green-200 shadow-sm">
-                                        <h3 className="text-lg font-semibold text-gray-800 mb-2">Selected Date</h3>
-                                        <div className="text-2xl font-bold text-gray-800 mb-4">
+                                    <div className="bg-green-50 rounded-lg p-4 md:p-6 border border-green-200 shadow-sm">
+                                        <h3 className="text-base md:text-lg font-semibold text-gray-800 mb-2">Selected Date</h3>
+                                        <div className="text-xl md:text-2xl font-bold text-gray-800 mb-4">
                                             May {selectedDate}, 2025
                                         </div>
-                                        <div className="text-lg text-gray-700 mb-4">25 Orders</div>
+                                        <div className="text-base md:text-lg text-gray-700 mb-4">25 Orders</div>
 
                                         <div className="space-y-3 max-h-48 overflow-y-auto pr-2">
-                                            <h4 className="font-semibold text-gray-800">Customer Orders</h4>
+                                            <h4 className="font-semibold text-gray-800 text-sm md:text-base">Customer Orders</h4>
                                             {staff.map(member => (
                                                 <div key={member.id} className="flex items-center gap-3">
                                                     <div className={`w-3 h-8 ${member.color} rounded`}></div>
                                                     <div>
-                                                        <div className="font-medium text-gray-800">{member.name}</div>
-                                                        <div className="text-sm text-gray-600">{member.time}</div>
+                                                        <div className="font-medium text-gray-800 text-sm md:text-base">{member.name}</div>
+                                                        <div className="text-xs md:text-sm text-gray-600">{member.time}</div>
                                                     </div>
                                                 </div>
                                             ))}
@@ -459,34 +473,34 @@ function RouteComponent() {
                                     </div>
 
                                     {/* Availability Status (Read-only) */}
-                                    <div className="bg-green-50 rounded-lg p-6 border border-green-200 shadow-sm">
+                                    <div className="bg-green-50 rounded-lg p-4 md:p-6 border border-green-200 shadow-sm">
                                         <div className="flex items-center justify-between">
-                                            <h3 className="text-lg font-semibold text-gray-800">Current Status</h3>
+                                            <h3 className="text-base md:text-lg font-semibold text-gray-800">Current Status</h3>
                                             <div className="flex items-center gap-2">
                                                 <div className="w-3 h-3 bg-green-500 rounded-full"></div>
-                                                <span className="text-green-700 font-medium">Available</span>
+                                                <span className="text-green-700 font-medium text-sm md:text-base">Available</span>
                                             </div>
                                         </div>
                                     </div>
 
                                     {/* Order Limit Display (Read-only) */}
-                                    <div className="bg-blue-50 rounded-lg p-6 border border-blue-200 shadow-sm">
-                                        <h3 className="text-lg font-semibold text-gray-800 mb-4">Order Limit</h3>
-                                        <div className="text-2xl font-bold text-blue-700">30 orders/day</div>
-                                        <div className="text-sm text-blue-600 mt-2">Current: 25 orders</div>
+                                    <div className="bg-blue-50 rounded-lg p-4 md:p-6 border border-blue-200 shadow-sm">
+                                        <h3 className="text-base md:text-lg font-semibold text-gray-800 mb-4">Order Limit</h3>
+                                        <div className="text-xl md:text-2xl font-bold text-blue-700">30 orders/day</div>
+                                        <div className="text-xs md:text-sm text-blue-600 mt-2">Current: 25 orders</div>
                                     </div>
 
                                     {/* Time Slots (Read-only) */}
-                                    <div className="bg-purple-50 rounded-lg p-6 border border-purple-200 shadow-sm">
-                                        <h3 className="text-lg font-semibold text-gray-800 mb-4">Time Availability</h3>
+                                    <div className="bg-purple-50 rounded-lg p-4 md:p-6 border border-purple-200 shadow-sm">
+                                        <h3 className="text-base md:text-lg font-semibold text-gray-800 mb-4">Time Availability</h3>
                                         <div className="space-y-2 max-h-48 overflow-y-auto pr-2">
                                             {timeSlots.map((slot, index) => (
-                                                <div key={index} className="flex items-center justify-between p-3 bg-white rounded-lg border border-gray-200 shadow-sm">
-                                                    <span className="text-sm font-medium text-gray-700">
+                                                <div key={index} className="flex items-center justify-between p-2 md:p-3 bg-white rounded-lg border border-gray-200 shadow-sm">
+                                                    <span className="text-xs md:text-sm font-medium text-gray-700">
                                                         {slot.hour} {slot.period}
                                                     </span>
                                                     <div className={`
-                                                        px-3 py-1 rounded-full text-xs font-medium
+                                                        px-2 md:px-3 py-1 rounded-full text-xs font-medium
                                                         ${slot.isAvailable
                                                             ? 'bg-green-100 text-green-700'
                                                             : 'bg-red-100 text-red-700'

@@ -37,7 +37,6 @@ export const Route = createLazyFileRoute('/admin-interface/orders')({
 
 function AdminOrdersInterface() {
     const [showOrderBackView, setShowOrderBackView] = useState(false)
-    const [isNotificationOpen, setIsNotificationOpen] = useState(false)
     const [isFilterOpen, setIsFilterOpen] = useState(false)
     const [activeTab, setActiveTab] = useState('New Orders')
     const [searchQuery, setSearchQuery] = useState('')
@@ -316,10 +315,23 @@ function AdminOrdersInterface() {
     const endIndex = Math.min(startIndex + 10, filteredOrders.length)
     const currentOrders = filteredOrders.slice(startIndex, endIndex)
 
+    const [isSidebarOpen, setIsSidebarOpen] = useState(false)
+    const [isNotificationOpen, setIsNotificationOpen] = useState(false)
+
     return (
-        <div className="min-h-screen bg-gradient-to-br from-amber-50 to-orange-100 flex">
+        <div className="min-h-screen bg-gradient-to-br from-amber-50 to-orange-100 flex overflow-x-hidden">
+            {/* Sidebar - Mobile Overlay */}
+            {isSidebarOpen && (
+                <div
+                    className="fixed inset-0 bg-black/50 z-40 lg:hidden"
+                    onClick={() => setIsSidebarOpen(false)}
+                />
+            )}
             {/* Sidebar */}
-            <div className="w-64 bg-gradient-to-b from-yellow-400 to-amber-500 shadow-lg">
+            <div className={`
+                            fixed lg:static inset-y-0 left-0 z-50 w-64 bg-gradient-to-b from-yellow-400 to-amber-500 shadow-lg transform transition-transform duration-300 ease-in-out
+                            ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
+                        `}>
                 {/* Logo */}
                 <div className="p-6 border-b border-amber-600">
                     <div className="flex justify-center items-center gap-3">
@@ -331,12 +343,15 @@ function AdminOrdersInterface() {
                 <nav className="p-4 space-y-2">
                     {sidebarItems.map((item, index) => {
                         const Icon = item.icon
-                        const isActive = location.pathname === item.route
+                        const isActive = location.pathname === item.route ||
+                            (location.pathname === '/admin-interface' && item.route === '/admin-interface/') ||
+                            (location.pathname === '/admin-interface/' && item.route === '/admin-interface/')
 
                         return (
                             <Link
                                 key={index}
                                 to={item.route}
+                                onClick={() => setIsSidebarOpen(false)} // Close sidebar on mobile when link is clicked
                                 className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left transition-all ${isActive
                                     ? 'bg-amber-800 text-yellow-300 shadow-md'
                                     : 'text-amber-900 hover:bg-amber-400 hover:text-amber-800'
@@ -350,7 +365,7 @@ function AdminOrdersInterface() {
                 </nav>
 
                 {/* Logout */}
-                <div className='border-t border-amber-600 mt-auto'>
+                <div className='border-t border-amber-600'>
                     <div className='w-auto mx-4'>
                         <button className="w-full flex items-center gap-3 px-4 py-3 mt-5 bg-gray-200 opacity-75 text-gray-950 rounded-lg hover:bg-amber-700 hover:text-white transition-colors">
                             <LogOut className="h-5 w-5" />
@@ -361,17 +376,25 @@ function AdminOrdersInterface() {
             </div>
 
             {/* Main Content */}
-            <div className="flex-1 flex flex-col">
+            <div className="flex-1 flex flex-col min-w-0">
                 {/* Top Bar */}
                 <header className="bg-amber-800 text-white p-4 shadow-md">
                     <div className="flex justify-between items-center">
-                        <div>
-                            <h2 className="text-2xl font-bold">Orders</h2>
-                            <p className="text-amber-200 text-sm">Recent transaction activity and all</p>
-                        </div>
                         <div className="flex items-center gap-4">
-                            <span className="text-amber-200">Date: May 16, 2025</span>
-                            <span className="text-amber-200">Time: 11:00 AM</span>
+                            {/* Mobile Menu Button */}
+                            <button
+                                onClick={() => setIsSidebarOpen(true)}
+                                className="lg:hidden p-2 text-white hover:bg-amber-700 rounded-lg"
+                            >
+                                <MenuIcon className="h-6 w-6" />
+                            </button>
+                            <div>
+                                <h2 className="text-xl lg:text-2xl font-bold">ORDERS</h2>
+                            </div>
+                        </div>
+                        <div className="flex items-center gap-2 lg:gap-4">
+                            <span className="text-amber-200 text-xs lg:text-sm hidden sm:inline">Date: May 16, 2025</span>
+                            <span className="text-amber-200 text-xs lg:text-sm hidden sm:inline">Time: 11:00 AM</span>
                             <div className="w-10 h-10 bg-yellow-400 rounded-full flex items-center justify-center">
                                 <div className='relative'>
                                     <button
@@ -431,9 +454,9 @@ function AdminOrdersInterface() {
 
                 {/* Orders Content */}
                 <main className="flex-1 p-6 overflow-y-auto">
-                    <div className="bg-white rounded-xl shadow-sm border border-gray-200">
+                    <div className="bg-white rounded-xl shadow-sm border border-gray-200 min-w-0 overflow-hidden">
                         {/* Table Header */}
-                        <div className="p-6 border-b border-gray-200">
+                        <div className="p-3 sm:p-4 lg:p-6 border-b border-gray-200">
                             <div className="flex justify-between items-center mb-4">
                                 <div className="relative">
                                     <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
@@ -452,13 +475,6 @@ function AdminOrdersInterface() {
                                     >
                                         <Filter className="h-4 w-4" />
                                         Filter
-                                    </button>
-                                    <button
-                                        onClick={() => setIsAddOrderModalOpen(true)}
-                                        className="flex items-center gap-2 bg-amber-500 text-white px-4 py-2 rounded-lg hover:bg-amber-600 transition-colors"
-                                    >
-                                        <Plus className="h-4 w-4" />
-                                        Add Order Manually
                                     </button>
                                 </div>
                             </div>

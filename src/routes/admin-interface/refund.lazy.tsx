@@ -55,7 +55,6 @@ interface RefundRequest {
 }
 
 function RouteComponent() {
-  const [isNotificationOpen, setIsNotificationOpen] = useState(false)
   const [selectedRefund, setSelectedRefund] = useState<RefundRequest | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
   const [isReviewModalOpen, setIsReviewModalOpen] = useState(false)
@@ -307,12 +306,24 @@ function RouteComponent() {
     return matchesSearch && matchesFilter && matchesDateRange
   })
 
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false)
+  const [isNotificationOpen, setIsNotificationOpen] = useState(false)
 
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-amber-50 to-orange-100 flex">
+    <div className="min-h-screen bg-gradient-to-br from-amber-50 to-orange-100 flex overflow-x-hidden">
+      {/* Sidebar - Mobile Overlay */}
+      {isSidebarOpen && (
+        <div
+          className="fixed inset-0 bg-black/50 z-40 lg:hidden"
+          onClick={() => setIsSidebarOpen(false)}
+        />
+      )}
       {/* Sidebar */}
-      <div className="w-64 bg-gradient-to-b from-yellow-400 to-amber-500 shadow-lg">
+      <div className={`
+                                    fixed lg:static inset-y-0 left-0 z-50 w-64 bg-gradient-to-b from-yellow-400 to-amber-500 shadow-lg transform transition-transform duration-300 ease-in-out
+                                    ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
+                                `}>
         {/* Logo */}
         <div className="p-6 border-b border-amber-600">
           <div className="flex justify-center items-center gap-3">
@@ -332,6 +343,7 @@ function RouteComponent() {
               <Link
                 key={index}
                 to={item.route}
+                onClick={() => setIsSidebarOpen(false)} // Close sidebar on mobile when link is clicked
                 className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left transition-all ${isActive
                   ? 'bg-amber-800 text-yellow-300 shadow-md'
                   : 'text-amber-900 hover:bg-amber-400 hover:text-amber-800'
@@ -356,17 +368,25 @@ function RouteComponent() {
       </div>
 
       {/* Main Content */}
-      <div className="flex-1 flex flex-col">
+      <div className="flex-1 flex flex-col min-w-0">
         {/* Top Bar */}
         <header className="bg-amber-800 text-white p-4 shadow-md">
           <div className="flex justify-between items-center">
-            <div>
-              <h2 className="text-2xl font-bold">REFUND MANAGEMENT</h2>
-              <p className="text-amber-200">Managing of refund from the customers</p>
-            </div>
             <div className="flex items-center gap-4">
-              <span className="text-amber-200">Date: May 16, 2025</span>
-              <span className="text-amber-200">Time: 11:00 AM</span>
+              {/* Mobile Menu Button */}
+              <button
+                onClick={() => setIsSidebarOpen(true)}
+                className="lg:hidden p-2 text-white hover:bg-amber-700 rounded-lg"
+              >
+                <MenuIcon className="h-6 w-6" />
+              </button>
+              <div>
+                <h2 className="text-xl lg:text-2xl font-bold">SALES</h2>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 lg:gap-4">
+              <span className="text-amber-200 text-xs lg:text-sm hidden sm:inline">Date: May 16, 2025</span>
+              <span className="text-amber-200 text-xs lg:text-sm hidden sm:inline">Time: 11:00 AM</span>
               <div className="w-10 h-10 bg-yellow-400 rounded-full flex items-center justify-center">
                 <div className='relative'>
                   <button
@@ -374,11 +394,7 @@ function RouteComponent() {
                     className="relative p-2 text-[#7a3d00] hover:bg-yellow-400 rounded-full"
                   >
                     <Bell className="h-6 w-6" />
-                    {notificationCount > 0 && (
-                      <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
-                        {notificationCount}
-                      </span>
-                    )}
+                    {notificationCount > 0 && <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">{notificationCount}</span>}
                   </button>
                   {/* Notification Dropdown */}
                   {isNotificationOpen && (
@@ -428,7 +444,7 @@ function RouteComponent() {
           </div>
         </header>
 
-        {/* Refund Content */}
+        {/* Sales Content */}
         <main className="flex-1 p-6 overflow-y-auto">
           {/* Search and Filter */}
           <div className="mb-6 flex gap-4">
@@ -452,50 +468,67 @@ function RouteComponent() {
           </div>
 
           {/* Refund Table */}
+          {/* Refund Table */}
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-            <div className="bg-amber-800 text-white">
-              <div className="grid grid-cols-7 gap-4 p-4 font-medium">
-                <div>ORDER ID</div>
-                <div>CUSTOMER NAME</div>
-                <div>ITEM</div>
-                <div>DATE</div>
-                <div>TIME</div>
-                <div>CONFIRMATION</div>
-                <div>REFUND BUTTON</div>
+            {/* Scroll wrapper */}
+            <div className="overflow-x-auto">
+              {/* Force wide layout */}
+              <div className="min-w-[900px]">
+                {/* Table Header */}
+                <div className="bg-amber-800 text-white">
+                  <div className="grid grid-cols-7 gap-4 p-4 font-medium">
+                    <div>ORDER ID</div>
+                    <div>CUSTOMER NAME</div>
+                    <div>ITEM</div>
+                    <div>DATE</div>
+                    <div>TIME</div>
+                    <div>CONFIRMATION</div>
+                    <div>REFUND BUTTON</div>
+                  </div>
+                </div>
+
+                {/* Table Body */}
+                <div className="divide-y divide-gray-200">
+                  {filteredRequests.map((request) => (
+                    <div
+                      key={request.id}
+                      className="grid grid-cols-7 gap-4 p-4 hover:bg-gray-50"
+                    >
+                      <div className="text-gray-800">{request.orderId}</div>
+                      <div className="text-gray-800">{request.customerName}</div>
+                      <div className="text-gray-800">{request.item}</div>
+                      <div className="text-gray-800">{request.date}</div>
+                      <div className="text-gray-800">{request.time}</div>
+                      <div>
+                        <span
+                          className={`px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(
+                            request.confirmation
+                          )}`}
+                        >
+                          {request.confirmation}
+                        </span>
+                      </div>
+                      <div>
+                        <button
+                          onClick={() => handleOpenReviewModal(request)}
+                          className="bg-yellow-400 text-amber-800 px-3 py-1 rounded text-sm font-medium hover:bg-yellow-500 transition-colors"
+                        >
+                          REVIEW
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+
+                  {filteredRequests.length === 0 && (
+                    <div className="text-center py-8 text-gray-500">
+                      No refund requests found.
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
-
-            <div className="divide-y divide-gray-200">
-              {filteredRequests.map((request) => (
-                <div key={request.id} className="grid grid-cols-7 gap-4 p-4 hover:bg-gray-50">
-                  <div className="text-gray-800">{request.orderId}</div>
-                  <div className="text-gray-800">{request.customerName}</div>
-                  <div className="text-gray-800">{request.item}</div>
-                  <div className="text-gray-800">{request.date}</div>
-                  <div className="text-gray-800">{request.time}</div>
-                  <div>
-                    <span className={`px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(request.confirmation)}`}>
-                      {request.confirmation}
-                    </span>
-                  </div>
-                  <div>
-                    <button
-                      onClick={() => handleOpenReviewModal(request)}
-                      className="bg-yellow-400 text-amber-800 px-3 py-1 rounded text-sm font-medium hover:bg-yellow-500 transition-colors"
-                    >
-                      REVIEW
-                    </button>
-                  </div>
-                </div>
-              ))}
-
-              {filteredRequests.length === 0 && (
-                <div className="text-center py-8 text-gray-500">
-                  No refund requests found.
-                </div>
-              )}
-            </div>
           </div>
+
         </main>
       </div>
 

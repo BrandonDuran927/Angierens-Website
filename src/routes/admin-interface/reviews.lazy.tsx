@@ -42,7 +42,6 @@ function RouteComponent() {
     const [selectedReview, setSelectedReview] = useState<Review | null>(null)
     const [isViewModalOpen, setIsViewModalOpen] = useState(false)
     const [isHiddenReviewsModalOpen, setIsHiddenReviewsModalOpen] = useState(false)
-    const [isNotificationOpen, setIsNotificationOpen] = useState(false)
     const [showHiddenReviews, setShowHiddenReviews] = useState(false)
     const location = useLocation()
 
@@ -285,10 +284,23 @@ function RouteComponent() {
         'STAFF\'S REVIEW': reviews.filter(r => r.category === 'STAFF\'S REVIEW' && !r.isHidden)
     }
 
+    const [isSidebarOpen, setIsSidebarOpen] = useState(false)
+    const [isNotificationOpen, setIsNotificationOpen] = useState(false)
+
     return (
-        <div className="min-h-screen bg-gradient-to-br from-amber-50 to-orange-100 flex">
+        <div className="min-h-screen bg-gradient-to-br from-amber-50 to-orange-100 flex overflow-x-hidden">
+            {/* Sidebar - Mobile Overlay */}
+            {isSidebarOpen && (
+                <div
+                    className="fixed inset-0 bg-black/50 z-40 lg:hidden"
+                    onClick={() => setIsSidebarOpen(false)}
+                />
+            )}
             {/* Sidebar */}
-            <div className="w-64 bg-gradient-to-b from-yellow-400 to-amber-500 shadow-lg">
+            <div className={`
+                                    fixed lg:static inset-y-0 left-0 z-50 w-64 bg-gradient-to-b from-yellow-400 to-amber-500 shadow-lg transform transition-transform duration-300 ease-in-out
+                                    ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
+                                `}>
                 {/* Logo */}
                 <div className="p-6 border-b border-amber-600">
                     <div className="flex justify-center items-center gap-3">
@@ -308,6 +320,7 @@ function RouteComponent() {
                             <Link
                                 key={index}
                                 to={item.route}
+                                onClick={() => setIsSidebarOpen(false)} // Close sidebar on mobile when link is clicked
                                 className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left transition-all ${isActive
                                     ? 'bg-amber-800 text-yellow-300 shadow-md'
                                     : 'text-amber-900 hover:bg-amber-400 hover:text-amber-800'
@@ -332,17 +345,25 @@ function RouteComponent() {
             </div>
 
             {/* Main Content */}
-            <div className="flex-1 flex flex-col">
+            <div className="flex-1 flex flex-col min-w-0">
                 {/* Top Bar */}
                 <header className="bg-amber-800 text-white p-4 shadow-md">
                     <div className="flex justify-between items-center">
-                        <div>
-                            <h2 className="text-2xl font-bold">REVIEWS</h2>
-                            <p className="text-amber-200">Customer feedback and ratings</p>
-                        </div>
                         <div className="flex items-center gap-4">
-                            <span className="text-amber-200">Date: May 17, 2025</span>
-                            <span className="text-amber-200">Time: 14:24:12</span>
+                            {/* Mobile Menu Button */}
+                            <button
+                                onClick={() => setIsSidebarOpen(true)}
+                                className="lg:hidden p-2 text-white hover:bg-amber-700 rounded-lg"
+                            >
+                                <MenuIcon className="h-6 w-6" />
+                            </button>
+                            <div>
+                                <h2 className="text-xl lg:text-2xl font-bold">ORDERS</h2>
+                            </div>
+                        </div>
+                        <div className="flex items-center gap-2 lg:gap-4">
+                            <span className="text-amber-200 text-xs lg:text-sm hidden sm:inline">Date: May 16, 2025</span>
+                            <span className="text-amber-200 text-xs lg:text-sm hidden sm:inline">Time: 11:00 AM</span>
                             <div className="w-10 h-10 bg-yellow-400 rounded-full flex items-center justify-center">
                                 <div className='relative'>
                                     <button
@@ -350,11 +371,7 @@ function RouteComponent() {
                                         className="relative p-2 text-[#7a3d00] hover:bg-yellow-400 rounded-full"
                                     >
                                         <Bell className="h-6 w-6" />
-                                        {notificationCount > 0 && (
-                                            <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
-                                                {notificationCount}
-                                            </span>
-                                        )}
+                                        {notificationCount > 0 && <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">{notificationCount}</span>}
                                     </button>
                                     {/* Notification Dropdown */}
                                     {isNotificationOpen && (
@@ -404,7 +421,7 @@ function RouteComponent() {
                     </div>
                 </header>
 
-                {/* Reviews Content */}
+                {/* Orders Content */}
                 <main className="flex-1 p-6 overflow-y-auto">
                     {/* Show Hidden Reviews Button */}
                     <div className="mb-6">
@@ -417,10 +434,10 @@ function RouteComponent() {
                     </div>
 
                     {/* Reviews Grid */}
-                    <div className="grid grid-cols-4 gap-6">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
                         {Object.entries(reviewsByCategory).map(([category, categoryReviews]) => (
-                            <div key={category} className="space-y-4 bg-amber-800">
-                                <div className='p-5 space-y-4'>
+                            <div key={category} className="space-y-4 bg-amber-800 rounded-lg">
+                                <div className="p-5 space-y-4">
                                     <h3 className={`text-white text-center py-2 px-4 rounded-lg font-semibold ${getCategoryColor(category)}`}>
                                         {category}
                                     </h3>
