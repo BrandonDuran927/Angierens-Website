@@ -340,7 +340,7 @@ function RouteComponent() {
       {/* Main */}
       <div className="w-full max-w-7xl mx-auto p-4 sm:p-6">
         <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-800 mb-2">My Review</h1>
-        <p className="text-sm sm:text-base text-gray-600 mb-4 sm:mb-6">This is where you can write your feedback</p>
+        <p className="text-sm sm:text-base text-gray-600 mb-4 sm:mb-6">This is where you can write your review</p>
 
         {/* Search and Filter */}
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 sm:gap-4 mb-4 sm:mb-6">
@@ -376,7 +376,7 @@ function RouteComponent() {
                   <div>STATUS</div>
                   <div>DATE</div>
                   <div>TIME</div>
-                  <div>FEEDBACK</div>
+                  <div>REVIEW</div>
                   <div>ACTION BUTTON</div>
                 </div>
               </div>
@@ -443,14 +443,7 @@ function RouteComponent() {
                           <Eye className="h-4 w-4" />
                           VIEW
                         </Link>
-                        <Link
-                          to="/customer-interface/feedback/$feedbackId"
-                          params={{ feedbackId: item.id }}
-                          className="bg-yellow-400 hover:bg-yellow-500 text-black px-3 py-1.5 rounded font-medium flex items-center gap-1 transition-colors text-sm"
-                        >
-                          <Edit className="h-4 w-4" />
-                          EDIT
-                        </Link>
+
                       </div>
                     </div>
 

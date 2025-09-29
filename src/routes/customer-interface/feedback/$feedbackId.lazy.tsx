@@ -124,10 +124,10 @@ function RouteComponent() {
   })
 
   const tabs = [
-    { id: 'delivery', label: 'Delivery Feedback', rating: feedbackData.deliveryRating, feedback: feedbackData.deliveryFeedback },
-    { id: 'food', label: 'Food Feedback', rating: feedbackData.foodRating, feedback: feedbackData.foodFeedback },
-    { id: 'staff', label: 'Staff Feedback', rating: feedbackData.staffRating, feedback: feedbackData.staffFeedback },
-    { id: 'rider', label: 'Rider Feedback', rating: feedbackData.riderRating, feedback: feedbackData.riderFeedback }
+    { id: 'delivery', label: 'Delivery Review', rating: feedbackData.deliveryRating, feedback: feedbackData.deliveryFeedback },
+    { id: 'food', label: 'Food Review', rating: feedbackData.foodRating, feedback: feedbackData.foodFeedback },
+    { id: 'staff', label: 'Staff Review', rating: feedbackData.staffRating, feedback: feedbackData.staffFeedback },
+    { id: 'rider', label: 'Rider Review', rating: feedbackData.riderRating, feedback: feedbackData.riderFeedback }
   ]
 
   const currentTab = tabs.find(tab => tab.id === activeTab) || tabs[0]
@@ -449,14 +449,6 @@ function RouteComponent() {
                   Send Anonymously
                 </label>
               </div>
-
-              <button
-                onClick={() => setIsEditing(!isEditing)}
-                className="flex items-center justify-center sm:justify-start gap-2 px-4 py-2 text-gray-600 hover:text-gray-800 transition-colors text-sm sm:text-base"
-              >
-                <Edit className="w-4 h-4 sm:w-5 sm:h-5" />
-                {isEditing ? 'Cancel Edit' : 'Edit'}
-              </button>
             </div>
 
             {/* Submit Button */}

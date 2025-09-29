@@ -338,13 +338,12 @@ function RouteComponent() {
 
     return (
         <div className="min-h-screen bg-gradient-to-br from-amber-50 to-orange-100 flex overflow-x-hidden">
-            {/* Sidebar */}
+            {/* Sidebar - following the uploaded image design */}
             <div
                 className={`
-        fixed inset-y-0 left-0 z-50 w-64 bg-yellow-400 transform transition-transform duration-300 ease-in-out
-        ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}
-        lg:translate-x-0
-      `}
+    fixed inset-y-0 left-0 z-50 w-64 bg-yellow-400 transform transition-transform duration-300 ease-in-out
+    ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}
+  `}
             >
                 {/* Header */}
                 <div className="bg-amber-800 text-white px-6 py-4 relative">
@@ -381,11 +380,12 @@ function RouteComponent() {
                             key={item.name}
                             to={item.route}
                             className={`
-              flex items-center gap-3 px-4 py-3 rounded-lg text-left font-semibold transition-colors w-full
-              ${item.active
+                flex items-center gap-3 px-4 py-3 rounded-lg text-left font-semibold transition-colors w-full
+                ${item.active
                                     ? 'bg-amber-700 text-white shadow-lg'
-                                    : 'text-amber-900 hover:bg-amber-300'}
-            `}
+                                    : 'text-amber-900 hover:bg-amber-300'
+                                }
+              `}
                         >
                             {item.icon}
                             {item.name}
@@ -405,46 +405,85 @@ function RouteComponent() {
             {/* Overlay for mobile */}
             {isSidebarOpen && (
                 <div
-                    className="fixed inset-0 bg-black/50 z-40 lg:hidden"
+                    className="fixed inset-0 bg-black/50 z-40"
                     onClick={() => setIsSidebarOpen(false)}
                 />
             )}
 
-            {/* Main Content */}
             <div className="flex-1 flex flex-col min-w-0">
-                {/* Top Bar */}
-                <header className="bg-amber-800 text-white p-3 sm:p-4 shadow-md">
+                {/* Header */}
+                <header className="bg-amber-800 text-white p-4 shadow-md">
                     <div className="flex justify-between items-center">
-                        <div className="flex items-center gap-3 sm:gap-4">
+                        <div className="flex items-center gap-4">
+                            {/* Mobile Menu Button */}
                             <button
                                 onClick={() => setIsSidebarOpen(true)}
-                                className="p-2 text-white hover:bg-amber-700 rounded-lg lg:hidden"
+                                className="p-2 text-white hover:bg-amber-700 rounded-lg"
                             >
                                 <Menu className="h-6 w-6" />
                             </button>
-                            <h1 className="text-lg sm:text-xl lg:text-3xl font-bold">REFUND</h1>
+                            <div className="flex items-center gap-2">
+                                <h1 className="text-xl lg:text-3xl font-bold">REFUND</h1>
+                            </div>
                         </div>
                         <div className="flex items-center gap-2 lg:gap-6">
-                            <span className="hidden sm:inline text-amber-200 text-sm lg:text-lg font-semibold">
-                                Date: {getCurrentDate()}
-                            </span>
-                            <span className="hidden sm:inline text-amber-200 text-sm lg:text-lg font-semibold">
-                                Time: {getCurrentTime()}
-                            </span>
-                            <div className="w-9 h-9 sm:w-10 sm:h-10 bg-yellow-400 rounded-full flex items-center justify-center">
+                            <span className="text-amber-200 text-xs lg:text-lg font-semibold hidden sm:inline">Date: {getCurrentDate()}</span>
+                            <span className="text-amber-200 text-xs lg:text-lg font-semibold hidden sm:inline">Time: {getCurrentTime()}</span>
+                            <div className="w-10 h-10 bg-yellow-400 rounded-full flex items-center justify-center">
                                 <div className="relative">
                                     <button
                                         onClick={() => setIsNotificationOpen(!isNotificationOpen)}
                                         className="relative p-2 text-[#7a3d00] hover:bg-yellow-400 rounded-full"
                                     >
-                                        <Bell className="h-5 w-5 sm:h-6 sm:w-6" />
+                                        <Bell className="h-6 w-6" />
                                         {notificationCount > 0 && (
-                                            <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-4 w-4 sm:h-5 sm:w-5 flex items-center justify-center">
+                                            <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
                                                 {notificationCount}
                                             </span>
                                         )}
                                     </button>
-                                    {/* Notifications Dropdown... */}
+                                    {/* Notification Dropdown */}
+                                    {isNotificationOpen && (
+                                        <div className="absolute right-0 mt-2 w-96 bg-white rounded-lg shadow-lg border border-gray-200 z-50">
+                                            <div className="p-4 border-b border-gray-200">
+                                                <h3 className="text-lg font-semibold text-gray-800">Notifications</h3>
+                                            </div>
+
+                                            <div className="max-h-80 overflow-y-auto">
+                                                {notifications.map((notification, index) => (
+                                                    <div
+                                                        key={notification.id}
+                                                        className={`p-4 border-b border-gray-100 hover:bg-gray-50 cursor-pointer ${index === notifications.length - 1 ? 'border-b-0' : ''
+                                                            }`}
+                                                    >
+                                                        <div className="flex items-start gap-3">
+                                                            <div className="flex-shrink-0 w-10 h-10 bg-yellow-400 rounded-full flex items-center justify-center text-black">
+                                                                {getNotificationIcon(notification.icon)}
+                                                            </div>
+                                                            <div className="flex-1 min-w-0">
+                                                                <p className="text-sm text-gray-800 leading-relaxed">
+                                                                    {notification.title}
+                                                                </p>
+                                                                <p className="text-xs text-gray-500 mt-1">
+                                                                    {notification.time}
+                                                                </p>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+
+                                            <div className="p-4 border-t border-gray-200">
+                                                <button
+                                                    onClick={markAllAsRead}
+                                                    className="w-full bg-yellow-400 text-black py-2 px-4 rounded-lg font-medium hover:bg-yellow-500 transition-colors flex items-center justify-center gap-2"
+                                                >
+                                                    <Bell className="h-4 w-4" />
+                                                    Mark all as read
+                                                </button>
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                         </div>
@@ -452,7 +491,7 @@ function RouteComponent() {
                 </header>
 
                 {/* Refund Content */}
-                <main className="flex-1 p-3 sm:p-4 lg:p-6 overflow-y-auto">
+                <main className="flex-1 p-3 sm:p-4 lg:p-6 overflow-y-auto overflow-x-hidden">
                     {/* Search + Filter */}
                     <div className="mb-6 flex flex-col sm:flex-row gap-3 sm:gap-4">
                         <div className="bg-white flex-1 relative">
@@ -475,55 +514,58 @@ function RouteComponent() {
                     </div>
 
                     {/* Refund Table (scrollable on small screens) */}
-                    <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-x-auto">
-                        <table className="min-w-[800px] w-full text-sm sm:text-base">
-                            <thead className="bg-amber-800 text-white">
-                                <tr className="text-left">
-                                    <th className="p-4">ORDER ID</th>
-                                    <th className="p-4">CUSTOMER NAME</th>
-                                    <th className="p-4">ITEM</th>
-                                    <th className="p-4">DATE</th>
-                                    <th className="p-4">TIME</th>
-                                    <th className="p-4">CONFIRMATION</th>
-                                    <th className="p-4">REFUND BUTTON</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-gray-200">
-                                {filteredRequests.map((request) => (
-                                    <tr key={request.id} className="hover:bg-gray-50">
-                                        <td className="p-4">{request.orderId}</td>
-                                        <td className="p-4">{request.customerName}</td>
-                                        <td className="p-4">{request.item}</td>
-                                        <td className="p-4">{request.date}</td>
-                                        <td className="p-4">{request.time}</td>
-                                        <td className="p-4">
-                                            <span
-                                                className={`px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(
-                                                    request.confirmation
-                                                )}`}
-                                            >
-                                                {request.confirmation}
-                                            </span>
-                                        </td>
-                                        <td className="p-4">
-                                            <button
-                                                onClick={() => handleOpenReviewModal(request)}
-                                                className="bg-yellow-400 text-amber-800 px-3 py-1 rounded text-sm font-medium hover:bg-yellow-500 transition-colors"
-                                            >
-                                                REVIEW
-                                            </button>
-                                        </td>
-                                    </tr>
-                                ))}
-                                {filteredRequests.length === 0 && (
+                    <div className="bg-white rounded-xl shadow-sm border border-gray-200 min-w-0 overflow-hidden">
+                        {/* Scrollable Table */}
+                        <div className="w-full overflow-x-auto">
+                            <table className="min-w-[800px] w-full text-sm sm:text-base">
+                                <thead className="bg-amber-800 text-white">
                                     <tr>
-                                        <td colSpan={7} className="text-center py-8 text-gray-500">
-                                            No refund requests found.
-                                        </td>
+                                        <th className="px-6 py-4 text-left font-medium">ORDER ID</th>
+                                        <th className="px-6 py-4 text-left font-medium">CUSTOMER</th>
+                                        <th className="px-6 py-4 text-left font-medium">ITEM</th>
+                                        <th className="px-6 py-4 text-left font-medium">DATE</th>
+                                        <th className="px-6 py-4 text-left font-medium">TIME</th>
+                                        <th className="px-6 py-4 text-left font-medium">STATUS</th>
+                                        <th className="px-6 py-4 text-center font-medium">ACTIONS</th>
                                     </tr>
-                                )}
-                            </tbody>
-                        </table>
+                                </thead>
+                                <tbody className="divide-y divide-gray-200">
+                                    {filteredRequests.map((request) => (
+                                        <tr key={request.id} className="hover:bg-gray-50">
+                                            <td className="p-4">{request.orderId}</td>
+                                            <td className="p-4">{request.customerName}</td>
+                                            <td className="p-4">{request.item}</td>
+                                            <td className="p-4">{request.date}</td>
+                                            <td className="p-4">{request.time}</td>
+                                            <td className="p-4">
+                                                <span
+                                                    className={`px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(
+                                                        request.confirmation
+                                                    )}`}
+                                                >
+                                                    {request.confirmation}
+                                                </span>
+                                            </td>
+                                            <td className="p-4">
+                                                <button
+                                                    onClick={() => handleOpenReviewModal(request)}
+                                                    className="bg-yellow-400 text-amber-800 px-3 py-1 rounded text-sm font-medium hover:bg-yellow-500 transition-colors"
+                                                >
+                                                    REVIEW
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                    {filteredRequests.length === 0 && (
+                                        <tr>
+                                            <td colSpan={7} className="text-center py-8 text-gray-500">
+                                                No refund requests found.
+                                            </td>
+                                        </tr>
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                 </main>
             </div>

@@ -248,7 +248,7 @@ function RouteComponent() {
     return (
         <div className="min-h-screen bg-gradient-to-br from-amber-50 to-orange-100 flex overflow-x-hidden">
 
-            {/* Sidebar - following the uploaded image design */}
+            {/* Sidebar */}
             <div
                 className={`
                     fixed inset-y-0 left-0 z-50 w-64 bg-yellow-400 transform transition-transform duration-300 ease-in-out
@@ -269,7 +269,7 @@ function RouteComponent() {
                         </div>
                         <button
                             onClick={() => setIsSidebarOpen(false)}
-                            className="lg:hidden p-2 hover:bg-amber-700 rounded-lg"
+                            className="p-2 hover:bg-amber-700 rounded-lg"
                         >
                             <X className="h-6 w-6" />
                         </button>
@@ -320,41 +320,41 @@ function RouteComponent() {
                 />
             )}
 
-            <div className="flex-1 flex flex-col">
+            <div className="flex-1 flex flex-col w-full">
                 {/* Header */}
-                <header className="bg-amber-800 text-white p-4 shadow-md">
+                <header className="bg-amber-800 text-white p-3 md:p-4 shadow-md">
                     <div className="flex justify-between items-center">
-                        <div className="flex items-center gap-4">
+                        <div className="flex items-center gap-2 md:gap-4">
                             {/* Mobile Menu Button */}
                             <button
                                 onClick={() => setIsSidebarOpen(true)}
                                 className="p-2 text-white hover:bg-amber-700 rounded-lg"
                             >
-                                <Menu className="h-6 w-6" />
+                                <Menu className="h-5 w-5 md:h-6 md:w-6" />
                             </button>
                             <div className="flex items-center gap-2">
-                                <h1 className="text-xl lg:text-3xl font-bold">ORDERS</h1>
+                                <h1 className="text-lg md:text-xl lg:text-3xl font-bold">ORDERS</h1>
                             </div>
                         </div>
-                        <div className="flex items-center gap-2 lg:gap-6">
+                        <div className="flex items-center gap-2 md:gap-4 lg:gap-6">
                             <span className="text-amber-200 text-xs lg:text-lg font-semibold hidden sm:inline">Date: {getCurrentDate()}</span>
                             <span className="text-amber-200 text-xs lg:text-lg font-semibold hidden sm:inline">Time: {getCurrentTime()}</span>
-                            <div className="w-10 h-10 bg-yellow-400 rounded-full flex items-center justify-center">
+                            <div className="w-8 h-8 md:w-10 md:h-10 bg-yellow-400 rounded-full flex items-center justify-center">
                                 <div className="relative">
                                     <button
                                         onClick={() => setIsNotificationOpen(!isNotificationOpen)}
-                                        className="relative p-2 text-[#7a3d00] hover:bg-yellow-400 rounded-full"
+                                        className="relative p-1.5 md:p-2 text-[#7a3d00] hover:bg-yellow-400 rounded-full"
                                     >
-                                        <Bell className="h-6 w-6" />
+                                        <Bell className="h-5 w-5 md:h-6 md:w-6" />
                                         {notificationCount > 0 && (
-                                            <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
+                                            <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-4 w-4 md:h-5 md:w-5 flex items-center justify-center">
                                                 {notificationCount}
                                             </span>
                                         )}
                                     </button>
                                     {/* Notification Dropdown */}
                                     {isNotificationOpen && (
-                                        <div className="absolute right-0 mt-2 w-96 bg-white rounded-lg shadow-lg border border-gray-200 z-50">
+                                        <div className="absolute right-0 mt-2 w-80 md:w-96 bg-white rounded-lg shadow-lg border border-gray-200 z-50">
                                             <div className="p-4 border-b border-gray-200">
                                                 <h3 className="text-lg font-semibold text-gray-800">Notifications</h3>
                                             </div>
@@ -401,13 +401,13 @@ function RouteComponent() {
                 </header>
 
                 {/* Main Content */}
-                <main className="flex-1 p-6">
+                <main className="flex-1 p-3 md:p-4 lg:p-6">
                     {/* Tab Navigation */}
-                    <div className="mb-6">
-                        <div className="flex gap-2 mb-4">
+                    <div className="mb-4 md:mb-6">
+                        <div className="flex gap-2 mb-3 md:mb-4">
                             <button
                                 onClick={() => setActiveTab('Today')}
-                                className={`px-6 py-3 rounded-lg font-semibold ${activeTab === 'Today'
+                                className={`px-4 py-2 md:px-6 md:py-3 rounded-lg font-semibold text-sm md:text-base ${activeTab === 'Today'
                                     ? 'bg-yellow-400 text-black'
                                     : 'bg-white text-gray-600 hover:bg-gray-100'
                                     }`}
@@ -416,7 +416,7 @@ function RouteComponent() {
                             </button>
                             <button
                                 onClick={() => setActiveTab('Scheduled')}
-                                className={`px-6 py-3 rounded-lg font-semibold ${activeTab === 'Scheduled'
+                                className={`px-4 py-2 md:px-6 md:py-3 rounded-lg font-semibold text-sm md:text-base ${activeTab === 'Scheduled'
                                     ? 'bg-yellow-400 text-black'
                                     : 'bg-white text-gray-600 hover:bg-gray-100'
                                     }`}
@@ -426,10 +426,10 @@ function RouteComponent() {
                         </div>
 
                         {/* Order Status Tabs */}
-                        <div className="flex gap-2 mb-4">
+                        <div className="flex flex-wrap gap-2 mb-3 md:mb-4">
                             <button
                                 onClick={() => setActiveOrderTab('New Orders')}
-                                className={`px-6 py-3 rounded-lg font-semibold ${activeOrderTab === 'New Orders'
+                                className={`px-3 py-2 md:px-6 md:py-3 rounded-lg font-semibold text-sm md:text-base ${activeOrderTab === 'New Orders'
                                     ? 'bg-yellow-400 text-black'
                                     : 'bg-white text-gray-600 hover:bg-gray-100'
                                     }`}
@@ -438,7 +438,7 @@ function RouteComponent() {
                             </button>
                             <button
                                 onClick={() => setActiveOrderTab('In Process')}
-                                className={`px-6 py-3 rounded-lg font-semibold ${activeOrderTab === 'In Process'
+                                className={`px-3 py-2 md:px-6 md:py-3 rounded-lg font-semibold text-sm md:text-base ${activeOrderTab === 'In Process'
                                     ? 'bg-yellow-400 text-black'
                                     : 'bg-white text-gray-600 hover:bg-gray-100'
                                     }`}
@@ -447,7 +447,7 @@ function RouteComponent() {
                             </button>
                             <button
                                 onClick={() => setActiveOrderTab('Completed')}
-                                className={`px-6 py-3 rounded-lg font-semibold ${activeOrderTab === 'Completed'
+                                className={`px-3 py-2 md:px-6 md:py-3 rounded-lg font-semibold text-sm md:text-base ${activeOrderTab === 'Completed'
                                     ? 'bg-yellow-400 text-black'
                                     : 'bg-white text-gray-600 hover:bg-gray-100'
                                     }`}
@@ -455,16 +455,16 @@ function RouteComponent() {
                                 Completed
                             </button>
 
-                            {/* Search Bar */}
-                            <div className="ml-auto flex items-center">
-                                <div className="relative">
-                                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
+                            {/* Search Bar - Full width on mobile */}
+                            <div className="w-full md:w-auto md:ml-auto flex items-center mt-2 md:mt-0">
+                                <div className="relative w-full md:w-auto">
+                                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4 md:h-5 md:w-5" />
                                     <input
                                         type="text"
                                         placeholder="Type here.."
                                         value={searchQuery}
                                         onChange={(e) => setSearchQuery(e.target.value)}
-                                        className="pl-10 pr-4 py-3 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-yellow-400 focus:border-transparent"
+                                        className="w-full md:w-auto pl-9 md:pl-10 pr-4 py-2 md:py-3 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-yellow-400 focus:border-transparent text-sm md:text-base"
                                     />
                                 </div>
                             </div>
@@ -472,45 +472,45 @@ function RouteComponent() {
                     </div>
 
                     {/* Orders Header */}
-                    <div className="bg-yellow-400 rounded-t-lg p-4 flex justify-between items-center">
-                        <h2 className="text-2xl font-bold text-black">New Orders Today</h2>
-                        <span className="text-2xl font-bold text-black">{activeOrders.length} Orders</span>
+                    <div className="bg-yellow-400 rounded-t-lg p-3 md:p-4 flex justify-between items-center">
+                        <h2 className="text-lg md:text-xl lg:text-2xl font-bold text-black">New Orders Today</h2>
+                        <span className="text-lg md:text-xl lg:text-2xl font-bold text-black">{activeOrders.length} Orders</span>
                     </div>
 
-                    {/* Orders Container - White Background */}
-                    <div className="bg-white rounded-lg p-6 shadow-sm">
-                        {/* Horizontal Scrollable Orders */}
-                        <div className="overflow-x-auto">
-                            <div className="flex gap-6 pb-4 max-w-sm">
+                    {/* Orders Container */}
+                    <div className="bg-white rounded-b-lg p-3 md:p-4 lg:p-6 shadow-sm">
+                        {/* Mobile: Vertical Stack, Desktop: Horizontal Scroll */}
+                        <div className="md:overflow-x-auto">
+                            <div className="flex flex-col md:flex-row gap-4 md:gap-6 md:pb-4">
                                 {activeOrders.map((order) => {
                                     const isExpanded = expandedOrderId === order.id;
 
                                     return (
                                         <div
                                             key={order.id}
-                                            className="bg-white rounded-lg shadow-lg border-4 border-yellow-400 flex-shrink-0 w-96"
+                                            className="bg-white rounded-lg shadow-lg border-4 border-yellow-400 w-full md:flex-shrink-0 md:w-96"
                                         >
                                             {/* Order Header */}
-                                            <div className="p-4 border-b border-gray-200">
+                                            <div className="p-3 md:p-4 border-b border-gray-200">
                                                 <div className="flex justify-between items-start mb-2">
                                                     <div>
-                                                        <h3 className="text-lg font-bold text-black">{order.customerName}</h3>
-                                                        <p className="text-sm text-gray-600">{order.deliveryTime}</p>
+                                                        <h3 className="text-base md:text-lg font-bold text-black">{order.customerName}</h3>
+                                                        <p className="text-xs md:text-sm text-gray-600">{order.deliveryTime}</p>
                                                     </div>
                                                     <div className="text-right">
-                                                        <span className="text-lg font-bold text-gray-500">{order.orderNumber}</span>
+                                                        <span className="text-base md:text-lg font-bold text-gray-500">{order.orderNumber}</span>
                                                         <div className="flex items-center gap-2 mt-1">
                                                             <button
                                                                 onClick={() => {
                                                                     setSelectedOrder(order);
                                                                     setIsStatusModalOpen(true);
                                                                 }}
-                                                                className="flex items-center gap-2 px-3 py-1 bg-orange-100 text-orange-700 rounded-full text-sm font-medium hover:bg-orange-200"
+                                                                className="flex items-center gap-1 md:gap-2 px-2 md:px-3 py-1 bg-orange-100 text-orange-700 rounded-full text-xs md:text-sm font-medium hover:bg-orange-200"
                                                             >
                                                                 {order.status}
                                                                 <svg
                                                                     xmlns="http://www.w3.org/2000/svg"
-                                                                    className="h-4 w-4"
+                                                                    className="h-3 w-3 md:h-4 md:w-4"
                                                                     fill="none"
                                                                     viewBox="0 0 24 24"
                                                                     stroke="currentColor"
@@ -527,7 +527,7 @@ function RouteComponent() {
                                                         </div>
                                                     </div>
                                                 </div>
-                                                <div className="flex gap-4 text-sm text-gray-500">
+                                                <div className="flex gap-2 md:gap-4 text-xs md:text-sm text-gray-500">
                                                     <span>{order.date}</span>
                                                     <span>{order.time}</span>
                                                 </div>
@@ -535,7 +535,7 @@ function RouteComponent() {
 
                                             {/* Expanded Details */}
                                             {isExpanded ? (
-                                                <div className="p-4 space-y-3 text-sm text-gray-700">
+                                                <div className="p-3 md:p-4 space-y-2 md:space-y-3 text-xs md:text-sm text-gray-700">
                                                     <p><span className="font-semibold">Customer Name:</span> {order.customerName}</p>
                                                     <p><span className="font-semibold">Order ID:</span> {order.orderNumber}</p>
                                                     <p><span className="font-semibold">Delivery date and time:</span> {order.date} {order.deliveryTime}</p>
@@ -549,7 +549,7 @@ function RouteComponent() {
                                                     <p><span className="font-semibold">Special Instructions:</span> Wag po paramihan yung bawang..</p>
                                                     <button
                                                         onClick={() => toggleExpandOrder(order.id)}
-                                                        className="px-4 py-2 border-2 border-gray-400 text-gray-600 rounded-lg hover:bg-gray-50 font-medium text-sm mt-4"
+                                                        className="px-3 md:px-4 py-2 border-2 border-gray-400 text-gray-600 rounded-lg hover:bg-gray-50 font-medium text-xs md:text-sm mt-3 md:mt-4"
                                                     >
                                                         Back
                                                     </button>
@@ -557,14 +557,14 @@ function RouteComponent() {
                                             ) : (
                                                 <>
                                                     {/* Compact View */}
-                                                    <div className="p-4 max-h-80 overflow-y-auto">
+                                                    <div className="p-3 md:p-4 max-h-80 overflow-y-auto">
                                                         {order.products.map((product, productIndex) => (
-                                                            <div key={productIndex} className="mb-6 last:mb-4">
-                                                                <h4 className="font-bold text-black mb-3">{product.name}</h4>
+                                                            <div key={productIndex} className="mb-4 md:mb-6 last:mb-4">
+                                                                <h4 className="font-bold text-sm md:text-base text-black mb-2 md:mb-3">{product.name}</h4>
                                                                 <div className="space-y-2">
                                                                     {product.items.map((item, itemIndex) => (
                                                                         <div key={itemIndex} className="flex items-center justify-between">
-                                                                            <div className="flex items-center gap-3">
+                                                                            <div className="flex items-center gap-2 md:gap-3">
                                                                                 <input
                                                                                     type="checkbox"
                                                                                     checked={item.completed}
@@ -574,14 +574,14 @@ function RouteComponent() {
                                                                                     className="w-4 h-4 text-yellow-400 bg-gray-100 border-gray-300 rounded focus:ring-yellow-500 focus:ring-2"
                                                                                 />
                                                                                 <span
-                                                                                    className={`text-sm ${item.completed ? 'line-through text-gray-500' : 'text-black'
+                                                                                    className={`text-xs md:text-sm ${item.completed ? 'line-through text-gray-500' : 'text-black'
                                                                                         }`}
                                                                                 >
                                                                                     {item.name}
                                                                                 </span>
                                                                             </div>
                                                                             <span
-                                                                                className={`text-sm font-medium ${item.completed ? 'line-through text-gray-500' : 'text-black'
+                                                                                className={`text-xs md:text-sm font-medium ${item.completed ? 'line-through text-gray-500' : 'text-black'
                                                                                     }`}
                                                                             >
                                                                                 {item.quantity} pcs.
@@ -594,16 +594,16 @@ function RouteComponent() {
                                                     </div>
 
                                                     {/* Footer */}
-                                                    <div className="p-4 border-t border-gray-200 flex justify-between items-center">
+                                                    <div className="p-3 md:p-4 border-t border-gray-200 flex justify-between items-center">
                                                         <div>
-                                                            <p className="text-sm text-gray-600">Total Amount</p>
-                                                            <p className="text-xl font-bold text-black">
+                                                            <p className="text-xs md:text-sm text-gray-600">Total Amount</p>
+                                                            <p className="text-lg md:text-xl font-bold text-black">
                                                                 ₱ {order.totalAmount.toLocaleString()}
                                                             </p>
                                                         </div>
                                                         <button
                                                             onClick={() => toggleExpandOrder(order.id)}
-                                                            className="px-4 py-2 border-2 border-gray-400 text-gray-600 rounded-lg hover:bg-gray-50 font-medium text-sm"
+                                                            className="px-3 md:px-4 py-2 border-2 border-gray-400 text-gray-600 rounded-lg hover:bg-gray-50 font-medium text-xs md:text-sm"
                                                         >
                                                             See More
                                                         </button>
@@ -618,18 +618,18 @@ function RouteComponent() {
                         </div>
                     </div>
                     {isStatusModalOpen && selectedOrder && (
-                        <div className="fixed inset-0 flex items-center justify-center bg-black/50 z-50">
-                            <div className="bg-white rounded-2xl shadow-xl p-6 w-[22rem]">
+                        <div className="fixed inset-0 flex items-center justify-center bg-black/50 z-50 p-4">
+                            <div className="bg-white rounded-2xl shadow-xl p-4 md:p-6 w-full max-w-sm">
                                 {/* Header */}
-                                <h2 className="text-xl font-bold text-gray-800 mb-2">
+                                <h2 className="text-lg md:text-xl font-bold text-gray-800 mb-2">
                                     Update Status
                                 </h2>
-                                <p className="text-sm text-gray-500 mb-6">
+                                <p className="text-xs md:text-sm text-gray-500 mb-4 md:mb-6">
                                     Choose the new status for order #<span className="font-semibold">{selectedOrder.id}</span>.
                                 </p>
 
                                 {/* Status Options */}
-                                <div className="space-y-3">
+                                <div className="space-y-2 md:space-y-3">
                                     {(['Preparing', 'Cooking', 'Ready'] as const).map((status) => {
                                         const colors: Record<typeof status, string> = {
                                             Preparing: 'bg-blue-100 text-blue-700 hover:bg-blue-200',
@@ -639,21 +639,21 @@ function RouteComponent() {
 
                                         const icons: Record<typeof status, React.ReactNode> = {
                                             Preparing: (
-                                                <svg className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2"
+                                                <svg className="h-4 w-4 md:h-5 md:w-5" fill="none" stroke="currentColor" strokeWidth="2"
                                                     viewBox="0 0 24 24">
                                                     <path strokeLinecap="round" strokeLinejoin="round"
                                                         d="M12 8v4l3 3" />
                                                 </svg>
                                             ),
                                             Cooking: (
-                                                <svg className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2"
+                                                <svg className="h-4 w-4 md:h-5 md:w-5" fill="none" stroke="currentColor" strokeWidth="2"
                                                     viewBox="0 0 24 24">
                                                     <path strokeLinecap="round" strokeLinejoin="round"
                                                         d="M12 6v6h4" />
                                                 </svg>
                                             ),
                                             Ready: (
-                                                <svg className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2"
+                                                <svg className="h-4 w-4 md:h-5 md:w-5" fill="none" stroke="currentColor" strokeWidth="2"
                                                     viewBox="0 0 24 24">
                                                     <path strokeLinecap="round" strokeLinejoin="round"
                                                         d="M5 13l4 4L19 7" />
@@ -667,7 +667,7 @@ function RouteComponent() {
                                                 onClick={() => {
                                                     // TO BE IMPLEMENTED
                                                 }}
-                                                className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg font-medium transition ${colors[status]}`}
+                                                className={`w-full flex items-center gap-2 md:gap-3 px-3 md:px-4 py-2 md:py-3 rounded-lg font-medium transition text-sm md:text-base ${colors[status]}`}
                                             >
                                                 {icons[status]}
                                                 {status}
@@ -677,10 +677,10 @@ function RouteComponent() {
                                 </div>
 
                                 {/* Footer */}
-                                <div className="mt-6 flex justify-end">
+                                <div className="mt-4 md:mt-6 flex justify-end">
                                     <button
                                         onClick={() => setIsStatusModalOpen(false)}
-                                        className="px-4 py-2 rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-100 transition"
+                                        className="px-4 py-2 rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-100 transition text-sm md:text-base"
                                     >
                                         Cancel
                                     </button>
