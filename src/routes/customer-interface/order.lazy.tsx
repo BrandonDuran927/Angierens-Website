@@ -17,6 +17,7 @@ interface Order {
     status: 'pending' | 'to-pay' | 'in-process' | 'completed' | 'cancelled' | 'refunded'
     image: string
     totalAmount: number
+    deliveryStatus?: 'preparing' | 'on-delivery' | 'delivered'
 }
 
 interface Notification {
@@ -114,14 +115,26 @@ function RouteComponent() {
             name: '5 in 1 Mix in Bilao (PALABOK)',
             inclusions: ['40 pcs. Pork Shanghai', '30 pcs. Pork Shanghai', '12 pcs. Pork BBQ', '30 slices Cordon Bleu'],
             addOns: 'Puto 20x',
-            price: 3950,
+            price: 1850,
             quantity: 2,
-            status: 'pending',
+            status: 'to-pay',
             image: '/public/menu-page img/pancit malabonbon.png',
-            totalAmount: 7900,
+            totalAmount: 3700,
         },
         {
             id: '2',
+            orderNumber: '#10',
+            name: '5 in 1 Mix in Bilao (PALABOK)',
+            inclusions: ['40 pcs. Pork Shanghai', '30 pcs. Pork Shanghai', '12 pcs. Pork BBQ', '30 slices Cordon Bleu'],
+            addOns: 'Puto 20x',
+            price: 1850,
+            quantity: 2,
+            status: 'pending',
+            image: '/public/menu-page img/pancit malabonbon.png',
+            totalAmount: 3700,
+        },
+        {
+            id: '3',
             orderNumber: '#01',
             name: '5 in 1 Mix in Bilao (SPAGHETTI)',
             inclusions: ['40 pcs. Pork Shanghai', '30 pcs. Pork Shanghai', '12 pcs. Pork BBQ', '30 slices Cordon Bleu'],
@@ -131,6 +144,32 @@ function RouteComponent() {
             status: 'completed',
             image: '/public/menu-page img/spaghetto.png',
             totalAmount: 1900,
+        },
+        {
+            id: '4',
+            orderNumber: '#08',
+            name: '5 in 1 Mix in Bilao (BIHON)',
+            inclusions: ['40 pcs. Pork Shanghai', '30 pcs. Pork Shanghai', '12 pcs. Pork BBQ', '30 slices Cordon Bleu'],
+            addOns: 'Puto 20x',
+            price: 1850,
+            quantity: 1,
+            status: 'in-process',
+            deliveryStatus: 'on-delivery',
+            image: '/public/menu-page img/pancit malabonbon.png',
+            totalAmount: 1850,
+        },
+        {
+            id: '5',
+            orderNumber: '#07',
+            name: '5 in 1 Mix in Bilao (CANTON)',
+            inclusions: ['40 pcs. Pork Shanghai', '30 pcs. Pork Shanghai', '12 pcs. Pork BBQ', '30 slices Cordon Bleu'],
+            addOns: 'Puto 20x',
+            price: 1850,
+            quantity: 1,
+            status: 'in-process',
+            deliveryStatus: 'preparing',
+            image: '/public/menu-page img/pancit malabonbon.png',
+            totalAmount: 1850,
         },
     ])
 
@@ -142,6 +181,19 @@ function RouteComponent() {
         { id: 'cancelled', label: 'Cancelled' },
         { id: 'refunded', label: 'Refunded' },
     ]
+
+    const getDeliveryStatusInfo = (deliveryStatus?: string) => {
+        switch (deliveryStatus) {
+            case 'preparing':
+                return { text: 'Preparing', color: 'bg-orange-100 text-orange-700 border-orange-300' }
+            case 'on-delivery':
+                return { text: 'On Delivery', color: 'bg-blue-100 text-blue-700 border-blue-300' }
+            case 'delivered':
+                return { text: 'Delivered', color: 'bg-green-100 text-green-700 border-green-300' }
+            default:
+                return { text: '', color: '' }
+        }
+    }
 
     const getStatusColor = (status: string) => {
         switch (status) {
@@ -443,7 +495,14 @@ function RouteComponent() {
                                                 </div>
 
                                                 <div className="text-left sm:text-right">
-                                                    <div className={`font-bold text-base sm:text-lg mb-2 ${getStatusColor(order.status)}`}>{order.status.toUpperCase()}</div>
+                                                    <div className={`font-bold text-base sm:text-lg mb-2 ${getStatusColor(order.status)}`}>
+                                                        {order.status.toUpperCase()}
+                                                    </div>
+                                                    {order.status === 'in-process' && order.deliveryStatus && (
+                                                        <div className={`inline-block px-3 py-1 rounded-full text-sm font-semibold mb-2 border ${getDeliveryStatusInfo(order.deliveryStatus).color}`}>
+                                                            {getDeliveryStatusInfo(order.deliveryStatus).text}
+                                                        </div>
+                                                    )}
                                                     <div className="text-sm text-gray-600 mb-2">Order ID: {order.orderNumber}</div>
                                                     <div className="text-lg sm:text-xl font-bold text-gray-800 mb-2 sm:mb-4">Total: {formatPrice(order.totalAmount)}</div>
                                                 </div>
@@ -456,9 +515,33 @@ function RouteComponent() {
                                         {order.status === 'pending' && (
                                             <button
                                                 onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}
-                                                className="px-3 sm:px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 text-sm sm:text-base"
+                                                className="px-3 sm:px-4 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 text-sm sm:text-base"
                                             >
-                                                Cancel
+                                                Refund
+                                            </button>
+                                        )}
+                                        {order.status === 'to-pay' && (
+                                            <>
+                                                <button
+                                                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                                                    className="px-3 sm:px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 text-sm sm:text-base"
+                                                >
+                                                    Cancel
+                                                </button>
+                                                <button
+                                                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                                                    className="px-3 sm:px-4 py-2 bg-yellow-400 text-black rounded-lg hover:bg-yellow-500 text-sm sm:text-base whitespace-nowrap"
+                                                >
+                                                    Upload Proof of Payment
+                                                </button>
+                                            </>
+                                        )}
+                                        {order.status === 'in-process' && order.deliveryStatus === 'on-delivery' && (
+                                            <button
+                                                onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                                                className="px-3 sm:px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 text-sm sm:text-base"
+                                            >
+                                                Track Order
                                             </button>
                                         )}
                                         {order.status === 'completed' && (
@@ -564,8 +647,7 @@ function RouteComponent() {
 
                         <div className="flex justify-end gap-3 mt-6">
                             <button onClick={() => setIsFilterModalOpen(false)} className="px-4 py-2 border border-gray-400 rounded hover:bg-gray-100">Cancel</button>
-                            <button onClick={() => setIsFilterModalOpen(false)} className="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600">Confirm</button>
-                        </div>
+                            <button onClick={() => setIsFilterModalOpen(false)} className="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600">Confirm</button></div>
                     </div>
                 </div>
             )}

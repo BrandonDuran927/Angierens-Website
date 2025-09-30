@@ -39,7 +39,7 @@ interface Employee {
     id: string
     type: 'Rider'
     name: string
-    status: 'On Deliver' | 'Waiting' | 'Returning' | 'Pick-up'
+    status: 'On Deliver' | 'Waiting' | 'Returning' | 'Pick-up' | 'Delivered'
     currentTask: string
     assignedOrders: string[]
 }
@@ -336,7 +336,7 @@ function RouteComponent() {
             id: '2',
             type: 'Rider',
             name: 'Lenny',
-            status: 'Waiting',
+            status: 'Pick-up',
             currentTask: 'Waiting for Customer Order',
             assignedOrders: ['#08', '#13', '#018']
         },
@@ -344,8 +344,8 @@ function RouteComponent() {
             id: '3',
             type: 'Rider',
             name: 'Marky',
-            status: 'Returning',
-            currentTask: 'Going back to Angieren',
+            status: 'Delivered',
+            currentTask: 'Completed delivery',
             assignedOrders: ['#09', '#14', '#019']
         },
         {
@@ -608,6 +608,7 @@ function RouteComponent() {
                                             <option value="All">All</option>
                                             <option value="Riders">Riders</option>
                                             <option value="Staff">Staff</option>
+                                            <option value="Chef">Chef</option>
                                         </select>
                                         <div className="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none">
                                             <svg className="w-4 h-4 text-black" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -660,7 +661,6 @@ function RouteComponent() {
                                             <td className="px-4 sm:px-6 py-3 sm:py-4 text-gray-800 font-medium">{employee.name}</td>
                                             <td className="px-4 sm:px-6 py-3 sm:py-4">
                                                 <div className="flex items-center gap-2">
-                                                    <div className={`w-2 h-2 rounded-full ${getStatusColor(employee.status)}`}></div>
                                                     <span className="text-gray-800">{employee.status}</span>
                                                 </div>
                                             </td>
@@ -673,9 +673,6 @@ function RouteComponent() {
                                                         </span>
                                                     ))}
                                                 </div>
-                                                <button className="text-amber-600 hover:text-amber-800 text-xs sm:text-sm mt-1 underline">
-                                                    see orders
-                                                </button>
                                             </td>
                                             <td className="px-4 sm:px-6 py-3 sm:py-4">
                                                 <div
@@ -852,7 +849,6 @@ function RouteComponent() {
                                 <div className="flex-1">
                                     <h2 className="text-2xl font-bold">{selectedEmployee.name}</h2>
                                     <div className="flex items-center gap-2 mt-1">
-                                        <div className={`w-2 h-2 rounded-full ${getStatusColor(selectedEmployee.status)}`}></div>
                                         <span className="text-amber-200">{selectedEmployee.status}</span>
                                     </div>
                                 </div>

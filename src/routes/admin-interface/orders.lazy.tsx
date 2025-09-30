@@ -174,7 +174,7 @@ function AdminOrdersInterface() {
             time: '10:30 AM',
             price: 'P 2,350',
             fulfillmentType: 'Delivery',
-            paymentMethod: 'Online - GCash 100%',
+            paymentMethod: 'Online - GCash',
             status: 'New Orders'
         },
         {
@@ -184,7 +184,7 @@ function AdminOrdersInterface() {
             time: '9:40 AM',
             price: 'P 850',
             fulfillmentType: 'Delivery',
-            paymentMethod: 'Online - COD: 50% ...',
+            paymentMethod: 'Online - GCash',
             status: 'New Orders'
         },
         {
@@ -194,7 +194,7 @@ function AdminOrdersInterface() {
             time: '11:02 AM',
             price: 'P 980',
             fulfillmentType: 'Delivery',
-            paymentMethod: 'Online - COD: 50% ...',
+            paymentMethod: 'Online - GCash',
             status: 'New Orders'
         },
         {
@@ -214,7 +214,7 @@ function AdminOrdersInterface() {
             time: '2:00 PM',
             price: 'P 450',
             fulfillmentType: 'Delivery',
-            paymentMethod: 'Online - GCash 100%',
+            paymentMethod: 'Online - GCash',
             status: 'New Orders'
         },
         {
@@ -224,7 +224,7 @@ function AdminOrdersInterface() {
             time: '9:05 AM',
             price: 'P 850',
             fulfillmentType: 'Pick-up',
-            paymentMethod: 'Online - GCash 100%',
+            paymentMethod: 'Online - GCash',
             status: 'New Orders'
         },
         {
@@ -234,7 +234,7 @@ function AdminOrdersInterface() {
             time: '10:24 AM',
             price: 'P 2450',
             fulfillmentType: 'Delivery',
-            paymentMethod: 'Online - GCash 100%',
+            paymentMethod: 'Online - GCash',
             status: 'New Orders'
         },
         {
@@ -254,7 +254,7 @@ function AdminOrdersInterface() {
             time: '1:20 PM',
             price: 'P 2450',
             fulfillmentType: 'Delivery',
-            paymentMethod: 'Online - GCash 100%',
+            paymentMethod: 'Online - GCash',
             status: 'New Orders'
         },
         {
@@ -1047,14 +1047,6 @@ function AdminOrdersInterface() {
                             >
                                 See more
                             </button>
-                            <div className="flex items-center gap-3">
-                                <button className="px-6 py-3 bg-red-500 text-white rounded-lg font-medium hover:bg-red-600 transition-colors">
-                                    Reject
-                                </button>
-                                <button className="px-6 py-3 bg-green-500 text-white rounded-lg font-medium hover:bg-green-600 transition-colors">
-                                    Accept
-                                </button>
-                            </div>
                         </div>
                     </div>
                 </div>
@@ -1121,12 +1113,6 @@ function AdminOrdersInterface() {
                             <div className="flex">
                                 <h4 className="text-lg font-semibold text-gray-800 mr-4 min-w-[200px]">Order Type:</h4>
                                 <p className="text-gray-600">Today</p>
-                            </div>
-
-                            {/* Payment Percentage */}
-                            <div className="flex">
-                                <h4 className="text-lg font-semibold text-gray-800 mr-4 min-w-[200px]">Payment %:</h4>
-                                <p className="text-gray-600">100</p>
                             </div>
                         </div>
 

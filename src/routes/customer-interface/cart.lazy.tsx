@@ -128,7 +128,7 @@ function RouteComponent() {
             id: '1',
             name: '5 in 1 Mix in Bilao (PALABOK)',
             addOns: '20 pcs. Puto',
-            price: 3950,
+            price: 1850,
             quantity: 2,
             image: '/public/menu-page img/pancit malabonbon.png',
             description: 'A hearty and flavorful blend of authentic Filipino dishes, perfectly portioned for sharing and celebrating with family and friends.',

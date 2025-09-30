@@ -8,6 +8,7 @@ import {
     DollarSign,
     Package,
     LogOut,
+    Upload
 } from 'lucide-react'
 
 export const Route = createLazyFileRoute('/staff/')({
@@ -66,7 +67,27 @@ function RouteComponent() {
     const [showOrderBackView, setShowOrderBackView] = useState(false)
     const [isOrderDetailsModalOpen, setIsOrderDetailsModalOpen] = useState(false)
     const [selectedOrder, setSelectedOrder] = useState<Order | null>(null)
+    const [isRejectModalOpen, setIsRejectModalOpen] = useState(false)
+    const [returnPaymentProof, setReturnPaymentProof] = useState<File | null>(null)
 
+    const handleReturnPaymentProofUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (e.target.files && e.target.files[0]) {
+            setReturnPaymentProof(e.target.files[0])
+        }
+    }
+
+    const handleRejectDone = () => {
+        // Handle the rejection and upload logic here
+        console.log('Order rejected with proof:', returnPaymentProof)
+        setIsRejectModalOpen(false)
+        setReturnPaymentProof(null)
+        setIsOrderDetailsModalOpen(false)
+    }
+
+    const handleRejectCancel = () => {
+        setIsRejectModalOpen(false)
+        setReturnPaymentProof(null)
+    }
 
     const notificationCount = 1
 
@@ -159,7 +180,7 @@ function RouteComponent() {
             time: '10:30 AM',
             price: '₱ 2,350',
             fulfillmentType: 'Delivery',
-            paymentMethod: 'Online - GCash 100%',
+            paymentMethod: 'Online - GCash',
             status: 'pending'
         },
         {
@@ -169,7 +190,7 @@ function RouteComponent() {
             time: '9:40 AM',
             price: '₱ 850',
             fulfillmentType: 'Delivery',
-            paymentMethod: 'Online - COD: 50%...',
+            paymentMethod: 'On-site',
             status: 'pending'
         },
 
@@ -559,8 +580,11 @@ function RouteComponent() {
 
                                 <div className="flex gap-2">
                                     <button
-                                        onClick={() => handleRejectOrder(order.id)}
-                                        className="flex-1 px-4 py-2.5 text-sm font-medium bg-red-500 text-white rounded-lg hover:bg-red-600 active:bg-red-700 transition-colors"
+                                        onClick={() => {
+                                            setIsOrderDetailsModalOpen(false);
+                                            setIsRejectModalOpen(true);
+                                        }}
+                                        className="px-6 py-3 bg-red-500 text-white rounded-lg font-medium hover:bg-red-600 transition-colors"
                                     >
                                         Reject
                                     </button>
@@ -953,10 +977,21 @@ function RouteComponent() {
                                 >
                                     See more
                                 </button>
+                                {/* NEW BUTTON HERE */}
+                                <button
+                                    onClick={() => {/* handle view proof of payment */ }}
+                                    className="px-6 py-3 bg-amber-600 text-white rounded-lg font-medium hover:bg-amber-700 transition-colors"
+                                >
+                                    View Proof of Payment
+                                </button>
                                 <div className="flex items-center gap-3">
-                                    <button className="px-6 py-3 bg-red-500 text-white rounded-lg font-medium hover:bg-red-600 transition-colors">
+                                    <button
+                                        onClick={() => setIsRejectModalOpen(true)}
+                                        className="px-6 py-3 bg-red-500 text-white rounded-lg font-medium hover:bg-red-600 transition-colors"
+                                    >
                                         Reject
                                     </button>
+
                                     <button className="px-6 py-3 bg-green-500 text-white rounded-lg font-medium hover:bg-green-600 transition-colors">
                                         Accept
                                     </button>
@@ -1030,12 +1065,6 @@ function RouteComponent() {
                                     <h4 className="text-lg font-semibold text-gray-800 mr-4 min-w-[200px]">Order Type:</h4>
                                     <p className="text-gray-600">Today</p>
                                 </div>
-
-                                {/* Payment Percentage */}
-                                <div className="flex">
-                                    <h4 className="text-lg font-semibold text-gray-800 mr-4 min-w-[200px]">Payment %:</h4>
-                                    <p className="text-gray-600">100</p>
-                                </div>
                             </div>
 
                             {/* Modal Footer */}
@@ -1050,7 +1079,10 @@ function RouteComponent() {
                                     Go back
                                 </button>
                                 <div className="flex items-center gap-3">
-                                    <button className="px-6 py-3 bg-red-500 text-white rounded-lg font-medium hover:bg-red-600 transition-colors">
+                                    <button
+                                        onClick={() => setIsRejectModalOpen(true)}
+                                        className="px-6 py-3 bg-red-500 text-white rounded-lg font-medium hover:bg-red-600 transition-colors"
+                                    >
                                         Reject
                                     </button>
                                     <button className="px-6 py-3 bg-green-500 text-white rounded-lg font-medium hover:bg-green-600 transition-colors">
@@ -1209,6 +1241,96 @@ function RouteComponent() {
                     </div>
                 )
             }
+
+            {/* Reject Order Modal */}
+            {isRejectModalOpen && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60]">
+                    <div className="bg-white rounded-xl shadow-2xl w-full max-w-md mx-4">
+                        {/* Modal Header */}
+                        <div className="flex items-center justify-between p-6 border-b border-gray-200">
+                            <h2 className="text-xl font-bold text-gray-800">Reject Order</h2>
+                            <button
+                                onClick={handleRejectCancel}
+                                className="text-gray-500 hover:text-gray-700 p-2 hover:bg-gray-100 rounded-full transition-colors"
+                            >
+                                <X className="h-6 w-6" />
+                            </button>
+                        </div>
+
+                        {/* Modal Body */}
+                        <div className="p-6 space-y-4">
+                            <p className="text-gray-600">
+                                Upload proof of return payment to complete the rejection process.
+                            </p>
+
+                            {/* File Upload Section */}
+                            <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-amber-600 transition-colors">
+                                <input
+                                    type="file"
+                                    id="returnPaymentProof"
+                                    accept="image/*,.pdf"
+                                    onChange={handleReturnPaymentProofUpload}
+                                    className="hidden"
+                                />
+                                <label
+                                    htmlFor="returnPaymentProof"
+                                    className="cursor-pointer flex flex-col items-center"
+                                >
+                                    <div className="w-16 h-16 bg-amber-100 rounded-full flex items-center justify-center mb-3">
+                                        <Upload className="h-8 w-8 text-amber-600" />
+                                    </div>
+                                    <span className="text-gray-700 font-medium mb-1">
+                                        Click to upload proof of return payment
+                                    </span>
+                                    <span className="text-sm text-gray-500">
+                                        PNG, JPG or PDF (max. 5MB)
+                                    </span>
+                                </label>
+                            </div>
+
+                            {/* Show uploaded file name */}
+                            {returnPaymentProof && (
+                                <div className="flex items-center gap-2 p-3 bg-green-50 border border-green-200 rounded-lg">
+                                    <div className="flex-1">
+                                        <p className="text-sm font-medium text-green-800">
+                                            {returnPaymentProof.name}
+                                        </p>
+                                        <p className="text-xs text-green-600">
+                                            {(returnPaymentProof.size / 1024).toFixed(2)} KB
+                                        </p>
+                                    </div>
+                                    <button
+                                        onClick={() => setReturnPaymentProof(null)}
+                                        className="text-green-600 hover:text-green-800"
+                                    >
+                                        <X className="h-5 w-5" />
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Modal Footer */}
+                        <div className="flex items-center justify-end gap-3 p-6 border-t border-gray-200 bg-gray-50">
+                            <button
+                                onClick={handleRejectCancel}
+                                className="px-6 py-3 border-2 border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-100 transition-colors"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={handleRejectDone}
+                                disabled={!returnPaymentProof}
+                                className={`px-6 py-3 rounded-lg font-medium transition-colors ${returnPaymentProof
+                                    ? 'bg-red-500 text-white hover:bg-red-600'
+                                    : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                                    }`}
+                            >
+                                Done
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div >
     )
 }

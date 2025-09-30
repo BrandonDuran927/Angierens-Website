@@ -409,9 +409,13 @@ function SpecificOrder() {
                 </Link>
                 <h2 className="text-lg sm:text-2xl font-bold text-black">Order ID: #{orderId}</h2>
               </div>
-              <div className="text-amber-600 px-3 sm:px-6 py-1 sm:py-2 rounded-full text-sm sm:text-xl font-medium text-center">
+              {/* <div className="text-amber-600 px-3 sm:px-6 py-1 sm:py-2 rounded-full text-sm sm:text-xl font-medium text-center">
                 Your order is for payment
-              </div>
+              </div> */}
+
+              <button className="bg-amber-600 hover:bg-amber-700 text-white px-4 py-2 rounded-lg text-sm sm:text-base font-medium transition-colors">
+                View Proof of Payment
+              </button>
             </div>
           </div>
 
