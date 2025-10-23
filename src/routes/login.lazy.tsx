@@ -1,17 +1,38 @@
 import { createLazyFileRoute, Link } from '@tanstack/react-router'
 import { useState } from 'react';
+import { supabase } from '@/lib/supabaseClient'
+import { useNavigate } from '@tanstack/react-router';
+
+
 
 export const Route = createLazyFileRoute('/login')({
   component: RouteComponent,
 })
 
 function RouteComponent() {
+  const navigate = useNavigate()
 
   const [showForgotModal, setShowForgotModal] = useState(false);
 
   const handleForgotClick = () => setShowForgotModal(true);
   const handleCloseModal = () => setShowForgotModal(false);
 
+
+
+  async function signInWithEmail() {
+
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email: "duranbrandon927@gmail.com",
+      password: "EPIC4_GROUP",
+    });
+
+    if (error) {
+      console.error("Error signing in:", error.message);
+    } else {
+      console.log("Sign-in successful:", data);
+      navigate({ to: "/customer-interface/home" })
+    }
+  }
   return (
     <div className="min-h-screen flex flex-col mt-50">
       {/* Modal Overlay */}
@@ -62,7 +83,6 @@ function RouteComponent() {
             <form className="flex flex-col gap-5">
               {/* Email Input */}
               <div className="flex items-center border border-gray-400 rounded-full px-4 py-2 shadow-sm">
-                <span className="mr-2">📧</span>
                 <input
                   type="email"
                   placeholder="Type Email Address"
@@ -72,7 +92,6 @@ function RouteComponent() {
 
               {/* Password Input */}
               <div className="flex items-center border border-gray-400 rounded-full px-4 py-2 shadow-sm">
-                <span className="mr-2">🔒</span>
                 <input
                   type="password"
                   placeholder="Type your password"
@@ -96,12 +115,15 @@ function RouteComponent() {
               </div>
 
               {/* Login Button */}
-              <Link
-                to="/customer-interface/home"
-                className="bg-[#964B00] text-white font-semibold py-2 rounded-full shadow-md hover:bg-[#7b3f00] text-center block"
+
+
+              <button
+                onClick={signInWithEmail}
+                type="button" // 👈 or "button" to stop submit behavior
+                className="bg-[#964B00] text-white font-semibold py-2 rounded-full shadow-md hover:bg-[#7b3f00] text-center"
               >
                 LOGIN
-              </Link>
+              </button>
 
               {/* Account link */}
               <p className="text-sm text-center">
@@ -122,16 +144,16 @@ function RouteComponent() {
               <div className="flex justify-center gap-6 text-3xl">
                 <button type="button">
                   <img
-                    src="https://upload.wikimedia.org/wikipedia/commons/5/53/Google_%22G%22_Logo.svg"
+                    src="https://img.icons8.com/?size=100&id=V5cGWnc9R4xj&format=png&color=000000"
                     alt="Google"
-                    className="w-8 h-8"
+                    className="w-8 h-8 cursor-pointer"
                   />
                 </button>
                 <button type="button">
                   <img
-                    src="https://upload.wikimedia.org/wikipedia/commons/0/05/Facebook_Logo_%282019%29.png"
+                    src="https://img.icons8.com/?size=100&id=uLWV5A9vXIPu&format=png&color=000000"
                     alt="Facebook"
-                    className="w-8 h-8"
+                    className="w-8 h-8 cursor-pointer"
                   />
                 </button>
               </div>

@@ -1,5 +1,7 @@
 import { createLazyFileRoute } from '@tanstack/react-router'
 import { useState } from 'react'
+import { supabase } from '@/lib/supabaseClient'
+
 
 export const Route = createLazyFileRoute('/signup')({
   component: Signup,
@@ -31,6 +33,21 @@ function Signup() {
     agree: false,
   })
 
+  async function signUpNewUser() {
+    const { data, error } = await supabase.auth.signUp({
+      email: 'duranbrandon927@gmail.com',
+      password: 'EPIC4_GROUP',
+      options: {
+        emailRedirectTo: 'https://example.com/welcome',
+      },
+    })
+
+    if (error) console.error('Error signing up:', error)
+    else console.log('Sign-up successful:', data)
+  }
+
+
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const target = e.target
     const { name, value } = target
@@ -41,14 +58,18 @@ function Signup() {
     }))
   }
 
+
+
+
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
 
-    // You can add form validation or API call here first
+    signUpNewUser()
+
     console.log('Form submitted:', form)
 
-    // Simulate sending OTP
-    setShowOtpModal(true)
+    // setShowOtpModal(true)
   }
 
   const closeOtpModal = () => {
@@ -57,7 +78,7 @@ function Signup() {
   }
 
   const verifyOtp = () => {
-    if (otpCode === '123456') { // Replace with actual validation
+    if (otpCode === '123456') {
       alert('OTP verified successfully!')
       closeOtpModal()
     } else {

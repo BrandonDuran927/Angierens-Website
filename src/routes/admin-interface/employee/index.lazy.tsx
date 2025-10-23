@@ -787,30 +787,6 @@ function RouteComponent() {
                                 />
                             </div>
 
-                            {/* Upload Profile Photo */}
-                            <div>
-                                <label className="block text-black font-medium mb-2">Upload Profile Photo:</label>
-                                <div className="relative">
-                                    <input
-                                        type="file"
-                                        accept="image/*"
-                                        onChange={handleFileUpload}
-                                        className="hidden"
-                                        id="profilePhoto"
-                                    />
-                                    <label
-                                        htmlFor="profilePhoto"
-                                        className="w-full bg-white px-4 py-3 rounded-lg border-0 cursor-pointer flex items-center gap-3 hover:bg-gray-50 transition-colors"
-                                    >
-                                        <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                                        </svg>
-                                        <span className="text-gray-600">
-                                            {formData.profilePhoto ? formData.profilePhoto.name : "Upload file from your computer"}
-                                        </span>
-                                    </label>
-                                </div>
-                            </div>
 
                             {/* Action Buttons */}
                             <div className="flex gap-4 pt-4">
@@ -839,13 +815,6 @@ function RouteComponent() {
                         {/* Employee Header */}
                         <div className="bg-amber-800 text-white p-6 rounded-t-xl">
                             <div className="flex items-center gap-4">
-                                <div className="w-16 h-16 bg-gray-300 rounded-full overflow-hidden">
-                                    <img
-                                        src={`/api/placeholder/64/64`}
-                                        alt={selectedEmployee.name}
-                                        className="w-full h-full object-cover"
-                                    />
-                                </div>
                                 <div className="flex-1">
                                     <h2 className="text-2xl font-bold">{selectedEmployee.name}</h2>
                                     <div className="flex items-center gap-2 mt-1">

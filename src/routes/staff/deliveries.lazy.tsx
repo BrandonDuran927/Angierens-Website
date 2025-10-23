@@ -737,7 +737,24 @@ function RouteComponent() {
                                         <tr key={order.id} className="hover:bg-gray-50">
                                             <td className="px-3 sm:px-4 lg:px-6 py-4 whitespace-nowrap">{order.id}</td>
                                             <td className="px-3 sm:px-4 lg:px-6 py-4 whitespace-nowrap">{order.customerName}</td>
-                                            <td className="px-3 sm:px-4 lg:px-6 py-4 whitespace-nowrap">{order.assignedRider || 'N/A'}</td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                                {order.assignedRider ? (
+                                                    order.assignedRider
+                                                ) : (
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="text-gray-500">N/A</span>
+                                                        <button
+                                                            onClick={() => {
+                                                                setSelectedOrderForAssign(order)
+                                                                setIsAssignModalOpen(true)
+                                                            }}
+                                                            className="px-3 py-1 text-xs bg-blue-100 text-blue-800 rounded-full hover:bg-blue-200 transition-colors"
+                                                        >
+                                                            + Rider
+                                                        </button>
+                                                    </div>
+                                                )}
+                                            </td>
                                             <td className="px-3 sm:px-4 lg:px-6 py-4 whitespace-nowrap">{order.assignedDate}</td>
                                             <td className="px-3 sm:px-4 lg:px-6 py-4 whitespace-nowrap">{order.assignedTime}</td>
                                             <td className="px-3 sm:px-4 lg:px-6 py-4 whitespace-nowrap font-semibold">{order.price}</td>
