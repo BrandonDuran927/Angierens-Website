@@ -41,11 +41,11 @@ export const Route = createLazyFileRoute('/customer-interface/')({
 
 function RouteComponent() {
   const [isNotificationOpen, setIsNotificationOpen] = useState(false)
+  const [notificationCount, setNotificationCount] = useState(3)
   const [isOrderDropdownOpen, setIsOrderDropdownOpen] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState('All Categories')
   const [searchQuery, setSearchQuery] = useState('')
   const [cartCount, setCartCount] = useState(0)
-  const [notificationCount, setNotificationCount] = useState(3)
   const [selectedItem, setSelectedItem] = useState<MenuItem | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [orderQuantity, setOrderQuantity] = useState(1)
