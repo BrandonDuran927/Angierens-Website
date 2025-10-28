@@ -3,6 +3,7 @@ import { createLazyFileRoute, Link } from '@tanstack/react-router'
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabaseClient'
 import { useNavigate } from '@tanstack/react-router';
+import { useUser } from '@/context/UserContext';
 
 interface Notification {
   id: string
@@ -18,6 +19,8 @@ export const Route = createLazyFileRoute('/login')({
 })
 
 function RouteComponent() {
+  const { setUser } = useUser();
+
   const navigate = useNavigate()
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -74,7 +77,7 @@ function RouteComponent() {
   };
 
   const navigationItems = [
-    { name: 'HOME', route: '/customer-interface/home', active: false },
+    { name: 'HOME', route: '/', active: false },
     { name: 'MENU', route: '/customer-interface/', active: false },
     { name: 'ORDER', route: '/customer-interface/order', active: false },
     { name: 'REVIEW', route: '/customer-interface/feedback', active: false },
@@ -175,8 +178,12 @@ function RouteComponent() {
       return;
     }
 
+    setUser(data.user)
     console.log("Sign-in successful:", data);
-    navigate({ to: "/customer-interface/home" });
+
+    setTimeout(() => {
+      navigate({ to: "/" });
+    }, 300);
   }
 
   async function sendPasswordResetEmail() {

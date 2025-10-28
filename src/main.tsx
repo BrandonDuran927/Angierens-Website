@@ -8,6 +8,9 @@ import { routeTree } from './routeTree.gen'
 import './styles.css'
 import reportWebVitals from './reportWebVitals.ts'
 
+import { UserProvider } from '@/context/UserContext'
+
+
 // Create a new router instance
 const router = createRouter({
   routeTree,
@@ -31,7 +34,9 @@ if (rootElement && !rootElement.innerHTML) {
   const root = ReactDOM.createRoot(rootElement)
   root.render(
     <StrictMode>
-      <RouterProvider router={router} />
+      <UserProvider>
+        <RouterProvider router={router} />
+      </UserProvider>
     </StrictMode>,
   )
 }

@@ -1,7 +1,9 @@
 import { createLazyFileRoute, Link } from '@tanstack/react-router'
-import { useState } from 'react';
 import { Search, ShoppingCart, Bell, Heart, Star, MessageSquare, X, Menu } from 'lucide-react'
-
+import { useState, useEffect } from 'react'
+import { useUser } from '@/context/UserContext'
+import { useNavigate } from '@tanstack/react-router'
+import { ProtectedRoute } from '@/components/ProtectedRoute'
 
 export const Route = createLazyFileRoute('/')({
   component: App,
@@ -17,6 +19,19 @@ interface Notification {
 }
 
 function App() {
+  const { user, signOut } = useUser()
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    console.log("Navigated to /customer-interface")
+    console.log("Current logged-in user:", user)
+  }, [user])
+
+  async function handleLogout() {
+    await signOut();
+    navigate({ to: "/login" });
+  }
+
   const [isNotificationOpen, setIsNotificationOpen] = useState(false)
   const [isReviewsModalOpen, setIsReviewsModalOpen] = useState(false);
   const [cartCount, setCartCount] = useState(0);
@@ -108,11 +123,11 @@ function App() {
   };
 
   const navigationItems = [
-    { name: 'HOME', route: '/customer-interface/home', active: true },
+    { name: 'HOME', route: '/', active: true },
     { name: 'MENU', route: '/customer-interface/', active: false },
-    { name: 'ORDER', route: '/login', active: false },
-    { name: 'FEEDBACK', route: '/login', active: false },
-    { name: 'MY INFO', route: '/login', active: false },
+    { name: 'ORDER', route: '/customer-interface/order', active: false },
+    { name: 'REVIEW', route: '/customer-interface/feedback', active: false },
+    { name: 'MY INFO', route: '/customer-interface/my-info', active: false }
   ];
 
   const logoStyle: React.CSSProperties = {
@@ -271,11 +286,23 @@ function App() {
                 )}
               </div>
 
-              {/* Sign up Button */}
-              <button className="bg-[#964B00] text-yellow-400 font-semibold py-1 sm:py-2 px-2 sm:px-3 md:px-4 text-xs sm:text-sm md:text-base rounded-full shadow-md border-2 border-yellow-400 hover:bg-yellow-400 hover:text-[#964B00] transition-colors whitespace-nowrap">
-                <span className="hidden sm:inline">SIGN UP</span>
-                <span className="sm:hidden">UP</span>
-              </button>
+              {/* Conditional Button */}
+              {user ? (
+                <button
+                  onClick={handleLogout}
+                  className="bg-[#964B00] text-yellow-400 font-semibold py-1 sm:py-2 px-2 sm:px-3 md:px-4 text-xs sm:text-sm md:text-base rounded-full shadow-md border-2 border-yellow-400 hover:bg-yellow-400 hover:text-[#964B00] transition-colors whitespace-nowrap"
+                >
+                  <span className="hidden sm:inline">SIGN OUT</span>
+                  <span className="sm:hidden">OUT</span>
+                </button>
+              ) : (
+                <Link to="/login">
+                  <button className="bg-[#964B00] text-yellow-400 font-semibold py-1 sm:py-2 px-2 sm:px-3 md:px-4 text-xs sm:text-sm md:text-base rounded-full shadow-md border-2 border-yellow-400 hover:bg-yellow-400 hover:text-[#964B00] transition-colors whitespace-nowrap">
+                    <span className="hidden sm:inline">SIGN IN</span>
+                    <span className="sm:hidden">IN</span>
+                  </button>
+                </Link>
+              )}
             </div>
           </div>
         </div>
@@ -611,7 +638,7 @@ function App() {
               <div>
                 <h4 className="text-md font-semibold mb-3 text-gray-800">Quick Links</h4>
                 <ul className="space-y-2 text-sm">
-                  <li><Link to="/customer-interface/home" className="text-gray-600 hover:text-gray-800">Home</Link></li>
+                  <li><Link to="/" className="text-gray-600 hover:text-gray-800">Home</Link></li>
                   <li><Link to="/" className="text-gray-600 hover:text-gray-800">Menu</Link></li>
                   <li><Link to="/" className="text-gray-600 hover:text-gray-800">About Us</Link></li>
                   <li><Link to="/" className="text-gray-600 hover:text-gray-800">Contact</Link></li>
