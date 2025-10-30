@@ -1,5 +1,5 @@
 import { createLazyFileRoute, useNavigate } from '@tanstack/react-router'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Link, useLocation } from '@tanstack/react-router'
 import {
     LayoutDashboard,
@@ -21,6 +21,7 @@ import {
     LucideCalendar,
     MenuIcon
 } from 'lucide-react'
+import { supabase } from '@/lib/supabaseClient'
 
 export const Route = createLazyFileRoute('/admin-interface/employee/')({
     component: RouteComponent,
@@ -37,11 +38,26 @@ interface Notification {
 
 interface Employee {
     id: string
-    type: 'Rider'
+    type: string
     name: string
-    status: 'On Deliver' | 'Waiting' | 'Returning' | 'Pick-up' | 'Delivered'
-    currentTask: string
+    email: string
+    phone: string
+    dateHired: string
     assignedOrders: string[]
+}
+
+interface EmployeeDetails {
+    phone: string
+    email: string
+    dateHired: string
+    recentDeliveries: {
+        order: string
+        date: string
+        time: string
+        customerName: string
+        status: string
+        address: string
+    }[]
 }
 
 interface FormData {
@@ -60,6 +76,9 @@ function RouteComponent() {
     const [filterType, setFilterType] = useState('All')
     const location = useLocation()
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
+    const [employees, setEmployees] = useState<Employee[]>([])
+    const [employeeDetails, setEmployeeDetails] = useState<Record<string, EmployeeDetails>>({})
+    const [loading, setLoading] = useState(true)
     const [formData, setFormData] = useState<FormData>({
         fullName: '',
         email: '',
@@ -76,48 +95,135 @@ function RouteComponent() {
     const [isTrackModalOpen, setIsTrackModalOpen] = useState(false)
     const [selectedEmployeeForTrack, setSelectedEmployeeForTrack] = useState<Employee | null>(null)
 
-    const availableOrders = [
-        {
-            id: '#022',
-            customerName: 'Maria Santos',
-            address: '789 Pine St, Makati City',
-            items: ['Adobo Rice Bowl', 'Lumpia Shanghai (6pcs)'],
-            total: '₱285.00',
-            orderTime: '11:45 AM',
-            priority: 'Normal',
-            estimatedTime: '25 mins'
-        },
-        {
-            id: '#023',
-            customerName: 'Robert Cruz',
-            address: '321 Elm Ave, Pasig City',
-            items: ['Sinigang na Baboy', 'Garlic Rice'],
-            total: '₱320.00',
-            orderTime: '11:50 AM',
-            priority: 'High',
-            estimatedTime: '30 mins'
-        },
-        {
-            id: '#024',
-            customerName: 'Lisa Garcia',
-            address: '654 Maple Rd, Taguig City',
-            items: ['Bicol Express', 'Plain Rice', 'Iced Tea'],
-            total: '₱245.00',
-            orderTime: '11:55 AM',
-            priority: 'Normal',
-            estimatedTime: '20 mins'
-        },
-        {
-            id: '#025',
-            customerName: 'Carlos Reyes',
-            address: '987 Oak Blvd, Mandaluyong City',
-            items: ['Lechon Kawali', 'Pancit Canton', 'Softdrinks'],
-            total: '₱395.00',
-            orderTime: '12:00 PM',
-            priority: 'High',
-            estimatedTime: '35 mins'
+    // Fetch employees from Supabase
+    useEffect(() => {
+        fetchEmployees()
+    }, [])
+
+    const fetchEmployees = async () => {
+        try {
+            setLoading(true)
+            // Fetch all users with role 'rider' or 'staff'
+            const { data: usersData, error: usersError } = await supabase
+                .from('users')
+                .select('*')
+                .in('user_role', ['Rider', 'Staff'])
+                .eq('is_active', true)
+
+            if (usersError) throw usersError
+
+            // Transform data to match Employee interface
+            const employeesData: Employee[] = (usersData || []).map((user: any) => ({
+                id: user.user_uid,
+                type: user.user_role === 'Rider' ? 'Rider' : 'Staff',
+                name: `${user.first_name} ${user.middle_name ? user.middle_name + ' ' : ''}${user.last_name}`.trim(),
+                email: user.email,
+                phone: user.phone_number,
+                dateHired: user.date_hired || 'N/A',
+                assignedOrders: []
+            }))
+
+            setEmployees(employeesData)
+
+            // Fetch delivery details for each rider
+            const detailsMap: Record<string, EmployeeDetails> = {}
+            for (const employee of employeesData) {
+                if (employee.type === 'Rider') {
+                    const deliveries = await fetchEmployeeDeliveries(employee.id)
+                    detailsMap[employee.id] = {
+                        phone: employee.phone,
+                        email: employee.email,
+                        dateHired: employee.dateHired,
+                        recentDeliveries: deliveries
+                    }
+                } else {
+                    detailsMap[employee.id] = {
+                        phone: employee.phone,
+                        email: employee.email,
+                        dateHired: employee.dateHired,
+                        recentDeliveries: []
+                    }
+                }
+            }
+
+            setEmployeeDetails(detailsMap)
+        } catch (error) {
+            console.error('Error fetching employees:', error)
+        } finally {
+            setLoading(false)
         }
-    ]
+    }
+
+    const fetchEmployeeDeliveries = async (riderId: string) => {
+        try {
+            // Get today's date range
+            const today = new Date()
+            today.setHours(0, 0, 0, 0)
+            const tomorrow = new Date(today)
+            tomorrow.setDate(tomorrow.getDate() + 1)
+
+            const { data: deliveriesData, error } = await supabase
+                .from('delivery')
+                .select(`
+                    delivery_id,
+                    delivery_time,
+                        address!inner(
+                        barangay,
+                        address_line,
+                        city
+                        ),
+                        order!inner(
+                        order_number,
+                        order_status,
+                        customer:users!order_customer_uid_fkey(
+                            first_name,
+                            last_name
+                        )
+                        )
+                    `)
+                .eq('rider_id', riderId)
+                .order('delivery_time', { ascending: false })
+
+
+            if (error) throw error
+
+            console.log('Fetched deliveries for rider', riderId, deliveriesData)
+
+            // Transform to delivery format
+            return (deliveriesData || []).map((delivery: any) => {
+                const deliveryTime = new Date(delivery.delivery_time)
+
+                // ✅ order is an array — get the first one
+                const order = delivery.order?.[0]
+                const customer = order?.customer
+                const address = delivery.address
+
+                return {
+                    order: `#${order?.order_number || 'N/A'}`,
+                    date: deliveryTime.toLocaleDateString('en-US', {
+                        month: 'short',
+                        day: 'numeric',
+                        year: 'numeric',
+                    }),
+                    time: deliveryTime.toLocaleTimeString('en-US', {
+                        hour: '2-digit',
+                        minute: '2-digit',
+                    }),
+                    customerName: customer
+                        ? `${customer.first_name} ${customer.last_name}`
+                        : 'N/A',
+                    status: order?.order_status || 'N/A',
+                    address: address
+                        ? `${address.address_line}, ${address.barangay}, ${address.city}`
+                        : 'N/A',
+                }
+            })
+
+        } catch (error) {
+            console.error('Error fetching deliveries:', error)
+            return []
+        }
+    }
 
     const [selectedOrders, setSelectedOrders] = useState<string[]>([])
 
@@ -158,72 +264,34 @@ function RouteComponent() {
         }
     }
 
-    const employeeDetails = {
-        '1': { // Penny's details
-            phone: '0912 332 1123',
-            email: 'Sugmiboy@gmail.com',
-            vehicle: 'ADV 150, 043230',
-            rating: 5,
-            recentDeliveries: [
-                {
-                    order: '#01',
-                    date: '2025-05-16',
-                    time: '10:30 AM',
-                    customerName: 'John Doe',
-                    status: 'Delivered',
-                    address: '123 Main St, Quezon City'
-                },
-                {
-                    order: '#03',
-                    date: '2025-05-16',
-                    time: '09:15 AM',
-                    customerName: 'Jane Smith',
-                    status: 'Delivered',
-                    address: '456 Oak Ave, Manila'
-                }
-            ]
-        },
-        '2': { // Lenny's details
-            phone: '0912 555 7890',
-            email: 'lenny.rider@gmail.com',
-            vehicle: 'NMAX 155, 987654',
-            rating: 4,
-            recentDeliveries: []
-        },
-        // Add more employee details as needed
-        '3': {
-            phone: '0912 777 4444',
-            email: 'marky.rider@gmail.com',
-            vehicle: 'PCX 160, 112233',
-            rating: 5,
-            recentDeliveries: []
-        },
-        '4': {
-            phone: '0912 888 9999',
-            email: 'morphy.rider@gmail.com',
-            vehicle: 'Aerox 155, 445566',
-            rating: 4,
-            recentDeliveries: []
-        },
-        '5': {
-            phone: '0912 333 2222',
-            email: 'jeremy.rider@gmail.com',
-            vehicle: 'Click 160, 778899',
-            rating: 5,
-            recentDeliveries: []
-        }
-    }
-
     const handleViewEmployee = (employee: Employee) => {
         setSelectedEmployee(employee)
         setIsViewModalOpen(true)
     }
 
-    const handleDeleteEmployee = (employeeId: string) => {
-        // Add your delete logic here
-        console.log('Deleting employee:', employeeId)
-        setIsViewModalOpen(false)
-        setSelectedEmployee(null)
+    const handleDeleteEmployee = async (employeeId: string) => {
+        try {
+            if (!confirm('Are you sure you want to delete this employee? This will set them as inactive.')) {
+                return
+            }
+
+            const { error } = await supabase
+                .from('users')
+                .update({ is_active: false })
+                .eq('user_uid', employeeId)
+
+            if (error) throw error
+
+            console.log('Employee deactivated:', employeeId)
+
+            await fetchEmployees()
+
+            setIsViewModalOpen(false)
+            setSelectedEmployee(null)
+        } catch (error) {
+            console.error('Error deactivating employee:', error)
+            alert('Failed to deactivate employee. Please try again.')
+        }
     }
 
     const renderStars = (rating: number) => {
@@ -323,49 +391,6 @@ function RouteComponent() {
         }
     ])
 
-    const [employees] = useState<Employee[]>([
-        {
-            id: '1',
-            type: 'Rider',
-            name: 'Penny',
-            status: 'On Deliver',
-            currentTask: 'Going to Customer Location',
-            assignedOrders: ['#06', '#12', '#017']
-        },
-        {
-            id: '2',
-            type: 'Rider',
-            name: 'Lenny',
-            status: 'Pick-up',
-            currentTask: 'Waiting for Customer Order',
-            assignedOrders: ['#08', '#13', '#018']
-        },
-        {
-            id: '3',
-            type: 'Rider',
-            name: 'Marky',
-            status: 'Delivered',
-            currentTask: 'Completed delivery',
-            assignedOrders: ['#09', '#14', '#019']
-        },
-        {
-            id: '4',
-            type: 'Rider',
-            name: 'Morphy',
-            status: 'Pick-up',
-            currentTask: 'Waiting for customer to Receive',
-            assignedOrders: ['#10', '#15', '#020']
-        },
-        {
-            id: '5',
-            type: 'Rider',
-            name: 'Jeremy',
-            status: 'Pick-up',
-            currentTask: 'Waiting for customer to Receive',
-            assignedOrders: ['#011', '#16', '#021']
-        }
-    ])
-
     const markAllAsRead = () => {
         setNotifications(prev => prev.map(notif => ({ ...notif, read: true })))
     }
@@ -398,23 +423,11 @@ function RouteComponent() {
         }
     }
 
-    const getStatusCounts = () => {
-        const counts = {
-            available: employees.filter(emp => emp.status === 'Waiting' || emp.status === 'Pick-up').length,
-            onDelivery: employees.filter(emp => emp.status === 'On Deliver').length,
-            waitingPickup: employees.filter(emp => emp.status === 'Pick-up').length,
-            awaiting: employees.filter(emp => emp.status === 'Waiting').length
-        }
-        return counts
-    }
-
-    const statusCounts = getStatusCounts()
-
     const filteredEmployees = employees.filter(employee => {
         const matchesSearch = employee.name.toLowerCase().includes(searchTerm.toLowerCase())
         const matchesFilter = filterType === 'All' ||
             (filterType === 'Riders' && employee.type === 'Rider') ||
-            (filterType === 'Staff' && employee.type !== 'Rider')
+            (filterType === 'Staff' && employee.type === 'Staff')
         return matchesSearch && matchesFilter
     })
 
@@ -425,21 +438,47 @@ function RouteComponent() {
         }))
     }
 
+    const handleCreateAccount = async () => {
+        try {
+            // Create user in Supabase
+            const { data, error } = await supabase
+                .from('users')
+                .insert([
+                    {
+                        first_name: formData.fullName.split(' ')[0],
+                        last_name: formData.fullName.split(' ').slice(1).join(' '),
+                        email: formData.email,
+                        phone_number: formData.phoneNumber,
+                        user_role: formData.employeeType.toLowerCase(),
+                        is_active: true,
+                        birth_date: new Date().toISOString(), // You may want to add a birth date field
+                        gender: 'other' // You may want to add a gender field
+                    }
+                ])
+                .select()
 
-    const handleCreateAccount = () => {
-        // Add your account creation logic here
-        console.log('Creating account:', formData)
-        setIsCreateModalOpen(false)
-        // Reset form
-        setFormData({
-            fullName: '',
-            email: '',
-            password: '',
-            phoneNumber: '',
-            employeeType: 'Rider',
-            vehicleInfo: '',
-            profilePhoto: null
-        })
+            if (error) throw error
+
+            console.log('Account created successfully:', data)
+
+            // Refresh the employee list
+            await fetchEmployees()
+
+            setIsCreateModalOpen(false)
+            // Reset form
+            setFormData({
+                fullName: '',
+                email: '',
+                password: '',
+                phoneNumber: '',
+                employeeType: 'Rider',
+                vehicleInfo: '',
+                profilePhoto: null
+            })
+        } catch (error) {
+            console.error('Error creating account:', error)
+            alert('Failed to create account. Please try again.')
+        }
     }
 
     const generateTemporaryPassword = () => {
@@ -456,6 +495,29 @@ function RouteComponent() {
 
     const [isSidebarOpen, setIsSidebarOpen] = useState(false)
     const [isNotificationOpen, setIsNotificationOpen] = useState(false)
+
+    // Mock data for available orders (you'll need to implement real data fetching)
+    const availableOrders = [
+        {
+            id: '#3204',
+            priority: 'High',
+            total: '₱450.00',
+            orderTime: '2:30 PM',
+            customerName: 'John Doe',
+            address: '123 Main St, BGC',
+            items: ['Adobo', 'Rice'],
+            estimatedTime: '30 mins'
+        }
+    ]
+
+    const LoadingSpinner = () => (
+        <div className="fixed inset-0 bg-black/50 flex justify-center items-center z-[60]">
+            <div className="bg-white rounded-xl shadow-lg p-6 flex flex-col items-center gap-4">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#964B00]"></div>
+                <p className="text-gray-700 font-medium">Processing...</p>
+            </div>
+        </div>
+    );
 
     return (
         <div className="min-h-screen bg-gradient-to-br from-amber-50 to-orange-100 flex overflow-x-hidden">
@@ -640,52 +702,42 @@ function RouteComponent() {
 
                         {/* Employee Table */}
                         <div className="overflow-x-auto">
-                            <table className="w-full min-w-[600px]">
-                                <thead>
-                                    <tr className="bg-amber-800 text-white text-sm sm:text-base">
-                                        <th className="px-4 sm:px-6 py-3 sm:py-4 text-left font-medium">TYPE</th>
-                                        <th className="px-4 sm:px-6 py-3 sm:py-4 text-left font-medium">NAME</th>
-                                        <th className="px-4 sm:px-6 py-3 sm:py-4 text-left font-medium">STATUS</th>
-                                        <th className="px-4 sm:px-6 py-3 sm:py-4 text-left font-medium">TASK</th>
-                                        <th className="px-4 sm:px-6 py-3 sm:py-4 text-left font-medium">ORDERS</th>
-                                        <th className="px-4 sm:px-6 py-3 sm:py-4 text-center font-medium">ACTIONS</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-gray-200 text-sm sm:text-base">
-                                    {filteredEmployees.map((employee) => (
-                                        <tr
-                                            key={employee.id}
-                                            className="border-b border-gray-100 hover:bg-gray-50 cursor-pointer transition-colors"
-                                        >
-                                            <td className="px-4 sm:px-6 py-3 sm:py-4 text-gray-800 font-medium">{employee.type}</td>
-                                            <td className="px-4 sm:px-6 py-3 sm:py-4 text-gray-800 font-medium">{employee.name}</td>
-                                            <td className="px-4 sm:px-6 py-3 sm:py-4">
-                                                <div className="flex items-center gap-2">
-                                                    <span className="text-gray-800">{employee.status}</span>
-                                                </div>
-                                            </td>
-                                            <td className="px-4 sm:px-6 py-3 sm:py-4 text-gray-800">{employee.currentTask}</td>
-                                            <td className="px-4 sm:px-6 py-3 sm:py-4">
-                                                <div className="flex flex-wrap gap-1">
-                                                    {employee.assignedOrders.map((order, orderIndex) => (
-                                                        <span key={orderIndex} className="text-gray-800">
-                                                            {order}{orderIndex < employee.assignedOrders.length - 1 ? ", " : ""}
-                                                        </span>
-                                                    ))}
-                                                </div>
-                                            </td>
-                                            <td className="px-4 sm:px-6 py-3 sm:py-4">
-                                                <div
-                                                    className="flex justify-center cursor-pointer bg-yellow-500 text-white px-3 sm:px-4 py-1.5 sm:py-2 rounded hover:bg-yellow-600 text-sm sm:text-base"
-                                                    onClick={() => handleViewEmployee(employee)} // pass employee object here
-                                                >
-                                                    VIEW
-                                                </div>
-                                            </td>
+                            {loading ? (
+                                <LoadingSpinner />
+                            ) : filteredEmployees.length === 0 ? (
+                                <div className="text-center py-8">
+                                    <p className="text-gray-600">No employees found</p>
+                                </div>
+                            ) : (
+                                <table className="w-full min-w-[600px]">
+                                    <thead>
+                                        <tr className="bg-amber-800 text-white text-sm sm:text-base">
+                                            <th className="px-4 sm:px-6 py-3 sm:py-4 text-left font-medium">TYPE</th>
+                                            <th className="px-4 sm:px-6 py-3 sm:py-4 text-left font-medium">NAME</th>
+                                            <th className="px-4 sm:px-6 py-3 sm:py-4 text-center font-medium">ACTIONS</th>
                                         </tr>
-                                    ))}
-                                </tbody>
-                            </table>
+                                    </thead>
+                                    <tbody className="divide-y divide-gray-200 text-sm sm:text-base">
+                                        {filteredEmployees.map((employee) => (
+                                            <tr
+                                                key={employee.id}
+                                                className="border-b border-gray-100 hover:bg-gray-50 cursor-pointer transition-colors"
+                                            >
+                                                <td className="px-4 sm:px-6 py-3 sm:py-4 text-gray-800 font-medium">{employee.type}</td>
+                                                <td className="px-4 sm:px-6 py-3 sm:py-4 text-gray-800 font-medium">{employee.name}</td>
+                                                <td className="px-4 sm:px-6 py-3 sm:py-4">
+                                                    <div
+                                                        className="flex justify-center cursor-pointer bg-yellow-500 text-white px-3 sm:px-4 py-1.5 sm:py-2 rounded hover:bg-yellow-600 text-sm sm:text-base"
+                                                        onClick={() => handleViewEmployee(employee)}
+                                                    >
+                                                        VIEW
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            )}
                         </div>
                     </div>
                 </main>
@@ -774,20 +826,6 @@ function RouteComponent() {
                                     </div>
                                 </div>
                             </div>
-
-                            {/* Vehicle Info */}
-                            <div>
-                                <label className="block text-black font-medium mb-2">Vehicle info:</label>
-                                <input
-                                    type="text"
-                                    placeholder="Type here the vehicle of the rider..."
-                                    value={formData.vehicleInfo}
-                                    onChange={(e) => handleFormChange('vehicleInfo', e.target.value)}
-                                    className="bg-white w-full px-4 py-3 rounded-lg border-0 focus:outline-none focus:ring-2 focus:ring-amber-600"
-                                />
-                            </div>
-
-
                             {/* Action Buttons */}
                             <div className="flex gap-4 pt-4">
                                 <button
@@ -817,82 +855,54 @@ function RouteComponent() {
                             <div className="flex items-center gap-4">
                                 <div className="flex-1">
                                     <h2 className="text-2xl font-bold">{selectedEmployee.name}</h2>
-                                    <div className="flex items-center gap-2 mt-1">
-                                        <span className="text-amber-200">{selectedEmployee.status}</span>
-                                    </div>
-                                </div>
-                                <div className="flex items-center gap-1">
-                                    {renderStars(employeeDetails[selectedEmployee.id as keyof typeof employeeDetails]?.rating || 0)}
+                                    <p className="text-amber-200 text-sm mt-1">{selectedEmployee.type}</p>
                                 </div>
                             </div>
                             <div className="mt-4 space-y-2">
                                 <p className="text-amber-200">
-                                    {employeeDetails[selectedEmployee.id as keyof typeof employeeDetails]?.phone || 'N/A'}
+                                    {employeeDetails[selectedEmployee.id]?.phone || 'N/A'}
                                 </p>
                                 <p className="text-amber-200">
-                                    {employeeDetails[selectedEmployee.id as keyof typeof employeeDetails]?.email || 'N/A'}
+                                    {employeeDetails[selectedEmployee.id]?.email || 'N/A'}
                                 </p>
                             </div>
                         </div>
 
                         {/* Employee Details */}
                         <div className="p-6 space-y-4">
-                            {/* Status and Orders */}
-                            <div className="space-y-3">
-                                <div className="bg-white bg-opacity-80 rounded-lg p-3">
-                                    <div className="flex justify-between items-center">
-                                        <span className="font-medium text-gray-700">Current Status:</span>
-                                        <span className="font-bold text-gray-800">{selectedEmployee.currentTask}</span>
-                                    </div>
-                                </div>
-
-                                <div className="bg-white bg-opacity-80 rounded-lg p-3">
-                                    <div className="flex justify-between items-center">
-                                        <span className="font-medium text-gray-700">Assigned Orders:</span>
-                                        <span className="font-bold text-gray-800">{selectedEmployee.assignedOrders.join(", ")}</span>
-                                    </div>
-                                </div>
-
-                                <div className="bg-white bg-opacity-80 rounded-lg p-3">
-                                    <div className="flex justify-between items-center">
-                                        <span className="font-medium text-gray-700">Vehicle Info:</span>
-                                        <span className="font-bold text-gray-800">
-                                            {employeeDetails[selectedEmployee.id as keyof typeof employeeDetails]?.vehicle || 'N/A'}
-                                        </span>
-                                    </div>
-                                </div>
-                            </div>
 
                             {/* Recent Deliveries */}
                             <div className="bg-white bg-opacity-80 rounded-lg p-4">
                                 <h3 className="text-lg font-bold text-gray-800 mb-4 text-center">RECENT DELIVERIES TODAY</h3>
 
-                                {employeeDetails[selectedEmployee.id as keyof typeof employeeDetails]?.recentDeliveries.length > 0 ? (
+                                {employeeDetails[selectedEmployee.id]?.recentDeliveries.length > 0 ? (
                                     <div className="overflow-x-auto">
-                                        <table className="w-full text-sm">
-                                            <thead>
-                                                <tr className="border-b-2 border-gray-400">
-                                                    <th className="text-left py-2 px-2 font-bold text-gray-700">ORDER</th>
-                                                    <th className="text-left py-2 px-2 font-bold text-gray-700">DATE</th>
-                                                    <th className="text-left py-2 px-2 font-bold text-gray-700">TIME</th>
-                                                    <th className="text-left py-2 px-2 font-bold text-gray-700">CUSTOMER NAME</th>
-                                                    <th className="text-left py-2 px-2 font-bold text-gray-700">DELIVERY STATUS</th>
-                                                    <th className="text-left py-2 px-2 font-bold text-gray-700">DELIVERY ADDRESS</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                {employeeDetails[selectedEmployee.id as keyof typeof employeeDetails]?.recentDeliveries.map((delivery, index) => (
-                                                    <tr key={index} className="border-b border-gray-300">
-                                                        <td className="py-2 px-2 text-gray-700">{delivery.order}</td>
-                                                        <td className="py-2 px-2 text-gray-700">{delivery.date}</td>
-                                                        <td className="py-2 px-2 text-gray-700">{delivery.time}</td>
-                                                        <td className="py-2 px-2 text-gray-700">{delivery.customerName}</td>
-                                                        <td className="py-2 px-2 text-gray-700">{delivery.status}</td>
-                                                        <td className="py-2 px-2 text-gray-700">{delivery.address}</td>
+                                        <div className="max-h-80 overflow-y-auto border rounded-lg">
+                                            <table className="w-full text-sm">
+                                                <thead>
+                                                    <tr className="border-b-2 border-gray-400">
+                                                        <th className="text-left py-2 px-2 font-bold text-gray-700">ORDER</th>
+                                                        <th className="text-left py-2 px-2 font-bold text-gray-700">DATE</th>
+                                                        <th className="text-left py-2 px-2 font-bold text-gray-700">TIME</th>
+                                                        <th className="text-left py-2 px-2 font-bold text-gray-700">CUSTOMER NAME</th>
+                                                        <th className="text-left py-2 px-2 font-bold text-gray-700">STATUS</th>
+                                                        <th className="text-left py-2 px-2 font-bold text-gray-700">DELIVERY ADDRESS</th>
                                                     </tr>
-                                                ))}
-                                            </tbody>
-                                        </table>
+                                                </thead>
+                                                <tbody>
+                                                    {employeeDetails[selectedEmployee.id]?.recentDeliveries.map((delivery, index) => (
+                                                        <tr key={index} className="border-b border-gray-300">
+                                                            <td className="py-2 px-2 text-gray-700">{delivery.order}</td>
+                                                            <td className="py-2 px-2 text-gray-700">{delivery.date}</td>
+                                                            <td className="py-2 px-2 text-gray-700">{delivery.time}</td>
+                                                            <td className="py-2 px-2 text-gray-700">{delivery.customerName}</td>
+                                                            <td className="py-2 px-2 text-gray-700">{delivery.status}</td>
+                                                            <td className="py-2 px-2 text-gray-700">{delivery.address}</td>
+                                                        </tr>
+                                                    ))}
+                                                </tbody>
+                                            </table>
+                                        </div>
                                     </div>
                                 ) : (
                                     <div className="text-center py-8">
@@ -928,27 +938,12 @@ function RouteComponent() {
                         <div className="bg-amber-800 text-white p-6 rounded-t-xl">
                             <h2 className="text-2xl font-bold">Assign Orders to {selectedEmployeeForAssign.name}</h2>
                             <p className="text-amber-200 mt-2">
-                                Current Status: {selectedEmployeeForAssign.status} |
-                                Current Orders: {selectedEmployeeForAssign.assignedOrders.join(', ')}
+                                Current Orders: {selectedEmployeeForAssign.assignedOrders.join(', ') || 'None'}
                             </p>
                         </div>
 
                         {/* Content */}
                         <div className="p-6">
-                            {/* Employee Status Card */}
-                            <div className="bg-yellow-50 border-2 border-yellow-400 rounded-lg p-4 mb-6">
-                                <div className="flex items-center justify-between">
-                                    <div>
-                                        <h3 className="text-lg font-bold text-gray-800">Employee Status</h3>
-                                        <p className="text-gray-600">Current Task: {selectedEmployeeForAssign.currentTask}</p>
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                        <div className={`w-3 h-3 rounded-full ${getStatusColor(selectedEmployeeForAssign.status)}`}></div>
-                                        <span className="font-medium">{selectedEmployeeForAssign.status}</span>
-                                    </div>
-                                </div>
-                            </div>
-
                             {/* Available Orders */}
                             <div className="mb-6">
                                 <h3 className="text-lg font-bold text-gray-800 mb-4">Available Orders ({availableOrders.length})</h3>
@@ -1084,7 +1079,7 @@ function RouteComponent() {
                         {/* Map Section - Full Width */}
                         <div className="relative">
                             <img
-                                src="/public/tmp-map.png" // Use your actual map image
+                                src="/tmp-map.png" // Use your actual map image
                                 alt="Delivery Route Map"
                                 className="w-full h-96 object-cover"
                             />

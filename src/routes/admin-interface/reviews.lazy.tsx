@@ -1,5 +1,5 @@
 import { createLazyFileRoute, useLocation, Link } from '@tanstack/react-router'
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import {
     LayoutDashboard,
     ShoppingCart,
@@ -15,6 +15,7 @@ import {
     Eye,
     LucideCalendar
 } from 'lucide-react'
+import { supabase } from '@/lib/supabaseClient'
 
 export const Route = createLazyFileRoute('/admin-interface/reviews')({
     component: RouteComponent,
@@ -30,20 +31,88 @@ interface Notification {
 }
 
 interface Review {
-    id: string
+    review_id: string
     customerName: string
-    category: 'DELIVERY\'S REVIEW' | 'FOOD\'S REVIEW' | 'RIDER\'S REVIEW' | 'STAFF\'S REVIEW'
+    status_type: 'Food' | 'Staff' | 'Rider' | 'Delivery'
     rating: number
     comment: string
-    isHidden: boolean
+    is_hidden: boolean
+    order_id: string
 }
 
 function RouteComponent() {
     const [selectedReview, setSelectedReview] = useState<Review | null>(null)
     const [isViewModalOpen, setIsViewModalOpen] = useState(false)
     const [isHiddenReviewsModalOpen, setIsHiddenReviewsModalOpen] = useState(false)
-    const [showHiddenReviews, setShowHiddenReviews] = useState(false)
+    const [reviews, setReviews] = useState<Review[]>([])
+    const [loading, setLoading] = useState(true)
     const location = useLocation()
+
+    useEffect(() => {
+        fetchReviews()
+
+        // Subscribe to real-time changes
+        const reviewsSubscription = supabase
+            .channel('reviews_changes')
+            .on('postgres_changes',
+                { event: '*', schema: 'public', table: 'review' },
+                () => {
+                    fetchReviews()
+                }
+            )
+            .subscribe()
+
+        return () => {
+            reviewsSubscription.unsubscribe()
+        }
+    }, [])
+
+    const fetchReviews = async () => {
+        try {
+            setLoading(true)
+
+            // Fetch reviews with related order and user data
+            const { data, error } = await supabase
+                .from('review')
+                .select(`
+                    review_id,
+                    review_type,
+                    rating,
+                    comment,
+                    is_hidden,
+                    order_id,
+                    order:order_id (
+                        customer_uid,
+                        user:customer_uid (
+                            first_name
+                        )
+                    )
+                `)
+
+            if (error) {
+                console.error('Error fetching reviews:', error)
+                return
+            }
+
+            console.log('Fetched reviews:', data)
+
+            const transformedReviews: Review[] = (data || []).map((review: any) => ({
+                review_id: review.review_id,
+                customerName: review.order?.user?.first_name || 'Unknown',
+                status_type: review.review_type,
+                rating: Number(review.rating),
+                comment: review.comment || '',
+                is_hidden: review.is_hidden || false,
+                order_id: review.order_id
+            }))
+
+            setReviews(transformedReviews)
+        } catch (error) {
+            console.error('Error fetching reviews:', error)
+        } finally {
+            setLoading(false)
+        }
+    }
 
     const sidebarItems = [
         {
@@ -109,104 +178,6 @@ function RouteComponent() {
         }
     ])
 
-    const [reviews, setReviews] = useState<Review[]>([
-        {
-            id: '1',
-            customerName: 'Russel',
-            category: 'DELIVERY\'S REVIEW',
-            rating: 5,
-            comment: 'Thank you for taking the time to share your positive experience with us!',
-            isHidden: false
-        },
-        {
-            id: '2',
-            customerName: 'Carlo',
-            category: 'FOOD\'S REVIEW',
-            rating: 5,
-            comment: 'WOWW',
-            isHidden: false
-        },
-        {
-            id: '3',
-            customerName: 'Trajeco',
-            category: 'RIDER\'S REVIEW',
-            rating: 5,
-            comment: 'Humble',
-            isHidden: false
-        },
-        {
-            id: '4',
-            customerName: 'Marizon',
-            category: 'STAFF\'S REVIEW',
-            rating: 5,
-            comment: 'Thank you',
-            isHidden: false
-        },
-        {
-            id: '5',
-            customerName: 'Prince',
-            category: 'DELIVERY\'S REVIEW',
-            rating: 5,
-            comment: 'Smooth.',
-            isHidden: false
-        },
-        {
-            id: '6',
-            customerName: 'Brandon',
-            category: 'FOOD\'S REVIEW',
-            rating: 5,
-            comment: 'Smooth',
-            isHidden: false
-        },
-        {
-            id: '7',
-            customerName: 'Ring',
-            category: 'RIDER\'S REVIEW',
-            rating: 5,
-            comment: 'Good Man',
-            isHidden: false
-        },
-        {
-            id: '8',
-            customerName: 'Charles',
-            category: 'STAFF\'S REVIEW',
-            rating: 5,
-            comment: 'Thank you for helping',
-            isHidden: false
-        },
-        {
-            id: '9',
-            customerName: 'Duran',
-            category: 'DELIVERY\'S REVIEW',
-            rating: 5,
-            comment: 'Stable Food',
-            isHidden: false
-        },
-        {
-            id: '10',
-            customerName: 'Leonhard',
-            category: 'FOOD\'S REVIEW',
-            rating: 5,
-            comment: 'I love Pancit',
-            isHidden: false
-        },
-        {
-            id: '11',
-            customerName: 'Nozicka',
-            category: 'RIDER\'S REVIEW',
-            rating: 5,
-            comment: 'Well Hardz Person',
-            isHidden: false
-        },
-        {
-            id: '12',
-            customerName: 'Yasuo',
-            category: 'STAFF\'S REVIEW',
-            rating: 5,
-            comment: 'Thank you so much',
-            isHidden: false
-        }
-    ])
 
     const markAllAsRead = () => {
         setNotifications(prev => prev.map(notif => ({ ...notif, read: true })))
@@ -252,8 +223,8 @@ function RouteComponent() {
     const toggleReviewVisibility = (reviewId: string) => {
         setReviews(prev =>
             prev.map(review =>
-                review.id === reviewId
-                    ? { ...review, isHidden: !review.isHidden }
+                review.review_id === reviewId
+                    ? { ...review, is_hidden: !review.is_hidden }
                     : review
             )
         )
@@ -268,24 +239,33 @@ function RouteComponent() {
         setIsHiddenReviewsModalOpen(true)
     }
 
-    const visibleReviews = showHiddenReviews
-        ? reviews
-        : reviews.filter(review => !review.isHidden)
+    // const visibleReviews = showHiddenReviews
+    //     ? reviews
+    //     : reviews.filter(review => !review.isHidden)
 
-    const totalReviews = reviews.length
-    const averageRating = reviews.reduce((sum, review) => sum + review.rating, 0) / reviews.length
-    const publishedReviews = reviews.filter(review => !review.isHidden).length
-    const todayReviews = 40 // This would be calculated based on today's date
+    // const totalReviews = reviews.length
+    // const averageRating = reviews.reduce((sum, review) => sum + review.rating, 0) / reviews.length
+    // const publishedReviews = reviews.filter(review => !review.isHidden).length
+    // const todayReviews = 40 // This would be calculated based on today's date
 
     const reviewsByCategory = {
-        'DELIVERY\'S REVIEW': reviews.filter(r => r.category === 'DELIVERY\'S REVIEW' && !r.isHidden),
-        'FOOD\'S REVIEW': reviews.filter(r => r.category === 'FOOD\'S REVIEW' && !r.isHidden),
-        'RIDER\'S REVIEW': reviews.filter(r => r.category === 'RIDER\'S REVIEW' && !r.isHidden),
-        'STAFF\'S REVIEW': reviews.filter(r => r.category === 'STAFF\'S REVIEW' && !r.isHidden)
+        'DELIVERY\'S REVIEW': reviews.filter(r => r.status_type === 'Delivery' && !r.is_hidden),
+        'FOOD\'S REVIEW': reviews.filter(r => r.status_type === 'Food' && !r.is_hidden),
+        'RIDER\'S REVIEW': reviews.filter(r => r.status_type === 'Rider' && !r.is_hidden),
+        'STAFF\'S REVIEW': reviews.filter(r => r.status_type === 'Staff' && !r.is_hidden)
     }
 
     const [isSidebarOpen, setIsSidebarOpen] = useState(false)
     const [isNotificationOpen, setIsNotificationOpen] = useState(false)
+
+    const LoadingSpinner = () => (
+        <div className="fixed inset-0 bg-black/50 flex justify-center items-center z-[60]">
+            <div className="bg-white rounded-xl shadow-lg p-6 flex flex-col items-center gap-4">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#964B00]"></div>
+                <p className="text-gray-700 font-medium">Processing...</p>
+            </div>
+        </div>
+    );
 
     return (
         <div className="min-h-screen bg-gradient-to-br from-amber-50 to-orange-100 flex overflow-x-hidden">
@@ -436,31 +416,50 @@ function RouteComponent() {
                     {/* Reviews Grid */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
                         {Object.entries(reviewsByCategory).map(([category, categoryReviews]) => (
-                            <div key={category} className="space-y-4 bg-amber-800 rounded-lg">
+                            <div
+                                key={category}
+                                className="space-y-4 bg-amber-800 rounded-lg h-[500px] overflow-y-auto"
+                            >
                                 <div className="p-5 space-y-4">
-                                    <h3 className={`text-white text-center py-2 px-4 rounded-lg font-semibold ${getCategoryColor(category)}`}>
+                                    <h3
+                                        className={`text-white text-center py-2 px-4 rounded-lg font-semibold ${getCategoryColor(
+                                            category
+                                        )}`}
+                                    >
                                         {category}
                                     </h3>
-                                    {categoryReviews.map((review) => (
-                                        <div key={review.id} className="bg-white rounded-lg p-4 shadow-sm border border-gray-200">
-                                            <div className="mb-3">
-                                                <h4 className="font-semibold text-gray-800 mb-1">{review.customerName}</h4>
-                                                <div className="flex gap-1">
-                                                    {renderStars(review.rating)}
+
+                                    {categoryReviews.length === 0 ? (
+                                        <div className="flex items-center justify-center h-full">
+                                            <p className="text-white text-sm italic opacity-80">
+                                                No reviews yet
+                                            </p>
+                                        </div>
+                                    ) : (
+                                        categoryReviews.map((review) => (
+                                            <div
+                                                key={review.review_id}
+                                                className="bg-white rounded-lg p-4 shadow-sm border border-gray-200"
+                                            >
+                                                <div className="mb-3">
+                                                    <h4 className="font-semibold text-gray-800 mb-1">
+                                                        {review.customerName}
+                                                    </h4>
+                                                    <div className="flex gap-1">{renderStars(review.rating)}</div>
+                                                </div>
+                                                <p className="text-gray-600 text-sm mb-3">{review.comment}</p>
+                                                <div className="flex gap-2">
+                                                    <button
+                                                        onClick={() => handleViewReview(review)}
+                                                        className="bg-yellow-400 text-amber-800 px-3 py-1 rounded text-xs font-medium hover:bg-yellow-500 transition-colors flex items-center gap-1"
+                                                    >
+                                                        <Eye className="h-3 w-3" />
+                                                        VIEW
+                                                    </button>
                                                 </div>
                                             </div>
-                                            <p className="text-gray-600 text-sm mb-3">{review.comment}</p>
-                                            <div className="flex gap-2">
-                                                <button
-                                                    onClick={() => handleViewReview(review)}
-                                                    className="bg-yellow-400 text-amber-800 px-3 py-1 rounded text-xs font-medium hover:bg-yellow-500 transition-colors flex items-center gap-1"
-                                                >
-                                                    <Eye className="h-3 w-3" />
-                                                    VIEW
-                                                </button>
-                                            </div>
-                                        </div>
-                                    ))}
+                                        ))
+                                    )}
                                 </div>
                             </div>
                         ))}
@@ -487,8 +486,8 @@ function RouteComponent() {
                                 <div className="flex gap-1 mb-2">
                                     {renderStars(selectedReview.rating)}
                                 </div>
-                                <span className={`inline-block px-3 py-1 rounded-full text-xs font-medium text-white ${getCategoryColor(selectedReview.category)}`}>
-                                    {selectedReview.category}
+                                <span className={`inline-block px-3 py-1 rounded-full text-xs font-medium text-white ${getCategoryColor(selectedReview.status_type)}`}>
+                                    {selectedReview.status_type}
                                 </span>
                             </div>
 
@@ -497,18 +496,6 @@ function RouteComponent() {
                             </div>
 
                             <div className="flex gap-3 pt-4">
-                                <button
-                                    onClick={() => {
-                                        toggleReviewVisibility(selectedReview.id)
-                                        setIsViewModalOpen(false)
-                                    }}
-                                    className={`px-4 py-2 rounded-lg font-medium transition-colors ${selectedReview.isHidden
-                                        ? 'bg-green-500 text-white hover:bg-green-600'
-                                        : 'bg-red-500 text-white hover:bg-red-600'
-                                        }`}
-                                >
-                                    {selectedReview.isHidden ? 'Show Review' : 'Hide Review'}
-                                </button>
                                 <button
                                     onClick={() => setIsViewModalOpen(false)}
                                     className="px-4 py-2 bg-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-400 transition-colors"
@@ -536,27 +523,27 @@ function RouteComponent() {
                         </div>
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            {reviews.filter(review => review.isHidden).map((review) => (
-                                <div key={review.id} className="bg-gray-50 rounded-lg p-4 border">
+                            {reviews.filter(review => review.is_hidden).map((review) => (
+                                <div key={review.review_id} className="bg-gray-50 rounded-lg p-4 border">
                                     <div className="mb-3">
                                         <h4 className="font-semibold text-gray-800 mb-1">{review.customerName}</h4>
                                         <div className="flex gap-1 mb-2">
                                             {renderStars(review.rating)}
                                         </div>
-                                        <span className={`inline-block px-2 py-1 rounded-full text-xs font-medium text-white ${getCategoryColor(review.category)}`}>
-                                            {review.category}
+                                        <span className={`inline-block px-2 py-1 rounded-full text-xs font-medium text-white ${getCategoryColor(review.status_type)}`}>
+                                            {review.status_type}
                                         </span>
                                     </div>
                                     <p className="text-gray-600 text-sm mb-3">{review.comment}</p>
                                     <button
-                                        onClick={() => toggleReviewVisibility(review.id)}
+                                        onClick={() => toggleReviewVisibility(review.review_id)}
                                         className="bg-green-500 text-white px-3 py-1 rounded text-xs font-medium hover:bg-green-600 transition-colors"
                                     >
                                         Show Review
                                     </button>
                                 </div>
                             ))}
-                            {reviews.filter(review => review.isHidden).length === 0 && (
+                            {reviews.filter(review => review.is_hidden).length === 0 && (
                                 <div className="col-span-full text-center text-gray-500 py-8">
                                     No hidden reviews found.
                                 </div>
@@ -574,6 +561,11 @@ function RouteComponent() {
                     </div>
                 </div>
             )}
+
+            {loading && <LoadingSpinner />}
+
         </div>
+
+
     )
 }

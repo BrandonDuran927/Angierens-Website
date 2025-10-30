@@ -82,9 +82,6 @@ const CustomerInterfaceSpecificOrderOrderIdLazyRouteImport = createFileRoute(
 const CustomerInterfaceFeedbackFeedbackIdLazyRouteImport = createFileRoute(
   '/customer-interface/feedback/$feedbackId',
 )()
-const AdminInterfaceEmployeeEmployeeIdLazyRouteImport = createFileRoute(
-  '/admin-interface/employee/$employeeId',
-)()
 
 const SignupLazyRoute = SignupLazyRouteImport.update({
   id: '/signup',
@@ -316,16 +313,6 @@ const CustomerInterfaceFeedbackFeedbackIdLazyRoute =
       (d) => d.Route,
     ),
   )
-const AdminInterfaceEmployeeEmployeeIdLazyRoute =
-  AdminInterfaceEmployeeEmployeeIdLazyRouteImport.update({
-    id: '/admin-interface/employee/$employeeId',
-    path: '/admin-interface/employee/$employeeId',
-    getParentRoute: () => rootRouteImport,
-  } as any).lazy(() =>
-    import('./routes/admin-interface/employee/$employeeId.lazy').then(
-      (d) => d.Route,
-    ),
-  )
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexLazyRoute
@@ -356,7 +343,6 @@ export interface FileRoutesByFullPath {
   '/chef-interface': typeof ChefInterfaceIndexLazyRoute
   '/customer-interface': typeof CustomerInterfaceIndexLazyRoute
   '/staff': typeof StaffIndexLazyRoute
-  '/admin-interface/employee/$employeeId': typeof AdminInterfaceEmployeeEmployeeIdLazyRoute
   '/customer-interface/feedback/$feedbackId': typeof CustomerInterfaceFeedbackFeedbackIdLazyRoute
   '/customer-interface/specific-order/$orderId': typeof CustomerInterfaceSpecificOrderOrderIdLazyRoute
   '/staff/layout/staff-layout': typeof StaffLayoutStaffLayoutLazyRoute
@@ -392,7 +378,6 @@ export interface FileRoutesByTo {
   '/chef-interface': typeof ChefInterfaceIndexLazyRoute
   '/customer-interface': typeof CustomerInterfaceIndexLazyRoute
   '/staff': typeof StaffIndexLazyRoute
-  '/admin-interface/employee/$employeeId': typeof AdminInterfaceEmployeeEmployeeIdLazyRoute
   '/customer-interface/feedback/$feedbackId': typeof CustomerInterfaceFeedbackFeedbackIdLazyRoute
   '/customer-interface/specific-order/$orderId': typeof CustomerInterfaceSpecificOrderOrderIdLazyRoute
   '/staff/layout/staff-layout': typeof StaffLayoutStaffLayoutLazyRoute
@@ -429,7 +414,6 @@ export interface FileRoutesById {
   '/chef-interface/': typeof ChefInterfaceIndexLazyRoute
   '/customer-interface/': typeof CustomerInterfaceIndexLazyRoute
   '/staff/': typeof StaffIndexLazyRoute
-  '/admin-interface/employee/$employeeId': typeof AdminInterfaceEmployeeEmployeeIdLazyRoute
   '/customer-interface/feedback/$feedbackId': typeof CustomerInterfaceFeedbackFeedbackIdLazyRoute
   '/customer-interface/specific-order/$orderId': typeof CustomerInterfaceSpecificOrderOrderIdLazyRoute
   '/staff/layout/staff-layout': typeof StaffLayoutStaffLayoutLazyRoute
@@ -467,7 +451,6 @@ export interface FileRouteTypes {
     | '/chef-interface'
     | '/customer-interface'
     | '/staff'
-    | '/admin-interface/employee/$employeeId'
     | '/customer-interface/feedback/$feedbackId'
     | '/customer-interface/specific-order/$orderId'
     | '/staff/layout/staff-layout'
@@ -503,7 +486,6 @@ export interface FileRouteTypes {
     | '/chef-interface'
     | '/customer-interface'
     | '/staff'
-    | '/admin-interface/employee/$employeeId'
     | '/customer-interface/feedback/$feedbackId'
     | '/customer-interface/specific-order/$orderId'
     | '/staff/layout/staff-layout'
@@ -539,7 +521,6 @@ export interface FileRouteTypes {
     | '/chef-interface/'
     | '/customer-interface/'
     | '/staff/'
-    | '/admin-interface/employee/$employeeId'
     | '/customer-interface/feedback/$feedbackId'
     | '/customer-interface/specific-order/$orderId'
     | '/staff/layout/staff-layout'
@@ -576,7 +557,6 @@ export interface RootRouteChildren {
   ChefInterfaceIndexLazyRoute: typeof ChefInterfaceIndexLazyRoute
   CustomerInterfaceIndexLazyRoute: typeof CustomerInterfaceIndexLazyRoute
   StaffIndexLazyRoute: typeof StaffIndexLazyRoute
-  AdminInterfaceEmployeeEmployeeIdLazyRoute: typeof AdminInterfaceEmployeeEmployeeIdLazyRoute
   CustomerInterfaceFeedbackFeedbackIdLazyRoute: typeof CustomerInterfaceFeedbackFeedbackIdLazyRoute
   CustomerInterfaceSpecificOrderOrderIdLazyRoute: typeof CustomerInterfaceSpecificOrderOrderIdLazyRoute
   StaffLayoutStaffLayoutLazyRoute: typeof StaffLayoutStaffLayoutLazyRoute
@@ -817,13 +797,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CustomerInterfaceFeedbackFeedbackIdLazyRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/admin-interface/employee/$employeeId': {
-      id: '/admin-interface/employee/$employeeId'
-      path: '/admin-interface/employee/$employeeId'
-      fullPath: '/admin-interface/employee/$employeeId'
-      preLoaderRoute: typeof AdminInterfaceEmployeeEmployeeIdLazyRouteImport
-      parentRoute: typeof rootRouteImport
-    }
   }
 }
 
@@ -856,8 +829,6 @@ const rootRouteChildren: RootRouteChildren = {
   ChefInterfaceIndexLazyRoute: ChefInterfaceIndexLazyRoute,
   CustomerInterfaceIndexLazyRoute: CustomerInterfaceIndexLazyRoute,
   StaffIndexLazyRoute: StaffIndexLazyRoute,
-  AdminInterfaceEmployeeEmployeeIdLazyRoute:
-    AdminInterfaceEmployeeEmployeeIdLazyRoute,
   CustomerInterfaceFeedbackFeedbackIdLazyRoute:
     CustomerInterfaceFeedbackFeedbackIdLazyRoute,
   CustomerInterfaceSpecificOrderOrderIdLazyRoute:

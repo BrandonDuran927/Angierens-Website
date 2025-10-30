@@ -1,5 +1,5 @@
 import { createLazyFileRoute } from '@tanstack/react-router'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Link, useLocation } from '@tanstack/react-router'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer, PieChart, Pie, Cell, BarChart, Bar } from 'recharts'
 import {
@@ -20,6 +20,8 @@ import {
     ChevronDown,
     MenuIcon
 } from 'lucide-react'
+import { supabase } from '@/lib/supabaseClient'
+
 
 export const Route = createLazyFileRoute('/admin-interface/sales')({
     component: RouteComponent,
@@ -34,6 +36,25 @@ interface Notification {
     read: boolean
 }
 
+interface SalesData {
+    period: string
+    revenue: number
+    orders: number
+}
+
+interface MenuItem {
+    rank: number
+    name: string
+    orders: number
+    menu_id: string
+}
+
+interface FulfillmentData {
+    name: string
+    value: number
+    color: string
+}
+
 type TimeFilter = 'daily' | 'weekly' | 'monthly' | 'yearly'
 
 function RouteComponent() {
@@ -42,6 +63,266 @@ function RouteComponent() {
     const [modalType, setModalType] = useState<'best' | 'least'>('best')
     const [timeFilter, setTimeFilter] = useState<TimeFilter>('daily')
     const [isFilterDropdownOpen, setIsFilterDropdownOpen] = useState(false)
+    const [isSidebarOpen, setIsSidebarOpen] = useState(false)
+    const [isNotificationOpen, setIsNotificationOpen] = useState(false)
+
+    // Data states
+    const [salesData, setSalesData] = useState<SalesData[]>([])
+    const [totalRevenueData, setTotalRevenueData] = useState<{ month: string; value: number }[]>([])
+    const [fulfillmentData, setFulfillmentData] = useState<FulfillmentData[]>([])
+    const [bestSalesItems, setBestSalesItems] = useState<MenuItem[]>([])
+    const [leastSalesItems, setLeastSalesItems] = useState<MenuItem[]>([])
+    const [loading, setLoading] = useState(true)
+
+    useEffect(() => {
+        fetchSalesData()
+        fetchTotalRevenueData()
+    }, [timeFilter])
+
+    useEffect(() => {
+        fetchFulfillmentData()
+        fetchBestAndLeastSales()
+    }, [])
+
+    const getDateRange = () => {
+        const now = new Date()
+        let startDate = new Date()
+
+        switch (timeFilter) {
+            case 'daily':
+                startDate.setHours(0, 0, 0, 0)
+                break
+            case 'weekly':
+                startDate.setDate(now.getDate() - 7)
+                break
+            case 'monthly':
+                startDate.setMonth(now.getMonth() - 1)
+                break
+            case 'yearly':
+                startDate.setFullYear(now.getFullYear() - 1)
+                break
+        }
+
+        return { startDate: startDate.toISOString(), endDate: now.toISOString() }
+    }
+
+    const fetchSalesData = async () => {
+        try {
+            setLoading(true)
+            const { startDate, endDate } = getDateRange()
+
+            // First, let's check all orders to see what statuses exist
+            const { data: allOrders, error: allError } = await supabase
+                .from('order')
+                .select('order_status, status_updated_at, total_price')
+                .order('status_updated_at', { ascending: false })
+                .limit(10)
+
+            console.log('Sample orders from database:', allOrders)
+            console.log('Date range:', { startDate, endDate })
+
+            // Now fetch with filters
+            const { data: orders, error } = await supabase
+                .from('order')
+                .select('status_updated_at, total_price, order_status')
+                .eq('order_status', 'Completed')
+                .order('status_updated_at', { ascending: true })
+
+            if (error) {
+                console.error('Supabase error:', error)
+                throw error
+            }
+
+            console.log('Filtered orders:', orders)
+            console.log('Number of orders found:', orders?.length || 0)
+
+            // Group data by period
+            const groupedData = groupDataByPeriod(orders || [])
+            console.log('Grouped data:', groupedData)
+            setSalesData(groupedData)
+        } catch (error) {
+            console.error('Error fetching sales data:', error)
+        } finally {
+            setLoading(false)
+        }
+    }
+
+    const groupDataByPeriod = (orders: any[]) => {
+        const grouped: { [key: string]: { revenue: number; orders: number } } = {}
+
+        orders.forEach(order => {
+            const date = new Date(order.created_at)
+            let period = ''
+
+            switch (timeFilter) {
+                case 'daily':
+                    period = `${date.getHours()}:00`
+                    break
+                case 'weekly':
+                    const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+                    period = days[date.getDay()]
+                    break
+                case 'monthly':
+                    period = `Week ${Math.ceil(date.getDate() / 7)}`
+                    break
+                case 'yearly':
+                    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+                    period = months[date.getMonth()]
+                    break
+            }
+
+            if (!grouped[period]) {
+                grouped[period] = { revenue: 0, orders: 0 }
+            }
+            grouped[period].revenue += order.total_price || 0
+            grouped[period].orders += 1
+        })
+
+        return Object.entries(grouped).map(([period, data]) => ({
+            period,
+            revenue: data.revenue,
+            orders: data.orders
+        }))
+    }
+
+    const fetchTotalRevenueData = async () => {
+        try {
+            const { startDate, endDate } = getDateRange()
+
+            const { data: orders, error } = await supabase
+                .from('order')
+                .select('status_updated_at, total_price, order_status')
+                .eq('order_status', 'Completed')
+                .gte('status_updated_at', startDate)
+                .lte('status_updated_at', endDate)
+                .order('status_updated_at', { ascending: true })
+
+            if (error) throw error
+
+            const grouped: Record<string, number> = {}
+
+            orders?.forEach(order => {
+                const date = new Date(order.status_updated_at)
+                let key = ''
+
+                switch (timeFilter) {
+                    case 'daily':
+                        key = `${date.getHours()}:00`
+                        break
+                    case 'weekly':
+                        key = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][date.getDay()]
+                        break
+                    case 'monthly':
+                        key = `Week ${Math.ceil(date.getDate() / 7)}`
+                        break
+                    case 'yearly':
+                        key = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][date.getMonth()]
+                        break
+                }
+
+                grouped[key] = (grouped[key] || 0) + (order.total_price || 0)
+            })
+
+            const formatted = Object.entries(grouped).map(([period, value]) => ({
+                month: period,
+                value
+            }))
+
+            setTotalRevenueData(formatted)
+        } catch (error) {
+            console.error('Error fetching total revenue data:', error)
+        }
+    }
+
+
+    const fetchFulfillmentData = async () => {
+        try {
+            const { data: orders, error } = await supabase
+                .from('order')
+                .select('order_type')
+                .in('order_status', ['Completed'])
+
+            if (error) throw error
+
+            const pickupCount = orders?.filter(o => o.order_type === 'pickup').length || 0
+            const deliveryCount = orders?.filter(o => o.order_type === 'delivery').length || 0
+            const total = pickupCount + deliveryCount
+
+            setFulfillmentData([
+                {
+                    name: 'Pick-up',
+                    value: total > 0 ? Math.round((pickupCount / total) * 100) : 0,
+                    color: '#f59e0b'
+                },
+                {
+                    name: 'Delivery',
+                    value: total > 0 ? Math.round((deliveryCount / total) * 100) : 0,
+                    color: '#fbbf24'
+                }
+            ])
+        } catch (error) {
+            console.error('Error fetching fulfillment data:', error)
+        }
+    }
+
+    const fetchBestAndLeastSales = async () => {
+        try {
+            const { data: orderItems, error } = await supabase
+                .from('order_item')
+                .select(`
+                    quantity,
+                    menu_id,
+                    menu (
+                        name
+                    ),
+                    order!inner (
+                        order_status
+                    )
+                `)
+                .in('order.order_status', ['Completed'])
+
+            if (error) throw error
+
+            // Group by menu item
+            const itemCounts: { [key: string]: { name: string; count: number; menu_id: string } } = {}
+
+            orderItems?.forEach(item => {
+                const menuId = item.menu_id
+                const menuData = item.menu as any
+
+                if (!itemCounts[menuId]) {
+                    itemCounts[menuId] = {
+                        name: menuData?.name || 'Unknown',
+                        count: 0,
+                        menu_id: menuId
+                    }
+                }
+                itemCounts[menuId].count += item.quantity
+            })
+
+            // Sort and format
+            const sortedItems = Object.values(itemCounts).sort((a, b) => b.count - a.count)
+
+            const best = sortedItems.slice(0, 10).map((item, index) => ({
+                rank: index + 1,
+                name: item.name,
+                orders: item.count,
+                menu_id: item.menu_id
+            }))
+
+            const least = sortedItems.slice(-10).reverse().map((item, index) => ({
+                rank: index + 1,
+                name: item.name,
+                orders: item.count,
+                menu_id: item.menu_id
+            }))
+
+            setBestSalesItems(best)
+            setLeastSalesItems(least)
+        } catch (error) {
+            console.error('Error fetching best/least sales:', error)
+        }
+    }
 
     const sidebarItems = [
         {
@@ -148,60 +429,12 @@ function RouteComponent() {
         }
     }
 
-    // Sample data for different time periods
-    const dailySalesData = [
-        { period: '6 AM', revenue: 2500, orders: 8 },
-        { period: '9 AM', revenue: 4200, orders: 15 },
-        { period: '12 PM', revenue: 8500, orders: 28 },
-        { period: '3 PM', revenue: 6800, orders: 22 },
-        { period: '6 PM', revenue: 12000, orders: 45 },
-        { period: '9 PM', revenue: 5200, orders: 18 }
-    ]
-
-    const weeklySalesData = [
-        { period: 'Mon', revenue: 35000, orders: 120 },
-        { period: 'Tue', revenue: 42000, orders: 145 },
-        { period: 'Wed', revenue: 38000, orders: 135 },
-        { period: 'Thu', revenue: 45000, orders: 160 },
-        { period: 'Fri', revenue: 52000, orders: 180 },
-        { period: 'Sat', revenue: 68000, orders: 220 },
-        { period: 'Sun', revenue: 58000, orders: 195 }
-    ]
-
-    const monthlySalesData = [
-        { period: 'Week 1', revenue: 280000, orders: 950 },
-        { period: 'Week 2', revenue: 320000, orders: 1100 },
-        { period: 'Week 3', revenue: 298000, orders: 1020 },
-        { period: 'Week 4', revenue: 340000, orders: 1180 }
-    ]
-
-    const yearlySalesData = [
-        { period: 'Jan', revenue: 300000, orders: 1200 },
-        { period: 'Feb', revenue: 400000, orders: 1500 },
-        { period: 'Mar', revenue: 350000, orders: 1300 },
-        { period: 'Apr', revenue: 1050000, orders: 3800 },
-        { period: 'May', revenue: 850000, orders: 3100 },
-        { period: 'Jun', revenue: 750000, orders: 2800 },
-        { period: 'Jul', revenue: 1100000, orders: 4200 },
-        { period: 'Aug', revenue: 950000, orders: 3600 },
-        { period: 'Sep', revenue: 1000000, orders: 3800 },
-        { period: 'Oct', revenue: 950000, orders: 3500 },
-        { period: 'Nov', revenue: 1200000, orders: 4500 },
-        { period: 'Dec', revenue: 1350000, orders: 5000 }
-    ]
-
     const getCurrentData = () => {
-        switch (timeFilter) {
-            case 'daily': return dailySalesData
-            case 'weekly': return weeklySalesData
-            case 'monthly': return monthlySalesData
-            case 'yearly': return yearlySalesData
-            default: return dailySalesData
-        }
+        return salesData
     }
 
     const getCurrentStats = () => {
-        const data = getCurrentData()
+        const data = salesData
         const totalRevenue = data.reduce((sum, item) => sum + item.revenue, 0)
         const totalOrders = data.reduce((sum, item) => sum + item.orders, 0)
         const avgOrderValue = totalOrders > 0 ? totalRevenue / totalOrders : 0
@@ -215,57 +448,12 @@ function RouteComponent() {
 
     const stats = getCurrentStats()
 
-    // Sales data
-    const totalRevenueData = [
-        { month: 'Jan', value: 30 },
-        { month: 'Feb', value: 40 },
-        { month: 'Mar', value: 35 },
-        { month: 'Apr', value: 105 },
-        { month: 'May', value: 85 },
-        { month: 'Jun', value: 75 },
-        { month: 'Jul', value: 110 },
-        { month: 'Aug', value: 95 },
-        { month: 'Sep', value: 100 },
-        { month: 'Oct', value: 95 },
-        { month: 'Nov', value: 120 },
-        { month: 'Dec', value: 135 },
-        { month: 'Jan', value: 140 },
-        { month: 'Feb', value: 150 },
-        { month: 'Mar', value: 160 }
-    ]
-
-    const fulfillmentData = [
-        { name: 'Pick-up', value: 70, color: '#f59e0b' },
-        { name: 'Delivery', value: 30, color: '#fbbf24' }
-    ]
-
-    const bestSalesItems = [
-        { rank: 1, name: 'Bilao 1', orders: 103, image: '🍛' },
-        { rank: 2, name: 'Bilao 2', orders: 94, image: '🍛' },
-        { rank: 3, name: 'Bilao 3', orders: 85, image: '🍛' },
-        { rank: 4, name: 'Bilao 4', orders: 77, image: '🍛' },
-        { rank: 5, name: 'Bilao 5', orders: 62, image: '🍛' },
-        { rank: 6, name: 'Bilao 6', orders: 55, image: '🍛' }
-    ]
-
-    const leastSalesItems = [
-        { rank: 1, name: 'Bilao 1', orders: 7, image: '🍛' },
-        { rank: 2, name: 'Bilao 2', orders: 9, image: '🍛' },
-        { rank: 3, name: 'Bilao 3', orders: 11, image: '🍛' },
-        { rank: 4, name: 'Bilao 4', orders: 13, image: '🍛' },
-        { rank: 5, name: 'Bilao 5', orders: 15, image: '🍛' },
-        { rank: 6, name: 'Bilao 6', orders: 16, image: '🍛' }
-    ]
-
     const filterOptions = [
         { value: 'daily', label: 'Daily Summary' },
         { value: 'weekly', label: 'Weekly Summary' },
         { value: 'monthly', label: 'Monthly Summary' },
         { value: 'yearly', label: 'Yearly Summary' }
     ]
-
-    const [isSidebarOpen, setIsSidebarOpen] = useState(false)
-    const [isNotificationOpen, setIsNotificationOpen] = useState(false)
 
     const SalesModal = () => {
         if (!isModalOpen) return null;
@@ -308,9 +496,13 @@ function RouteComponent() {
                                     <tr key={item.rank} className="hover:bg-gray-50">
                                         <td className="py-4 text-sm font-medium text-gray-800">{item.rank}</td>
                                         <td className="py-4">
-                                            <div className="w-12 h-12 bg-amber-100 rounded-lg flex items-center justify-center text-2xl">
-                                                {item.image}
-                                            </div>
+                                            {/* <div className="w-12 h-12 bg-amber-100 rounded-lg flex items-center justify-center text-2xl overflow-hidden">
+                                                {item.image.startsWith('http') ? (
+                                                    <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
+                                                ) : (
+                                                    <span>{item.image}</span>
+                                                )}
+                                            </div> */}
                                         </td>
                                         <td className="py-4 text-sm text-gray-800 font-medium">{item.name}</td>
                                         <td className="py-4 text-sm font-bold text-gray-800 text-right">{item.orders}</td>
@@ -323,6 +515,15 @@ function RouteComponent() {
             </div>
         );
     };
+
+    const LoadingSpinner = () => (
+        <div className="fixed inset-0 bg-black/50 flex justify-center items-center z-[60]">
+            <div className="bg-white rounded-xl shadow-lg p-6 flex flex-col items-center gap-4">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#964B00]"></div>
+                <p className="text-gray-700 font-medium">Processing...</p>
+            </div>
+        </div>
+    );
 
     return (
         <div className="min-h-screen bg-gradient-to-br from-amber-50 to-orange-100 flex overflow-x-hidden">
@@ -460,6 +661,7 @@ function RouteComponent() {
 
                 {/* Sales Content */}
                 <main className="flex-1 p-6 overflow-y-auto">
+
                     {/* Time Filter Dropdown */}
                     <div className="mb-6 flex justify-between items-center">
                         <h1 className="text-2xl font-bold text-gray-800">Sales Summary</h1>
@@ -582,7 +784,7 @@ function RouteComponent() {
                     {/* Charts and Analytics Row */}
                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 lg:gap-6 mb-8">
                         {/* Total Revenue Chart - Takes 2 columns, positioned on left */}
-                        <div className="col-span-2 bg-white rounded-xl p-6 shadow-sm border-2 border-yellow-400">
+                        <div className="col-span-1 lg:col-span-2 bg-white rounded-xl p-6 shadow-sm border-2 border-yellow-400">
                             <h3 className="text-xl font-bold text-gray-800 mb-6">Total Revenue Trend</h3>
                             <div className="h-64">
                                 <ResponsiveContainer width="100%" height="100%">
@@ -673,12 +875,16 @@ function RouteComponent() {
                                 </button>
                             </div>
                             <div className="space-y-3">
-                                {bestSalesItems.slice(0, 6).map((item, index) => (
+                                {bestSalesItems.slice(0, 6).map((item) => (
                                     <div key={item.rank} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                                         <div className="flex items-center gap-3">
                                             <span className="text-sm font-bold text-gray-500 w-6">#{item.rank}</span>
-                                            <div className="w-10 h-10 bg-amber-100 rounded-lg flex items-center justify-center text-xl">
-                                                {item.image}
+                                            <div className="w-10 h-10 bg-amber-100 rounded-lg flex items-center justify-center text-xl overflow-hidden">
+                                                {/* {item.image.startsWith('http') ? (
+                                                            <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
+                                                        ) : (
+                                                            <span>{item.image}</span>
+                                                        )} */}
                                             </div>
                                             <div>
                                                 <p className="font-medium text-gray-800">{item.name}</p>
@@ -710,12 +916,16 @@ function RouteComponent() {
                                 </button>
                             </div>
                             <div className="space-y-3">
-                                {leastSalesItems.slice(0, 6).map((item, index) => (
+                                {leastSalesItems.slice(0, 6).map((item) => (
                                     <div key={item.rank} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                                         <div className="flex items-center gap-3">
                                             <span className="text-sm font-bold text-gray-500 w-6">#{item.rank}</span>
-                                            <div className="w-10 h-10 bg-amber-100 rounded-lg flex items-center justify-center text-xl">
-                                                {item.image}
+                                            <div className="w-10 h-10 bg-amber-100 rounded-lg flex items-center justify-center text-xl overflow-hidden">
+                                                {/* {item.image.startsWith('http') ? (
+                                                            <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
+                                                        ) : (
+                                                            <span>{item.image}</span>
+                                                        )} */}
                                             </div>
                                             <div>
                                                 <p className="font-medium text-gray-800">{item.name}</p>
@@ -735,6 +945,9 @@ function RouteComponent() {
 
             {/* Sales Modal */}
             <SalesModal />
+
+            {/* Loading Spinner */}
+            {loading && <LoadingSpinner />}
         </div>
     )
 }
