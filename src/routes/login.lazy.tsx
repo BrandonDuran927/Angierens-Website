@@ -178,13 +178,42 @@ function RouteComponent() {
       return;
     }
 
-    setUser(data.user)
-    console.log("Sign-in successful:", data);
+    const user = data.user;
+    setUser(user);
+    console.log("Sign-in successful:", user);
 
-    setTimeout(() => {
-      navigate({ to: "/" });
-    }, 300);
+    // ✅ Fetch the user's role from your "users" table
+    const { data: userData, error: userError } = await supabase
+      .from("users")
+      .select("user_role")
+      .eq("user_uid", user.id)
+      .single();
+
+    if (userError || !userData) {
+      console.error("Error fetching user role:", userError);
+      alert("Unable to identify your role. Please contact support.");
+      return;
+    }
+
+    console.log("User role:", userData.user_role);
+
+    switch (userData.user_role) {
+      case "Owner":
+        navigate({ to: "/admin-interface" });
+        break;
+      case "Staff":
+        navigate({ to: "/staff" });
+        break;
+      case "Chef":
+        navigate({ to: "/chef-interface" });
+        break;
+      case "Customer":
+      default:
+        navigate({ to: "/customer-interface/home" });
+        break;
+    }
   }
+
 
   async function sendPasswordResetEmail() {
     if (!emailToReset) {

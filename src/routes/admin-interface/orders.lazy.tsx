@@ -1,18 +1,13 @@
 import { createLazyFileRoute, Link } from '@tanstack/react-router'
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useLocation } from '@tanstack/react-router'
 import { LayoutDashboard, ShoppingCart, TrendingUp, MessageSquare, Users, Menu as MenuIcon, RefreshCw, LogOut, Search, Filter, Eye, Bell, Plus, ChevronLeft, ChevronRight, Calendar, Clock, CreditCard, Truck, DollarSign, X, Heart, Star, LucideCalendar } from 'lucide-react'
+import { fetchOrders } from '@/lib/api'
+import type {
+    Order
+} from '@/lib/api'
+import { useQuery } from '@tanstack/react-query'
 
-interface Order {
-    id: string
-    customerName: string
-    date: string
-    time: string
-    price: string
-    fulfillmentType: 'Delivery' | 'Pick-up'
-    paymentMethod: string
-    status: 'New Orders' | 'In Process' | 'Completed'
-}
 
 interface Notification {
     id: string
@@ -36,29 +31,44 @@ export const Route = createLazyFileRoute('/admin-interface/orders')({
 })
 
 function AdminOrdersInterface() {
+    type TabType = 'New Orders' | 'In Process' | 'Completed'
+    const tabs: TabType[] = ['New Orders', 'In Process', 'Completed']
+
+
     const [showOrderBackView, setShowOrderBackView] = useState(false)
     const [isFilterOpen, setIsFilterOpen] = useState(false)
-    const [activeTab, setActiveTab] = useState('New Orders')
+    const [activeTab, setActiveTab] = useState<TabType>('New Orders')
     const [searchQuery, setSearchQuery] = useState('')
     const [currentPage, setCurrentPage] = useState(1)
-    const [isAddOrderModalOpen, setIsAddOrderModalOpen] = useState(false)
-    const [orderForm, setOrderForm] = useState({
-        fullName: '',
-        email: '',
-        phone: '',
-        fulfillmentType: '',
-        selectedItems: [],
-        addOns: {
-            puto: 0,
-            sapinSapin: 0,
-            kutsinta: 0
-        }
-    })
-    // 1. ADD THIS STATE VARIABLE (around line 45, with other useState declarations)
     const [selectedOrder, setSelectedOrder] = useState<Order | null>(null)
     const [isOrderDetailsModalOpen, setIsOrderDetailsModalOpen] = useState(false)
+    const [isSidebarOpen, setIsSidebarOpen] = useState(false)
+    const [isNotificationOpen, setIsNotificationOpen] = useState(false)
+    const orderPrice = selectedOrder?.order_item.reduce((sum, item) => {
+        return sum + Number(item.subtotal_price);
+    }, 0);
 
-    const location = useLocation() // Hook to get current location
+
+    const location = useLocation()
+    const statusGroups = {
+        'New Orders': ['Pending'],
+        'In Process': ['Queueing', 'Cancelled', 'Refunding', 'Refund', 'On Delivery', 'Claim Order'],
+        'Completed': ['Completed'],
+    };
+
+    const { data: orders = [], isLoading, error, refetch } = useQuery({
+        queryKey: ['orders'],
+        queryFn: fetchOrders,
+        refetchInterval: 30000,
+    })
+
+    useEffect(() => {
+        if (orders.length > 0) {
+            console.log("✅ Orders fetched successfully:", orders)
+        } else if (!isLoading && !error) {
+            console.log("⚠️ No orders found.")
+        }
+    }, [orders, isLoading, error])
 
     const sidebarItems = [
         {
@@ -166,109 +176,6 @@ function AdminOrdersInterface() {
         setIsOrderDetailsModalOpen(false)
     }
 
-    const orders: Order[] = [
-        {
-            id: '#06',
-            customerName: 'Brandon Duran',
-            date: 'May 16, 2025',
-            time: '10:30 AM',
-            price: 'P 2,350',
-            fulfillmentType: 'Delivery',
-            paymentMethod: 'Online - GCash',
-            status: 'New Orders'
-        },
-        {
-            id: '#07',
-            customerName: 'Russel Carlo',
-            date: 'May 17, 2025',
-            time: '9:40 AM',
-            price: 'P 850',
-            fulfillmentType: 'Delivery',
-            paymentMethod: 'Online - GCash',
-            status: 'New Orders'
-        },
-        {
-            id: '#08',
-            customerName: 'Charles Caadiang',
-            date: 'May 17, 2025',
-            time: '11:02 AM',
-            price: 'P 980',
-            fulfillmentType: 'Delivery',
-            paymentMethod: 'Online - GCash',
-            status: 'New Orders'
-        },
-        {
-            id: '#09',
-            customerName: 'Prince Manuel',
-            date: 'May 17, 2025',
-            time: '11:40 AM',
-            price: 'P 450',
-            fulfillmentType: 'Delivery',
-            paymentMethod: 'On-site',
-            status: 'New Orders'
-        },
-        {
-            id: '#10',
-            customerName: 'Shiela Anne',
-            date: 'May 18, 2025',
-            time: '2:00 PM',
-            price: 'P 450',
-            fulfillmentType: 'Delivery',
-            paymentMethod: 'Online - GCash',
-            status: 'New Orders'
-        },
-        {
-            id: '#11',
-            customerName: 'Selita Sesina',
-            date: 'May 19, 2025',
-            time: '9:05 AM',
-            price: 'P 850',
-            fulfillmentType: 'Pick-up',
-            paymentMethod: 'Online - GCash',
-            status: 'New Orders'
-        },
-        {
-            id: '#12',
-            customerName: 'Karina Mikana',
-            date: 'May 20, 2025',
-            time: '10:24 AM',
-            price: 'P 2450',
-            fulfillmentType: 'Delivery',
-            paymentMethod: 'Online - GCash',
-            status: 'New Orders'
-        },
-        {
-            id: '#13',
-            customerName: 'Elliot Kingsman',
-            date: 'May 21, 2025',
-            time: '2:40 PM',
-            price: 'P 980',
-            fulfillmentType: 'Delivery',
-            paymentMethod: 'On-site',
-            status: 'New Orders'
-        },
-        {
-            id: '#14',
-            customerName: 'Karina Mikana',
-            date: 'May 22, 2025',
-            time: '1:20 PM',
-            price: 'P 2450',
-            fulfillmentType: 'Delivery',
-            paymentMethod: 'Online - GCash',
-            status: 'New Orders'
-        },
-        {
-            id: '#15',
-            customerName: 'Elliot Kingsman',
-            date: 'May 22, 2025',
-            time: '2:10 PM',
-            price: 'P 980',
-            fulfillmentType: 'Delivery',
-            paymentMethod: 'On-site',
-            status: 'New Orders'
-        }
-    ]
-
     const markAllAsRead = () => {
         setNotifications(prev => prev.map(notif => ({ ...notif, read: true })))
     }
@@ -305,18 +212,51 @@ function AdminOrdersInterface() {
         }
     }
 
+    const filteredOrdersTab = orders.filter((order) =>
+        statusGroups[activeTab]?.includes(order.order_status)
+    );
+
+    // Filter orders based on search query
     const filteredOrders = orders.filter(order =>
-        order.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        order.customerName.toLowerCase().includes(searchQuery.toLowerCase())
+        order.order_id.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        order.user.customer_name.toLowerCase().includes(searchQuery.toLowerCase())
     )
 
+    // Pagination
     const totalPages = Math.ceil(filteredOrders.length / 10)
     const startIndex = (currentPage - 1) * 10
     const endIndex = Math.min(startIndex + 10, filteredOrders.length)
     const currentOrders = filteredOrders.slice(startIndex, endIndex)
 
-    const [isSidebarOpen, setIsSidebarOpen] = useState(false)
-    const [isNotificationOpen, setIsNotificationOpen] = useState(false)
+
+    const LoadingSpinner = () => (
+        <div className="fixed inset-0 bg-black/50 flex justify-center items-center z-[60]">
+            <div className="bg-white rounded-xl shadow-lg p-6 flex flex-col items-center gap-4">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#964B00]"></div>
+                <p className="text-gray-700 font-medium">Processing...</p>
+            </div>
+        </div>
+    );
+
+    const formatScheduleTime = (dateStr: string, timeStr: string): string => {
+        // Convert to Date object for formatting
+        const date = new Date(`${dateStr}T${timeStr}`);
+
+        // Format time (e.g. 10:00:00 → 10 AM)
+        const formattedTime = date.toLocaleTimeString('en-US', {
+            hour: 'numeric',
+            hour12: true,
+        });
+
+        // Format date (e.g. 2025-11-03 → November 3, 2025)
+        const formattedDate = date.toLocaleDateString('en-US', {
+            month: 'long',
+            day: 'numeric',
+            year: 'numeric',
+        });
+
+        return `${formattedTime} to be delivered on ${formattedDate}`;
+    }
 
     return (
         <div className="min-h-screen bg-gradient-to-br from-amber-50 to-orange-100 flex overflow-x-hidden">
@@ -480,8 +420,8 @@ function AdminOrdersInterface() {
                             </div>
 
                             {/* Tabs */}
-                            <div className="flex gap-2">
-                                {['New Orders', 'In Process', 'Completed'].map((tab) => (
+                            <div className="flex gap-2 mb-4">
+                                {tabs.map((tab) => (
                                     <button
                                         key={tab}
                                         onClick={() => setActiveTab(tab)}
@@ -501,7 +441,7 @@ function AdminOrdersInterface() {
                             <table className="w-full">
                                 <thead className="bg-gray-50">
                                     <tr>
-                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Order ID</th>
+                                        <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Order ID</th>
                                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Customer Name</th>
                                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
                                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Time</th>
@@ -509,35 +449,58 @@ function AdminOrdersInterface() {
                                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fulfillment Type</th>
                                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Payment Method</th>
                                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Action</th>
+                                        <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Action</th>
                                     </tr>
                                 </thead>
                                 <tbody className="bg-white divide-y divide-gray-200">
-                                    {currentOrders.map((order) => (
-                                        <tr key={order.id} className="hover:bg-gray-50">
-                                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{order.id}</td>
-                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{order.customerName}</td>
-                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{order.date}</td>
-                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{order.time}</td>
-                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{order.price}</td>
-                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{order.fulfillmentType}</td>
-                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{order.paymentMethod}</td>
-                                            <td className="px-6 py-4 whitespace-nowrap">
-                                                <div className="flex gap-2">
-                                                    For Approval
-                                                </div>
-                                            </td>
-                                            <td className="px-6 py-4 whitespace-nowrap">
-                                                <button
-                                                    onClick={() => openOrderDetails(order)}
-                                                    className="text-gray-600 hover:text-gray-800 transition-colors"
-                                                >
-                                                    <Eye className="h-6 w-6" />
-                                                </button>
+                                    {filteredOrdersTab.length > 0 ? (
+                                        filteredOrdersTab.map((order) => (
+                                            <tr key={order.order_id} className="hover:bg-gray-50">
+                                                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 text-center">
+                                                    {order.order_number}
+                                                </td>
+                                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                                    {order.user.customer_name}
+                                                </td>
+                                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                                    {order.date}
+                                                </td>
+                                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                                    {order.time}
+                                                </td>
+                                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                                    ₱ {order.total_price}
+                                                </td>
+                                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                                    {order.order_type}
+                                                </td>
+                                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                                    {order.payment.paymentMethod ?? 'No payment yet'}
+                                                </td>
+                                                <td className="px-6 py-4 whitespace-nowrap">
+                                                    <div className="flex gap-2">
+                                                        {order.order_status}
+                                                    </div>
+                                                </td>
+                                                <td className="px-6 py-4 text-center whitespace-nowrap">
+                                                    <button
+                                                        onClick={() => openOrderDetails(order)}
+                                                        className="text-gray-600 hover:text-gray-800 transition-colors"
+                                                    >
+                                                        <Eye className="h-6 w-6" />
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        ))
+                                    ) : (
+                                        <tr>
+                                            <td colSpan={9} className="text-center py-6 text-gray-500">
+                                                No orders found in this category
                                             </td>
                                         </tr>
-                                    ))}
+                                    )}
                                 </tbody>
+
                             </table>
                         </div>
 
@@ -576,245 +539,6 @@ function AdminOrdersInterface() {
                             </div>
                         </div>
                     </div>
-                    {/* Add Order Modal */}
-                    {isAddOrderModalOpen && (
-                        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-                            <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl mx-4 max-h-[90vh] overflow-y-auto">
-                                {/* Modal Header */}
-                                <div className="p-6 border-b border-gray-200">
-                                    <h2 className="text-2xl font-bold text-gray-800">Add Order Manually (On-site)</h2>
-                                </div>
-
-                                {/* Modal Body */}
-                                <div className="p-6">
-                                    <div className="grid grid-cols-2 gap-8">
-                                        {/* Left Column - Customer Info & Orders */}
-                                        <div className="space-y-4">
-                                            <div>
-                                                <label className="block text-sm font-semibold text-gray-700 mb-2">Full Name:</label>
-                                                <input
-                                                    type="text"
-                                                    placeholder="Type the full name of the customer"
-                                                    value={orderForm.fullName}
-                                                    onChange={(e) => setOrderForm(prev => ({ ...prev, fullName: e.target.value }))}
-                                                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500"
-                                                />
-                                            </div>
-
-                                            <div>
-                                                <label className="block text-sm font-semibold text-gray-700 mb-2">Email Address:</label>
-                                                <input
-                                                    type="email"
-                                                    placeholder="Type the working email address..."
-                                                    value={orderForm.email}
-                                                    onChange={(e) => setOrderForm(prev => ({ ...prev, email: e.target.value }))}
-                                                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500"
-                                                />
-                                            </div>
-
-                                            <div>
-                                                <label className="block text-sm font-semibold text-gray-700 mb-2">Phone Number:</label>
-                                                <input
-                                                    type="tel"
-                                                    placeholder="Type the working phone number..."
-                                                    value={orderForm.phone}
-                                                    onChange={(e) => setOrderForm(prev => ({ ...prev, phone: e.target.value }))}
-                                                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500"
-                                                />
-                                            </div>
-
-                                            <div>
-                                                <label className="block text-sm font-semibold text-gray-700 mb-2">Fulfillment Type:</label>
-                                                <select
-                                                    value={orderForm.fulfillmentType}
-                                                    onChange={(e) => setOrderForm(prev => ({ ...prev, fulfillmentType: e.target.value }))}
-                                                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500"
-                                                >
-                                                    <option value="">Select fulfillment type</option>
-                                                    <option value="pickup">Pick-up</option>
-                                                    <option value="delivery">Delivery</option>
-                                                </select>
-                                            </div>
-
-                                            {/* Add orders section */}
-                                            <div>
-                                                <label className="block text-sm font-semibold text-gray-700 mb-2">Add orders:</label>
-                                                <div className="relative">
-                                                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-                                                    <input
-                                                        type="text"
-                                                        placeholder="Search a name of the item"
-                                                        className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500"
-                                                    />
-                                                </div>
-
-                                                {/* Current Added Orders List */}
-                                                <div className="mt-3 space-y-2 bg-gray-50 p-3 rounded-lg">
-                                                    <h4 className="text-sm font-semibold text-gray-700">Current Orders:</h4>
-                                                    <div className="space-y-2">
-                                                        <div className="flex justify-between items-center text-sm">
-                                                            <span>• 5 in 1 Mix in Bilao (Palabok)</span>
-                                                            <span className="font-semibold">₱ 3,750</span>
-                                                        </div>
-                                                        <div className="flex justify-between items-center text-sm">
-                                                            <span>• 5 in 1 Mix in Bilao (Carbonara)</span>
-                                                            <span className="font-semibold">₱ 3,750</span>
-                                                        </div>
-                                                    </div>
-                                                    <div className="border-t border-gray-300 pt-2 mt-2">
-                                                        <div className="flex justify-between items-center font-semibold">
-                                                            <span>Price</span>
-                                                            <span className="text-lg">₱ 3,750</span>
-                                                        </div>
-                                                    </div>
-                                                </div>
-
-                                                {/* Available Menu items to add */}
-                                                <div className="mt-3">
-                                                    <h4 className="text-sm font-semibold text-gray-700 mb-2">Available Items:</h4>
-                                                    <div className="space-y-2 max-h-40 overflow-y-auto">
-                                                        <div className="bg-amber-600 text-white p-3 rounded-lg">
-                                                            <div className="flex justify-between items-center">
-                                                                <div>
-                                                                    <h4 className="font-semibold">5 in 1 Mix in Bilao (Palabok)</h4>
-                                                                    <p className="text-sm opacity-90">Inclusion:</p>
-                                                                    <p className="text-xs opacity-75">40 pcs. Pork Shanghai, 30 pcs. Pork Shanghai, 20 pcs. Cheese Stick</p>
-                                                                </div>
-                                                                <div className="flex items-center gap-2">
-                                                                    <button className="w-8 h-8 bg-white text-amber-600 rounded-full flex items-center justify-center">-</button>
-                                                                    <span className="text-white font-semibold">2</span>
-                                                                    <button className="w-8 h-8 bg-white text-amber-600 rounded-full flex items-center justify-center">+</button>
-                                                                </div>
-                                                            </div>
-                                                        </div>
-
-                                                        <div className="bg-amber-600 text-white p-3 rounded-lg">
-                                                            <div className="flex justify-between items-center">
-                                                                <div>
-                                                                    <h4 className="font-semibold">5 in 1 Mix in Bilao (Palabok)</h4>
-                                                                    <p className="text-sm opacity-90">Inclusion:</p>
-                                                                    <p className="text-xs opacity-75">40 pcs. Pork Shanghai, 30 pcs. Pork Shanghai, 20 pcs. Cheese Stick</p>
-                                                                </div>
-                                                                <div className="flex items-center gap-2">
-                                                                    <button className="w-8 h-8 bg-white text-amber-600 rounded-full flex items-center justify-center">-</button>
-                                                                    <span className="text-white font-semibold">2</span>
-                                                                    <button className="w-8 h-8 bg-white text-amber-600 rounded-full flex items-center justify-center">+</button>
-                                                                </div>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-
-                                        {/* Right Column - Add-ons (same as before) */}
-                                        <div>
-                                            <h3 className="text-lg font-semibold text-gray-700 mb-4">Add-ons:</h3>
-                                            <div className="space-y-3">
-                                                {/* Puto */}
-                                                <div className="flex items-center justify-between">
-                                                    <span className="bg-amber-200 text-amber-800 px-3 py-1 rounded-full text-sm font-medium">Puto</span>
-                                                    <div className="flex items-center gap-2">
-                                                        <button
-                                                            onClick={() => setOrderForm(prev => ({
-                                                                ...prev,
-                                                                addOns: { ...prev.addOns, puto: Math.max(0, prev.addOns.puto - 1) }
-                                                            }))}
-                                                            className="w-8 h-8 border border-gray-300 rounded-full flex items-center justify-center hover:bg-gray-100"
-                                                        >
-                                                            -
-                                                        </button>
-                                                        <span className="w-8 text-center">{orderForm.addOns.puto}</span>
-                                                        <button
-                                                            onClick={() => setOrderForm(prev => ({
-                                                                ...prev,
-                                                                addOns: { ...prev.addOns, puto: prev.addOns.puto + 1 }
-                                                            }))}
-                                                            className="w-8 h-8 border border-gray-300 rounded-full flex items-center justify-center hover:bg-gray-100"
-                                                        >
-                                                            +
-                                                        </button>
-                                                    </div>
-                                                </div>
-
-                                                {/* Sapin-sapin */}
-                                                <div className="flex items-center justify-between">
-                                                    <span className="bg-amber-200 text-amber-800 px-3 py-1 rounded-full text-sm font-medium">Sapin-sapin</span>
-                                                    <div className="flex items-center gap-2">
-                                                        <button
-                                                            onClick={() => setOrderForm(prev => ({
-                                                                ...prev,
-                                                                addOns: { ...prev.addOns, sapinSapin: Math.max(0, prev.addOns.sapinSapin - 1) }
-                                                            }))}
-                                                            className="w-8 h-8 border border-gray-300 rounded-full flex items-center justify-center hover:bg-gray-100"
-                                                        >
-                                                            -
-                                                        </button>
-                                                        <span className="w-8 text-center">{orderForm.addOns.sapinSapin}</span>
-                                                        <button
-                                                            onClick={() => setOrderForm(prev => ({
-                                                                ...prev,
-                                                                addOns: { ...prev.addOns, sapinSapin: prev.addOns.sapinSapin + 1 }
-                                                            }))}
-                                                            className="w-8 h-8 border border-gray-300 rounded-full flex items-center justify-center hover:bg-gray-100"
-                                                        >
-                                                            +
-                                                        </button>
-                                                    </div>
-                                                </div>
-
-                                                {/* Kutsinta */}
-                                                <div className="flex items-center justify-between">
-                                                    <span className="bg-amber-200 text-amber-800 px-3 py-1 rounded-full text-sm font-medium">Kutsinta</span>
-                                                    <div className="flex items-center gap-2">
-                                                        <button
-                                                            onClick={() => setOrderForm(prev => ({
-                                                                ...prev,
-                                                                addOns: { ...prev.addOns, kutsinta: Math.max(0, prev.addOns.kutsinta - 1) }
-                                                            }))}
-                                                            className="w-8 h-8 border border-gray-300 rounded-full flex items-center justify-center hover:bg-gray-100"
-                                                        >
-                                                            -
-                                                        </button>
-                                                        <span className="w-8 text-center">{orderForm.addOns.kutsinta}</span>
-                                                        <button
-                                                            onClick={() => setOrderForm(prev => ({
-                                                                ...prev,
-                                                                addOns: { ...prev.addOns, kutsinta: prev.addOns.kutsinta + 1 }
-                                                            }))}
-                                                            className="w-8 h-8 border border-gray-300 rounded-full flex items-center justify-center hover:bg-gray-100"
-                                                        >
-                                                            +
-                                                        </button>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {/* Modal Footer */}
-                                <div className="flex items-center justify-end gap-3 p-6 border-t border-gray-200">
-                                    <button
-                                        onClick={() => setIsAddOrderModalOpen(false)}
-                                        className="px-6 py-2 border border-red-400 text-red-500 rounded-lg hover:bg-red-50 transition-colors font-medium"
-                                    >
-                                        Cancel
-                                    </button>
-                                    <button
-                                        onClick={() => {
-                                            // Handle form submission here
-                                            console.log('Order form:', orderForm)
-                                            setIsAddOrderModalOpen(false)
-                                        }}
-                                        className="px-6 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors font-medium"
-                                    >
-                                        Confirm
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    )}
                 </main>
             </div>
 
@@ -972,9 +696,9 @@ function AdminOrdersInterface() {
                         <div className="flex items-center justify-between p-6 border-b border-gray-200">
                             <div className="flex items-center gap-4">
                                 <span className="text-gray-600 font-medium">FRONT</span>
-                                <span className="text-xl font-bold text-gray-800">Order ID: {selectedOrder.id}</span>
+                                <span className="text-xl font-bold text-gray-800">Order #: {selectedOrder.order_number}</span>
                                 <span className="bg-black text-white px-4 py-1 rounded-full text-sm font-medium">
-                                    Pending
+                                    {selectedOrder.order_status}
                                 </span>
                             </div>
                             <button
@@ -989,8 +713,8 @@ function AdminOrdersInterface() {
                         <div className="p-6 space-y-6">
                             {/* Customer Info */}
                             <div>
-                                <h3 className="text-2xl font-bold text-gray-800 mb-2">{selectedOrder.customerName}</h3>
-                                <p className="text-gray-600 text-lg">2PM To Be Delivered</p>
+                                <h3 className="text-2xl font-bold text-gray-800 mb-2">{selectedOrder.user.customer_name}</h3>
+                                <p className="text-gray-600 text-lg">{formatScheduleTime(selectedOrder.schedule.schedule_date, selectedOrder.schedule.schedule_time)}</p>
                             </div>
 
                             {/* Date and Time */}
@@ -1008,14 +732,36 @@ function AdminOrdersInterface() {
                                 </div>
 
                                 <div className="space-y-3">
-                                    <div className="grid grid-cols-3 gap-4 items-start">
+                                    {selectedOrder?.order_item?.length ? (
+                                        selectedOrder.order_item.map((item) => (
+                                            <div key={item.order_item_id} className="grid grid-cols-3 gap-4 items-start">
+                                                <div>
+                                                    <p className="font-medium text-gray-800">{item.menu.name} (₱ {item.menu.price})</p>
+                                                    {item.menu.inclusion && (
+                                                        <p className="text-sm text-gray-600 mb-1.5">inclusions: {item.menu.inclusion}</p>
+                                                    )}
+                                                    {/* 
+                                                    // TODO: Implement add-ons
+                                                    {item.menu.add_ons && (
+                                                        <p className="text-sm text-gray-600">add-ons: {item.menu.add_ons}</p>
+                                                    )} */}
+                                                </div>
+                                                <div className="text-center font-medium">{item.quantity}</div>
+                                                <div className="text-right font-bold">₱ {(item.subtotal_price * item.quantity).toLocaleString()}</div>
+
+                                            </div>
+                                        ))
+                                    ) : (
+                                        <p className="text-gray-500 text-center italic">No items found.</p>
+                                    )}
+                                    {/* <div className="grid grid-cols-3 gap-4 items-start">
                                         <div>
-                                            <p className="font-medium text-gray-800">5 in 1 Mix in Bilao (Palabok)</p>
+                                            <p className="font-medium text-gray-800">{selectedOrder.}</p>
                                             <p className="text-sm text-gray-600">add-ons: 20 pcs. Puto</p>
                                         </div>
                                         <div className="text-center font-medium">2</div>
                                         <div className="text-right font-bold">₱ 4,100</div>
-                                    </div>
+                                    </div> */}
                                 </div>
                             </div>
 
@@ -1023,15 +769,17 @@ function AdminOrdersInterface() {
                             <div className="border-t border-gray-200 pt-4 space-y-3">
                                 <div className="flex justify-between items-center">
                                     <span className="text-lg font-medium">Price</span>
-                                    <span className="text-lg font-bold">₱ 4,100</span>
+                                    <span className="text-lg font-bold">₱ {orderPrice}</span>
                                 </div>
-                                <div className="flex justify-between items-center">
-                                    <span className="text-lg font-medium">Delivery fee</span>
-                                    <span className="text-lg font-bold">₱ 75</span>
-                                </div>
+                                {selectedOrder.delivery && (
+                                    <div className="flex justify-between items-center">
+                                        <span className="text-lg font-medium">Delivery fee</span>
+                                        <span className="text-lg font-bold">₱ {selectedOrder.delivery.delivery_fee}</span>
+                                    </div>
+                                )}
                                 <div className="flex justify-between items-center text-xl font-bold border-t border-gray-200 pt-3">
-                                    <span>Remaining Total</span>
-                                    <span>₱ 4,175</span>
+                                    <span>Total</span>
+                                    <span>₱ {orderPrice + selectedOrder.delivery.delivery_fee}</span>
                                 </div>
                             </div>
                         </div>
@@ -1069,7 +817,7 @@ function AdminOrdersInterface() {
                                     BACK
                                 </button>
                                 <span className="bg-black text-white px-4 py-1 rounded-full text-sm font-medium">
-                                    Pending
+                                    {selectedOrder.order_status}
                                 </span>
                             </div>
                             <button
@@ -1088,32 +836,27 @@ function AdminOrdersInterface() {
                             {/* Delivery Address */}
                             <div className="flex">
                                 <h4 className="text-lg font-semibold text-gray-800 mr-4 min-w-[200px]">Delivery Address:</h4>
-                                <p className="text-gray-600">Blk 20, Lot 15, Queensville, Caloocan City</p>
+                                <p className="text-gray-600">{selectedOrder.delivery.address.address_line}, {selectedOrder.delivery.address.barangay}, {selectedOrder.delivery.address.city}</p>
                             </div>
 
                             {/* Customer Contact */}
                             <div className="flex">
                                 <h4 className="text-lg font-semibold text-gray-800 mr-4 min-w-[200px]">Customer Contact #:</h4>
-                                <p className="text-gray-600">+63 123 123 1234</p>
+                                <p className="text-gray-600">{selectedOrder.user.phone_number}</p>
                             </div>
 
                             {/* Special Instructions */}
                             <div className="flex">
                                 <h4 className="text-lg font-semibold text-gray-800 mr-4 min-w-[200px]">Special Instructions:</h4>
-                                <p className="text-gray-600">Wag po paramihan yung bawang..</p>
+                                <p className="text-gray-600">{selectedOrder.additional_information}</p>
                             </div>
 
                             {/* Fulfillment Type */}
                             <div className="flex">
                                 <h4 className="text-lg font-semibold text-gray-800 mr-4 min-w-[200px]">Fulfillment Type:</h4>
-                                <p className="text-gray-600">{selectedOrder.fulfillmentType}</p>
+                                <p className="text-gray-600">{selectedOrder.order_type}</p>
                             </div>
 
-                            {/* Order Type */}
-                            <div className="flex">
-                                <h4 className="text-lg font-semibold text-gray-800 mr-4 min-w-[200px]">Order Type:</h4>
-                                <p className="text-gray-600">Today</p>
-                            </div>
                         </div>
 
                         {/* Modal Footer */}
@@ -1127,18 +870,13 @@ function AdminOrdersInterface() {
                             >
                                 Go back
                             </button>
-                            <div className="flex items-center gap-3">
-                                <button className="px-6 py-3 bg-red-500 text-white rounded-lg font-medium hover:bg-red-600 transition-colors">
-                                    Reject
-                                </button>
-                                <button className="px-6 py-3 bg-green-500 text-white rounded-lg font-medium hover:bg-green-600 transition-colors">
-                                    Accept
-                                </button>
-                            </div>
                         </div>
                     </div>
                 </div>
             )}
+
+            {/* Loading Spinner */}
+            {isLoading && <LoadingSpinner />}
         </div>
     )
 }
