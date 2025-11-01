@@ -3,27 +3,69 @@ import type { ReactNode } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import type { User } from "@supabase/supabase-js";
 
+// Create a custom type that extends the Supabase User with your users table fields
+type ExtendedUser = User & {
+    first_name?: string;
+    middle_name?: string;
+    last_name?: string;
+    phone_number?: string;
+    is_active?: boolean;
+    user_role?: string;
+    date_hired?: string;
+    birth_date?: string;
+    gender?: string;
+    other_contact?: string;
+};
+
 type UserContextType = {
-    user: User | null;
-    setUser: (user: User | null) => void;
+    user: ExtendedUser | null;
+    setUser: (user: ExtendedUser | null) => void;
     signOut: () => Promise<void>;
 };
 
 const UserContext = createContext<UserContextType | undefined>(undefined);
 
 export function UserProvider({ children }: { children: ReactNode }) {
-    const [user, setUser] = useState<User | null>(null);
+    const [user, setUser] = useState<ExtendedUser | null>(null);
 
+    // Function to fetch and merge user data
+    const fetchCompleteUserData = async (authUser: User) => {
+        const { data: userData, error } = await supabase
+            .from('users')
+            .select('*')
+            .eq('user_uid', authUser.id)
+            .single();
+
+        if (error) {
+            console.error('Error fetching user data:', error);
+            return authUser;
+        }
+
+        // Merge auth user with database user data
+        return { ...authUser, ...userData } as ExtendedUser;
+    };
 
     useEffect(() => {
-        supabase.auth.getSession().then(({ data: { session } }) => {
-            setUser(session?.user ?? null);
+        // Get initial session
+        supabase.auth.getSession().then(async ({ data: { session } }) => {
+            if (session?.user) {
+                const completeUser = await fetchCompleteUserData(session.user);
+                setUser(completeUser);
+            } else {
+                setUser(null);
+            }
         });
 
+        // Listen for auth changes
         const {
             data: { subscription },
-        } = supabase.auth.onAuthStateChange((_event, session) => {
-            setUser(session?.user ?? null);
+        } = supabase.auth.onAuthStateChange(async (_event, session) => {
+            if (session?.user) {
+                const completeUser = await fetchCompleteUserData(session.user);
+                setUser(completeUser);
+            } else {
+                setUser(null);
+            }
         });
 
         return () => {
@@ -33,7 +75,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
 
     const signOut = async () => {
         await supabase.auth.signOut();
-        setUser(null); // clear user context
+        setUser(null);
     };
 
     return (
