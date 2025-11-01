@@ -15,9 +15,6 @@ interface Notification {
   read: boolean
 }
 
-// TODO: (DONE) Implement T&C Privacy policy modal
-// TODO: Add database functionality -> Store user details
-
 export const Route = createLazyFileRoute('/signup')({
   component: Signup,
 })

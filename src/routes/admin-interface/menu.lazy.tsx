@@ -1,6 +1,4 @@
-// Owner View-Only Menu Interface - No editing capabilities
-
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { createLazyFileRoute, Link, useLocation } from '@tanstack/react-router'
 import {
     LayoutDashboard,
@@ -15,8 +13,11 @@ import {
     Heart,
     Star,
     LucideCalendar,
-    MenuIcon
+    MenuIcon,
+    Eye,
+    Search
 } from 'lucide-react'
+import { supabase } from '@/lib/supabaseClient'
 
 export const Route = createLazyFileRoute('/admin-interface/menu')({
     component: RouteComponent,
@@ -32,15 +33,28 @@ interface Notification {
 }
 
 interface MenuItem {
-    id: number
+    menu_id: string
     name: string
-    image: string
-    inclusions: string[]
-    available: boolean
+    description: string
+    price: number
+    inclusion: string | null
+    is_available: boolean
+    category: string | null
+    size: string | null
+    quantity_description: string | null
+    image_url: string | null
+}
+
+interface AddOn {
+    add_on: string
+    name: string
+    price: number
+    quantity?: number // optional
 }
 
 function RouteComponent() {
     const location = useLocation()
+    const [searchQuery, setSearchQuery] = useState('')
 
     const sidebarItems = [
         {
@@ -130,91 +144,54 @@ function RouteComponent() {
         }
     ])
 
-    const [menuItems] = useState<MenuItem[]>([
-        {
-            id: 1,
-            name: '5 in 1 Mix in Bilao (PALABOK)',
-            available: true,
-            inclusions: [
-                '40 pcs. Pork Shanghai',
-                '12 pcs. Pork BBQ',
-                '30 pcs. Pork Shanghai',
-                '30 slices Cordon Bleu'
-            ],
-            image: "/public/menu-page img/pancit malabonbon.png"
-        },
-        {
-            id: 2,
-            name: '5 in 1 Mix in Bilao (SPAGHETTI)',
-            available: true,
-            inclusions: [
-                '40 pcs. Pork Shanghai',
-                '12 pcs. Pork BBQ',
-                '30 pcs. Pork Shanghai',
-                '30 slices Cordon Bleu'
-            ],
-            image: "/public/menu-page img/spaghetto.png"
-        },
-        {
-            id: 3,
-            name: '5 in 1 Mix in Bilao (VALENCIANA)',
-            available: true,
-            inclusions: [
-                '40 pcs. Pork Shanghai',
-                '12 pcs. Pork BBQ',
-                '30 pcs. Pork Shanghai',
-                '30 slices Cordon Bleu'
-            ],
-            image: "/public/menu-page img/valencia.png"
-        },
-        {
-            id: 4,
-            name: '5 in 1 Mix in Bilao (SOTANGHON GUISADO)',
-            available: true,
-            inclusions: [
-                '40 pcs. Pork Shanghai',
-                '12 pcs. Pork BBQ',
-                '30 pcs. Pork Shanghai',
-                '30 slices Cordon Bleu'
-            ],
-            image: "/public/menu-page img/sotanghonney.png"
-        },
-        {
-            id: 5,
-            name: '5 in 1 BAKEDMAC',
-            available: true,
-            inclusions: [
-                '40 pcs. Pork Shanghai',
-                '12 pcs. Pork BBQ',
-                '30 pcs. Buttered Puto',
-                '30 slices Cordon Bleu'
-            ],
-            image: "/public/menu-page img/baked mac.png"
-        },
-        {
-            id: 6,
-            name: '5 in 1 Mix in Bilao (SPECIAL PANSIT MALABON)',
-            image: '/public/menu-page img/special.png',
-            inclusions: [
-                '40 pcs. Pork Shanghai',
-                '12 pcs. Pork BBQ',
-                '30 pcs. Pork Shanghai',
-                '30 slices Cordon Bleu'
-            ],
-            available: true
-        }
-    ])
+    const [menuItems, setMenuItems] = useState<MenuItem[]>([])
+    const [addons, setAddons] = useState<AddOn[]>([])
+    const [loading, setLoading] = useState(true)
+    const [error, setError] = useState<string | null>(null)
 
     const [showMenuDetails, setShowMenuDetails] = useState(false)
     const [selectedMenuItem, setSelectedMenuItem] = useState<MenuItem | null>(null)
 
-    // View-only addons data
-    const [addons] = useState([
-        { id: '1', name: 'Puto', quantity: 2, available: true },
-        { id: '2', name: 'Sapin-sapin', quantity: 2, available: true }
-    ])
-
     const [showAddonsModal, setShowAddonsModal] = useState(false)
+
+    // Fetch menu items from Supabase
+    useEffect(() => {
+        fetchMenuItems()
+        fetchAddons()
+    }, [])
+
+    const fetchMenuItems = async () => {
+        try {
+            setLoading(true)
+            const { data, error } = await supabase
+                .from('menu')
+                .select('*')
+                .order('name', { ascending: true })
+
+            if (error) throw error
+
+            setMenuItems(data || [])
+        } catch (err) {
+            console.error('Error fetching menu items:', err)
+            setError('Failed to load menu items')
+        } finally {
+            setLoading(false)
+        }
+    }
+
+    const fetchAddons = async () => {
+        try {
+            const { data, error } = await supabase
+                .from('add_on')
+                .select('*')
+
+            if (error) throw error
+
+            setAddons(data || [])
+        } catch (err) {
+            console.error('Error fetching add-ons:', err)
+        }
+    }
 
     const markAllAsRead = () => {
         setNotifications(prev => prev.map(notif => ({ ...notif, read: true })))
@@ -254,7 +231,30 @@ function RouteComponent() {
     const [isSidebarOpen, setIsSidebarOpen] = useState(false)
     const [isNotificationOpen, setIsNotificationOpen] = useState(false)
 
+    // Parse inclusions string to array
+    const parseInclusions = (inclusion: string | null): string[] => {
+        if (!inclusion) return []
+        try {
+            // Try parsing as JSON array first
+            const parsed = JSON.parse(inclusion)
+            if (Array.isArray(parsed)) return parsed
+        } catch {
+            // If not JSON, split by common delimiters
+            return inclusion.split(/[,;\n]/).map(item => item.trim()).filter(item => item)
+        }
+        return []
+    }
 
+    // Filter menu items based on search query
+    const filteredMenuItems = menuItems.filter(item => {
+        const query = searchQuery.toLowerCase()
+        return (
+            item.name.toLowerCase().includes(query) ||
+            item.description.toLowerCase().includes(query) ||
+            (item.category && item.category.toLowerCase().includes(query)) ||
+            (item.size && item.size.toLowerCase().includes(query))
+        )
+    })
 
     return (
         <div className="min-h-screen bg-gradient-to-br from-amber-50 to-orange-100 flex overflow-x-hidden">
@@ -267,7 +267,7 @@ function RouteComponent() {
             )}
             {/* Sidebar */}
             <div className={`
-                fixed lg:static inset-y-0 left-0 z-50 w-64 bg-gradient-to-b from-yellow-400 to-amber-500 shadow-lg transform transition-transform duration-300 ease-in-out
+                fixed inset-y-0 left-0 z-50 w-64 bg-gradient-to-b from-yellow-400 to-amber-500 shadow-lg transform transition-transform duration-300 ease-in-out
                 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
             `}>
                 {/* Logo */}
@@ -289,7 +289,7 @@ function RouteComponent() {
                             <Link
                                 key={index}
                                 to={item.route}
-                                onClick={() => setIsSidebarOpen(false)} // Close sidebar on mobile when link is clicked
+                                onClick={() => setIsSidebarOpen(false)}
                                 className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left transition-all ${isActive
                                     ? 'bg-amber-800 text-yellow-300 shadow-md'
                                     : 'text-amber-900 hover:bg-amber-400 hover:text-amber-800'
@@ -314,7 +314,7 @@ function RouteComponent() {
             </div>
 
             {/* Main Content */}
-            <div className="flex-1 flex flex-col min-w-0">
+            <div className="flex-1 flex flex-col min-w-0 lg:ml-64">
                 {/* Header */}
                 <header className="bg-amber-800 text-white p-4 shadow-md">
                     <div className="flex justify-between items-center">
@@ -394,75 +394,178 @@ function RouteComponent() {
                 <main className="flex-1 p-8">
                     <button
                         onClick={() => openAddonsModal()}
-                        className="bg-yellow-400 hover:bg-yellow-500 text-white font-semibold px-6 py-3 rounded-lg transition-colors mb-8"
+                        className="bg-yellow-400 hover:bg-yellow-500 text-amber-900 font-semibold px-6 py-3 rounded-lg transition-colors mb-8"
                     >
                         View Add-ons
                     </button>
 
-                    {/* Menu Items Grid */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                        {menuItems.map((item) => (
-                            <div key={item.id} className="bg-white rounded-2xl shadow-lg overflow-hidden border-4 border-amber-200">
-                                {/* Clickable area for viewing details */}
-                                <div onClick={() => openMenuDetails(item)} className="cursor-pointer">
-                                    {/* Food Image */}
-                                    <div className="relative h-64 overflow-hidden">
-                                        <img
-                                            src={item.image || "/path/to/default-food-image.jpg"}
-                                            alt={item.name}
-                                            className="w-full h-full object-cover"
-                                        />
-                                        {/* Optional overlay for better visual effect */}
-                                        <div className="absolute inset-0 bg-gradient-to-br from-transparent to-black/10"></div>
-                                    </div>
-
-
-                                    {/* Item Details */}
-                                    <div className="p-6">
-                                        <h3 className="font-bold text-lg text-gray-800 mb-3">{item.name}</h3>
-
-                                        <div className="mb-4">
-                                            <p className="text-sm font-semibold text-gray-700 mb-2">Inclusions:</p>
-                                            <div className="grid grid-cols-2 gap-1 text-xs text-gray-600">
-                                                {item.inclusions.map((inclusion, idx) => (
-                                                    <div key={idx}>{inclusion}</div>
-                                                ))}
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {/* Availability Status - Read Only */}
-                                <div className="px-6 pb-6">
-                                    <div className="relative">
-                                        <div
-                                            className={`w-full flex items-center justify-center px-4 py-2 rounded-lg font-semibold ${item.available
-                                                ? 'bg-green-100 text-green-800 border-2 border-green-300'
-                                                : 'bg-red-100 text-red-800 border-2 border-red-300'
-                                                }`}
-                                        >
-                                            <span>Status: {item.available ? 'Available' : 'Unavailable'}</span>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        ))}
+                    {/* Search Filter */}
+                    <div className="mb-6">
+                        <div className="relative max-w-md">
+                            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+                            <input
+                                type="text"
+                                placeholder="Search menu items..."
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                                className="w-full pl-10 pr-4 py-3 border-2 border-amber-200 rounded-lg focus:outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-200 transition-all"
+                            />
+                        </div>
                     </div>
+
+                    {/* Loading State */}
+                    {loading && (
+                        <div className="fixed inset-0 bg-black/50 flex justify-center items-center z-[60]">
+                            <div className="bg-white rounded-xl shadow-lg p-6 flex flex-col items-center gap-4">
+                                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#964B00]"></div>
+                                <p className="text-gray-700 font-medium">Processing...</p>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Error State */}
+                    {error && (
+                        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
+                            {error}
+                        </div>
+                    )}
+
+                    {/* Empty State */}
+                    {!loading && !error && filteredMenuItems.length === 0 && (
+                        <div className="text-center py-12">
+                            <p className="text-xl text-gray-600">
+                                {searchQuery ? 'No menu items found matching your search' : 'No menu items found'}
+                            </p>
+                        </div>
+                    )}
+
+                    {/* Menu Items Table */}
+                    {!loading && !error && menuItems.length > 0 && (
+                        <div className="bg-white rounded-xl shadow-lg overflow-hidden border-2 border-amber-200">
+                            <div className="overflow-x-auto">
+                                <table className="w-full table-fixed">
+                                    <thead>
+                                        <tr className="bg-gradient-to-r from-amber-800 to-amber-800">
+                                            <th className="px-6 py-4 text-left text-sm font-bold text-yellow-400 uppercase tracking-wider w-[15%]">
+                                                Name
+                                            </th>
+                                            <th className="px-6 py-4 text-left text-sm font-bold text-yellow-400 uppercase tracking-wider w-[25%]">
+                                                Description
+                                            </th>
+                                            <th className="px-6 py-4 text-left text-sm font-bold text-yellow-400 uppercase tracking-wider w-[10%]">
+                                                Price
+                                            </th>
+                                            <th className="px-6 py-4 text-left text-sm font-bold text-yellow-400 uppercase tracking-wider w-[15%]">
+                                                Category
+                                            </th>
+                                            <th className="px-6 py-4 text-left text-sm font-bold text-yellow-400 uppercase tracking-wider w-[10%]">
+                                                Size
+                                            </th>
+                                            <th className="px-6 py-4 text-left text-sm font-bold text-yellow-400 uppercase tracking-wider w-[15%]">
+                                                Availability
+                                            </th>
+                                            <th className="px-6 py-4 text-center text-sm font-bold text-yellow-400 uppercase tracking-wider w-[10%]">
+                                                Actions
+                                            </th>
+                                        </tr>
+                                    </thead>
+
+                                    <tbody className="bg-white divide-y divide-gray-200">
+                                        {filteredMenuItems.map((item, index) => (
+                                            <tr
+                                                key={item.menu_id}
+                                                className={`hover:bg-amber-50 transition-colors ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'
+                                                    }`}
+                                            >
+                                                {/* Name */}
+                                                <td className="px-6 py-4 whitespace-nowrap">
+                                                    <div
+                                                        className="text-sm font-semibold text-gray-900 max-w-[160px] overflow-hidden text-ellipsis truncate"
+                                                        title={item.name}
+                                                    >
+                                                        {item.name}
+                                                    </div>
+                                                </td>
+
+                                                {/* Description */}
+                                                <td className="px-6 py-4">
+                                                    <div
+                                                        className="text-sm text-gray-700 max-w-[250px] overflow-hidden text-ellipsis truncate"
+                                                        title={item.description}
+                                                    >
+                                                        {item.description || '-'}
+                                                    </div>
+                                                </td>
+
+                                                {/* Price */}
+                                                <td className="px-6 py-4 whitespace-nowrap">
+                                                    <div className="text-sm font-bold text-amber-600">
+                                                        ₱{Number(item.price).toFixed(2)}
+                                                    </div>
+                                                </td>
+
+                                                {/* Category */}
+                                                <td className="px-6 py-4 whitespace-nowrap">
+                                                    {item.category ? (
+                                                        <span className="px-2 py-1 inline-block text-xs font-semibold rounded-full bg-amber-100 text-amber-800 max-w-[100px] truncate">
+                                                            {item.category}
+                                                        </span>
+                                                    ) : (
+                                                        <span className="text-sm text-gray-400">-</span>
+                                                    )}
+                                                </td>
+
+                                                {/* Size */}
+                                                <td className="px-6 py-4 whitespace-nowrap">
+                                                    {item.size ? (
+                                                        <span className="px-2 py-1 inline-block text-xs font-semibold rounded-full bg-blue-100 text-blue-800 max-w-[80px] truncate">
+                                                            {item.size}
+                                                        </span>
+                                                    ) : (
+                                                        <span className="text-sm text-gray-400">-</span>
+                                                    )}
+                                                </td>
+
+                                                {/* Availability */}
+                                                <td className="px-6 py-4 whitespace-nowrap text-center">
+                                                    <span
+                                                        className={`px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${item.is_available
+                                                            ? 'bg-green-100 text-green-800'
+                                                            : 'bg-red-100 text-red-800'
+                                                            }`}
+                                                    >
+                                                        {item.is_available ? 'Available' : 'Unavailable'}
+                                                    </span>
+                                                </td>
+
+                                                {/* Actions */}
+                                                <td className="px-6 py-4 whitespace-nowrap text-center">
+                                                    <button
+                                                        onClick={() => openMenuDetails(item)}
+                                                        className="inline-flex items-center gap-1 bg-amber-500 hover:bg-amber-600 text-white px-3 py-2 rounded-lg text-sm font-medium transition-colors cursor-pointer"
+                                                    >
+                                                        <Eye className="h-4 w-4" />
+                                                        View
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+
+                                </table>
+                            </div>
+                        </div>
+                    )}
                 </main>
             </div>
 
             {/* Menu Item Details Modal - View Only */}
             {showMenuDetails && selectedMenuItem && (
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-                    <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full max-h-[90vh] overflow-y-auto">
-                        {/* Header with food image */}
-                        <div className="relative h-48 bg-gradient-to-br from-green-100 to-amber-100 flex items-center justify-center rounded-t-2xl">
-                            <div className="w-32 h-32 bg-green-600 rounded-full flex items-center justify-center relative overflow-hidden">
-                                {/* Mock food image */}
-                                <div className="absolute inset-2 bg-gradient-to-br from-red-400 to-orange-400 rounded-full"></div>
-                                <div className="absolute inset-3 bg-gradient-to-br from-yellow-200 to-orange-200 rounded-full"></div>
-                                <div className="absolute inset-4 bg-gradient-to-br from-green-400 to-lime-300 rounded-full"></div>
-                            </div>
+                    <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+                        {/* Header */}
+                        <div className="p-6 border-b border-gray-200 bg-gradient-to-r from-amber-400 to-amber-500">
+                            <h2 className="text-2xl font-bold text-amber-900">Menu Item Details</h2>
                         </div>
 
                         {/* Details Content - Read Only */}
@@ -470,34 +573,78 @@ function RouteComponent() {
                             {/* Food Name */}
                             <div>
                                 <label className="block text-sm font-semibold text-gray-700 mb-2">Food Name:</label>
-                                <div className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg text-gray-800">
+                                <div className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg text-gray-800 font-semibold">
                                     {selectedMenuItem.name}
+                                </div>
+                            </div>
+
+                            {/* Description */}
+                            <div>
+                                <label className="block text-sm font-semibold text-gray-700 mb-2">Description:</label>
+                                <div className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg text-gray-800">
+                                    {selectedMenuItem.description || '-'}
+                                </div>
+                            </div>
+
+                            {/* Price */}
+                            <div>
+                                <label className="block text-sm font-semibold text-gray-700 mb-2">Price:</label>
+                                <div className="w-full px-4 py-3 bg-amber-50 border border-amber-200 rounded-lg text-amber-800 font-bold text-xl">
+                                    ₱{Number(selectedMenuItem.price).toFixed(2)}
+                                </div>
+                            </div>
+
+                            {/* Category, Size, and Quantity in a Grid */}
+                            <div className="grid grid-cols-3 gap-4">
+                                <div>
+                                    <label className="block text-sm font-semibold text-gray-700 mb-2">Category:</label>
+                                    <div className="w-full px-4 py-3 bg-amber-50 border border-amber-200 rounded-lg text-amber-800">
+                                        {selectedMenuItem.category || '-'}
+                                    </div>
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-semibold text-gray-700 mb-2">Size:</label>
+                                    <div className="w-full px-4 py-3 bg-blue-50 border border-blue-200 rounded-lg text-blue-800">
+                                        {selectedMenuItem.size || '-'}
+                                    </div>
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-semibold text-gray-700 mb-2">Quantity:</label>
+                                    <div className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg text-gray-800">
+                                        {selectedMenuItem.quantity_description || '-'}
+                                    </div>
                                 </div>
                             </div>
 
                             {/* Inclusions */}
                             <div>
                                 <label className="block text-sm font-semibold text-gray-700 mb-2">Inclusions:</label>
-                                <div className="flex flex-wrap gap-2">
-                                    {selectedMenuItem.inclusions.map((inclusion, idx) => (
-                                        <span
-                                            key={idx}
-                                            className="inline-flex items-center bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm font-medium"
-                                        >
-                                            {inclusion}
-                                        </span>
-                                    ))}
-                                </div>
+                                {selectedMenuItem.inclusion ? (
+                                    <div className="flex flex-wrap gap-2">
+                                        {parseInclusions(selectedMenuItem.inclusion).map((inclusion, idx) => (
+                                            <span
+                                                key={idx}
+                                                className="inline-flex items-center bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm font-medium"
+                                            >
+                                                {inclusion}
+                                            </span>
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <div className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg text-gray-400">
+                                        No inclusions
+                                    </div>
+                                )}
                             </div>
 
                             {/* Availability Status */}
                             <div>
                                 <label className="block text-sm font-semibold text-gray-700 mb-2">Availability:</label>
-                                <div className={`w-full px-4 py-3 border rounded-lg font-medium ${selectedMenuItem.available
-                                    ? 'bg-green-50 border-green-200 text-green-800'
-                                    : 'bg-red-50 border-red-200 text-red-800'
+                                <div className={`w-full px-4 py-3 border-2 rounded-lg font-semibold text-center ${selectedMenuItem.is_available
+                                    ? 'bg-green-50 border-green-300 text-green-800'
+                                    : 'bg-red-50 border-red-300 text-red-800'
                                     }`}>
-                                    {selectedMenuItem.available ? 'Available' : 'Unavailable'}
+                                    {selectedMenuItem.is_available ? '✓ Available' : '✗ Unavailable'}
                                 </div>
                             </div>
 
@@ -505,7 +652,7 @@ function RouteComponent() {
                             <div className="pt-4">
                                 <button
                                     onClick={closeMenuDetails}
-                                    className="w-full bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold py-3 rounded-lg transition-colors"
+                                    className="w-full bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold py-3 rounded-lg transition-colors cursor-pointer"
                                 >
                                     Close
                                 </button>
@@ -518,14 +665,14 @@ function RouteComponent() {
             {/* View Add-ons Modal - Read Only */}
             {showAddonsModal && (
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-                    <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[80vh] overflow-y-auto">
+                    <div className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[80vh] overflow-y-auto">
                         {/* Header */}
-                        <div className="p-6 border-b border-gray-200">
+                        <div className="p-6 border-b border-gray-200 bg-gradient-to-r from-amber-400 to-amber-500">
                             <div className="flex justify-between items-center">
-                                <h2 className="text-2xl font-bold text-gray-800">Add-ons Overview</h2>
+                                <h2 className="text-2xl font-bold text-amber-900">Add-ons Overview</h2>
                                 <button
                                     onClick={closeAddonsModal}
-                                    className="text-gray-500 hover:text-gray-700 text-2xl cursor-pointer"
+                                    className="text-amber-900 hover:text-amber-700 text-3xl font-bold cursor-pointer"
                                 >
                                     ×
                                 </button>
@@ -534,44 +681,66 @@ function RouteComponent() {
 
                         {/* Content */}
                         <div className="p-6">
-                            {/* Table Header */}
-                            <div className="grid grid-cols-3 gap-4 mb-4 text-lg font-semibold text-gray-700">
-                                <div>Item name</div>
-                                <div className="text-center">Quantity</div>
-                                <div className="text-center">Availability</div>
-                            </div>
+                            {addons.length === 0 ? (
+                                <div className="text-center py-12 text-gray-600">
+                                    <MenuIcon className="h-16 w-16 mx-auto mb-4 text-gray-400" />
+                                    <p className="text-xl">No add-ons available</p>
+                                </div>
+                            ) : (
+                                <div className="bg-white rounded-lg overflow-hidden border border-gray-200">
+                                    <table className="w-full table-fixed">
+                                        <thead>
+                                            <tr className="bg-gradient-to-r from-amber-800 to-amber-800">
+                                                <th className="px-6 py-4 text-left text-sm font-bold text-yellow-400 uppercase tracking-wider w-[50%]">
+                                                    Name
+                                                </th>
+                                                <th className="px-6 py-4 text-left text-sm font-bold text-yellow-400 uppercase tracking-wider w-[25%]">
+                                                    Price
+                                                </th>
+                                                <th className="px-6 py-4 text-center text-sm font-bold text-yellow-400 uppercase tracking-wider w-[25%]">
+                                                    Quantity
+                                                </th>
+                                            </tr>
+                                        </thead>
 
-                            {/* Add-ons List - Read Only */}
-                            <div className="space-y-3">
-                                {addons.map((addon) => (
-                                    <div key={addon.id} className="grid grid-cols-3 gap-4 items-center">
-                                        {/* Item Name */}
-                                        <div className="bg-yellow-100 text-yellow-800 px-4 py-2 rounded-lg font-semibold border border-yellow-200">
-                                            {addon.name}
-                                        </div>
+                                        <tbody className="bg-white divide-y divide-gray-200">
+                                            {addons.map((addon, index) => (
+                                                <tr
+                                                    key={addon.add_on}
+                                                    className={`hover:bg-gray-50 transition-colors ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'
+                                                        }`}
+                                                >
+                                                    {/* Name */}
+                                                    <td className="px-6 py-4 whitespace-nowrap">
+                                                        <div
+                                                            className="text-sm font-semibold text-gray-900 max-w-[200px] overflow-hidden text-ellipsis truncate"
+                                                            title={addon.name}
+                                                        >
+                                                            {addon.name}
+                                                        </div>
+                                                    </td>
 
-                                        {/* Quantity Display */}
-                                        <div className="flex items-center justify-center">
-                                            <span className="text-lg font-semibold bg-gray-100 px-4 py-2 rounded-lg border">
-                                                {addon.quantity}
-                                            </span>
-                                        </div>
+                                                    {/* Price */}
+                                                    <td className="px-6 py-4 whitespace-nowrap">
+                                                        <div className="text-sm font-bold text-amber-600">
+                                                            ₱{Number(addon.price).toFixed(2)}
+                                                        </div>
+                                                    </td>
 
-                                        {/* Availability Status */}
-                                        <div className="flex justify-center">
-                                            <div
-                                                className={`px-4 py-2 rounded-lg font-semibold min-w-[80px] text-center border-2 ${addon.available
-                                                    ? 'bg-green-100 text-green-800 border-green-300'
-                                                    : 'bg-red-100 text-red-800 border-red-300'
-                                                    }`}
-                                            >
-                                                {addon.available ? 'Available' : 'Unavailable'}
-                                            </div>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
+                                                    {/* Quantity */}
+                                                    <td className="px-6 py-4 whitespace-nowrap text-center">
+                                                        <div className="text-sm font-medium text-gray-700">
+                                                            {addon.quantity ?? '-'}
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            )}
                         </div>
+
 
                         {/* Footer */}
                         <div className="p-6 border-t border-gray-200">

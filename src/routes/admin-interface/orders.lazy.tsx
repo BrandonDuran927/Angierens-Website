@@ -33,11 +33,11 @@ export const Route = createLazyFileRoute('/admin-interface/orders')({
 function AdminOrdersInterface() {
     type TabType = 'New Orders' | 'In Process' | 'Completed'
     const tabs: TabType[] = ['New Orders', 'In Process', 'Completed']
+    const [activeTab, setActiveTab] = useState<TabType>('New Orders')
 
 
     const [showOrderBackView, setShowOrderBackView] = useState(false)
     const [isFilterOpen, setIsFilterOpen] = useState(false)
-    const [activeTab, setActiveTab] = useState<TabType>('New Orders')
     const [searchQuery, setSearchQuery] = useState('')
     const [currentPage, setCurrentPage] = useState(1)
     const [selectedOrder, setSelectedOrder] = useState<Order | null>(null)
@@ -441,7 +441,7 @@ function AdminOrdersInterface() {
                             <table className="w-full">
                                 <thead className="bg-gray-50">
                                     <tr>
-                                        <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Order ID</th>
+                                        <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Order #</th>
                                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Customer Name</th>
                                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
                                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Time</th>

@@ -1,5 +1,5 @@
 import { createLazyFileRoute, useLocation, Link } from '@tanstack/react-router'
-import React, { useState, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer } from 'recharts'
 import {
     LayoutDashboard,
@@ -31,6 +31,11 @@ import {
 import { useUser } from '@/context/UserContext'
 import { useNavigate } from '@tanstack/react-router'
 import { ProtectedRoute } from '@/components/ProtectedRoute'
+import { fetchOrders, fetchDashboardStats, fetchChartData } from '@/lib/api'
+import type {
+    Order
+} from '@/lib/api'
+import { useQuery } from '@tanstack/react-query'
 
 
 export const Route = createLazyFileRoute('/admin-interface/')({
@@ -58,6 +63,45 @@ function RouteComponent() {
     const { user, signOut } = useUser()
     const navigate = useNavigate();
 
+    type TabType = 'New Orders' | 'In Process' | 'Completed'
+    const tabs: TabType[] = ['New Orders', 'In Process', 'Completed']
+    const [activeTab, setActiveTab] = useState<TabType>('New Orders')
+    const [selectedOrder, setSelectedOrder] = useState<Order | null>(null)
+    const [isOrderDetailsModalOpen, setIsOrderDetailsModalOpen] = useState(false)
+    const orderPrice = selectedOrder?.order_item.reduce((sum, item) => {
+        return sum + Number(item.subtotal_price);
+    }, 0);
+    const [showOrderBackView, setShowOrderBackView] = useState(false)
+    const [revenueFilter, setRevenueFilter] = useState<number>(12)
+    const [ordersFilter, setOrdersFilter] = useState<number>(6)
+
+    const closeOrderDetails = () => {
+        setSelectedOrder(null)
+        setIsOrderDetailsModalOpen(false)
+    }
+
+    const openOrderDetails = (order: Order) => {
+        setSelectedOrder(order)
+        setIsOrderDetailsModalOpen(true)
+    }
+
+    const formatScheduleTime = (dateStr: string, timeStr: string): string => {
+        const date = new Date(`${dateStr}T${timeStr}`);
+
+        const formattedTime = date.toLocaleTimeString('en-US', {
+            hour: 'numeric',
+            hour12: true,
+        });
+
+        const formattedDate = date.toLocaleDateString('en-US', {
+            month: 'long',
+            day: 'numeric',
+            year: 'numeric',
+        });
+
+        return `${formattedTime} to be delivered on ${formattedDate}`;
+    }
+
     useEffect(() => {
         console.log("Navigated to /customer-interface")
         console.log("Current logged-in user:", user)
@@ -71,7 +115,6 @@ function RouteComponent() {
     const [isNotificationOpen, setIsNotificationOpen] = useState(false)
     const [isSidebarOpen, setIsSidebarOpen] = useState(false)
     const [isFilterOpen, setIsFilterOpen] = useState(false)
-    const [activeTab, setActiveTab] = useState('New Orders')
     const [searchQuery, setSearchQuery] = useState('')
 
     const location = useLocation() // Hook to get current location
@@ -240,48 +283,48 @@ function RouteComponent() {
         { month: 'Dec', value: 115 }
     ]
 
-    const orders = [
-        {
-            id: '#06',
-            customerName: 'Brandon Duran',
-            date: 'May 16, 2025',
-            time: '10:30 AM',
-            price: '₱ 2,350',
-            fulfillmentType: 'Delivery',
-            paymentMethod: 'Online - GCash 100%',
-            status: 'New Orders'
-        },
-        {
-            id: '#07',
-            customerName: 'Russel Carlo',
-            date: 'May 17, 2025',
-            time: '10:30 AM',
-            price: '₱ 850',
-            fulfillmentType: 'Pick-up',
-            paymentMethod: 'Online - COD: 50% ...',
-            status: 'New Orders'
-        },
-        {
-            id: '#08',
-            customerName: 'Charles Caadiang',
-            date: 'May 17, 2025',
-            time: '10:30 AM',
-            price: '₱ 980',
-            fulfillmentType: 'Delivery',
-            paymentMethod: 'Online - GCash 50%',
-            status: 'New Orders'
-        },
-        {
-            id: '#09',
-            customerName: 'Prince Manuel',
-            date: 'May 17, 2025',
-            time: '10:30 AM',
-            price: '₱ 450',
-            fulfillmentType: 'Delivery',
-            paymentMethod: 'On-site',
-            status: 'New Orders'
-        }
-    ]
+    const statusGroups = {
+        'New Orders': ['Pending'],
+        'In Process': ['Queueing', 'Cancelled', 'Refunding', 'Refund', 'On Delivery', 'Claim Order'],
+        'Completed': ['Completed'],
+    };
+
+    const { data: orders = [], isLoading, error, refetch } = useQuery({
+        queryKey: ['orders'],
+        queryFn: fetchOrders,
+        refetchInterval: 30000,
+    })
+
+    const { data: dashboardStats, isLoading: isStatsLoading } = useQuery({
+        queryKey: ['dashboardStats'],
+        queryFn: fetchDashboardStats,
+        refetchInterval: 60000,
+    })
+
+    const { data: revenueChartData, isLoading: isRevenueChartLoading } = useQuery({
+        queryKey: ['revenueChartData', revenueFilter],
+        queryFn: () => fetchChartData(revenueFilter),
+        refetchInterval: 60000,
+    })
+
+    const { data: ordersChartData, isLoading: isOrdersChartLoading } = useQuery({
+        queryKey: ['ordersChartData', ordersFilter],
+        queryFn: () => fetchChartData(ordersFilter),
+        refetchInterval: 60000,
+    })
+
+    const filteredOrdersTab = orders.filter((order) =>
+        statusGroups[activeTab]?.includes(order.order_status)
+    );
+
+    const LoadingSpinner = () => (
+        <div className="fixed inset-0 bg-black/50 flex justify-center items-center z-[60]">
+            <div className="bg-white rounded-xl shadow-lg p-6 flex flex-col items-center gap-4">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#964B00]"></div>
+                <p className="text-gray-700 font-medium">Processing...</p>
+            </div>
+        </div>
+    );
 
     return (
         <ProtectedRoute>
@@ -426,14 +469,16 @@ function RouteComponent() {
                     <main className="flex-1 p-3 sm:p-4 lg:p-6 overflow-y-auto overflow-x-hidden">
                         {/* Stats Cards */}
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3 sm:gap-4 lg:gap-6 mb-4 sm:mb-6 lg:mb-8">
-                            <div className="bg-white rounded-xl p-3 sm:p-4 lg:p-6 shadow-sm border border-gray-200 min-w-0"> {/* Add min-w-0 and responsive padding */}
+                            <div className="bg-white rounded-xl p-3 sm:p-4 lg:p-6 shadow-sm border border-gray-200 min-w-0">
                                 <div className="flex items-center gap-2 sm:gap-3 lg:gap-4">
-                                    <div className="w-10 h-10 sm:w-12 sm:h-12 bg-amber-100 rounded-lg flex items-center justify-center flex-shrink-0"> {/* Add flex-shrink-0 */}
+                                    <div className="w-10 h-10 sm:w-12 sm:h-12 bg-amber-100 rounded-lg flex items-center justify-center flex-shrink-0">
                                         <DollarSign className="h-5 w-5 sm:h-6 sm:w-6 text-amber-600" />
                                     </div>
-                                    <div className="min-w-0 flex-1"> {/* Add min-w-0 and flex-1 */}
-                                        <p className="text-gray-600 text-xs sm:text-sm truncate">Total Revenue</p> {/* Add truncate */}
-                                        <p className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-800 truncate">₱ 1,074,600</p> {/* Add truncate */}
+                                    <div className="min-w-0 flex-1">
+                                        <p className="text-gray-600 text-xs sm:text-sm truncate">Total Revenue</p>
+                                        <p className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-800 truncate">
+                                            ₱ {isStatsLoading ? '...' : dashboardStats?.totalRevenue.toLocaleString() || '0'}
+                                        </p>
                                     </div>
                                 </div>
                             </div>
@@ -445,7 +490,9 @@ function RouteComponent() {
                                     </div>
                                     <div>
                                         <p className="text-gray-600 text-sm">Total Orders</p>
-                                        <p className="text-2xl font-bold text-gray-800">658</p>
+                                        <p className="text-2xl font-bold text-gray-800">
+                                            {isStatsLoading ? '...' : dashboardStats?.totalOrders || '0'}
+                                        </p>
                                     </div>
                                 </div>
                             </div>
@@ -457,7 +504,9 @@ function RouteComponent() {
                                     </div>
                                     <div>
                                         <p className="text-gray-600 text-sm">Total Menu</p>
-                                        <p className="text-2xl font-bold text-gray-800">40</p>
+                                        <p className="text-2xl font-bold text-gray-800">
+                                            {isStatsLoading ? '...' : dashboardStats?.totalMenu || '0'}
+                                        </p>
                                     </div>
                                 </div>
                             </div>
@@ -469,7 +518,9 @@ function RouteComponent() {
                                     </div>
                                     <div>
                                         <p className="text-gray-600 text-sm">Total Employees</p>
-                                        <p className="text-2xl font-bold text-gray-800">10</p>
+                                        <p className="text-2xl font-bold text-gray-800">
+                                            {isStatsLoading ? '...' : dashboardStats?.totalEmployees || '0'}
+                                        </p>
                                     </div>
                                 </div>
                             </div>
@@ -487,31 +538,43 @@ function RouteComponent() {
                         </div>
 
                         {/* Charts */}
+                        {/* Charts */}
                         <div className="grid grid-cols-1 xl:grid-cols-2 gap-3 sm:gap-4 lg:gap-6 mb-4 sm:mb-6 lg:mb-8">
                             {/* Revenue Chart */}
                             <div className="bg-white rounded-xl p-3 sm:p-4 lg:p-6 shadow-sm border border-gray-200 min-w-0">
                                 <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-4 lg:mb-6 gap-2">
                                     <h3 className="text-lg sm:text-xl font-bold text-gray-800 truncate">Total Revenue</h3>
-                                    <button className="flex items-center gap-2 text-gray-600 hover:text-gray-800 text-sm">
-                                        <Filter className="h-4 w-4" />
-                                        Filter
-                                    </button>
+                                    <select
+                                        value={revenueFilter}
+                                        onChange={(e) => setRevenueFilter(Number(e.target.value))}
+                                        className="border border-gray-300 rounded px-3 py-1 text-sm"
+                                    >
+                                        <option value={3}>Last 3 Months</option>
+                                        <option value={6}>Last 6 Months</option>
+                                        <option value={12}>Last Year</option>
+                                    </select>
                                 </div>
-                                <div className="h-48 sm:h-56 lg:h-64 w-full overflow-hidden"> {/* Add overflow-hidden and responsive height */}
-                                    <ResponsiveContainer width="100%" height="100%">
-                                        <LineChart data={revenueData}>
-                                            <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                                            <XAxis dataKey="month" stroke="#666" fontSize={12} />
-                                            <YAxis stroke="#666" fontSize={12} />
-                                            <Line
-                                                type="monotone"
-                                                dataKey="value"
-                                                stroke="#f59e0b"
-                                                strokeWidth={3}
-                                                dot={{ fill: '#f59e0b', strokeWidth: 2, r: 4 }}
-                                            />
-                                        </LineChart>
-                                    </ResponsiveContainer>
+                                <div className="h-48 sm:h-56 lg:h-64 w-full overflow-hidden">
+                                    {isRevenueChartLoading ? (
+                                        <div className="flex items-center justify-center h-full">
+                                            <p className="text-gray-500">Loading chart...</p>
+                                        </div>
+                                    ) : (
+                                        <ResponsiveContainer width="100%" height="100%">
+                                            <LineChart data={revenueChartData?.revenueData || []}>
+                                                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                                                <XAxis dataKey="month" stroke="#666" fontSize={12} />
+                                                <YAxis stroke="#666" fontSize={12} />
+                                                <Line
+                                                    type="monotone"
+                                                    dataKey="value"
+                                                    stroke="#f59e0b"
+                                                    strokeWidth={3}
+                                                    dot={{ fill: '#f59e0b', strokeWidth: 2, r: 4 }}
+                                                />
+                                            </LineChart>
+                                        </ResponsiveContainer>
+                                    )}
                                 </div>
                             </div>
 
@@ -519,21 +582,31 @@ function RouteComponent() {
                             <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200">
                                 <div className="flex justify-between items-center mb-6">
                                     <h3 className="text-xl font-bold text-gray-800">Total Orders</h3>
-                                    <select className="border border-gray-300 rounded px-3 py-1 text-sm">
-                                        <option>Last 6 Months</option>
-                                        <option>Last 3 Months</option>
-                                        <option>Last Year</option>
+                                    <select
+                                        value={ordersFilter}
+                                        onChange={(e) => setOrdersFilter(Number(e.target.value))}
+                                        className="border border-gray-300 rounded px-3 py-1 text-sm"
+                                    >
+                                        <option value={3}>Last 3 Months</option>
+                                        <option value={6}>Last 6 Months</option>
+                                        <option value={12}>Last Year</option>
                                     </select>
                                 </div>
                                 <div className="h-64">
-                                    <ResponsiveContainer width="100%" height="100%">
-                                        <BarChart data={ordersData}>
-                                            <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                                            <XAxis dataKey="month" stroke="#666" fontSize={12} />
-                                            <YAxis stroke="#666" fontSize={12} />
-                                            <Bar dataKey="value" fill="#f59e0b" radius={[4, 4, 0, 0]} />
-                                        </BarChart>
-                                    </ResponsiveContainer>
+                                    {isOrdersChartLoading ? (
+                                        <div className="flex items-center justify-center h-full">
+                                            <p className="text-gray-500">Loading chart...</p>
+                                        </div>
+                                    ) : (
+                                        <ResponsiveContainer width="100%" height="100%">
+                                            <BarChart data={ordersChartData?.ordersData || []}>
+                                                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                                                <XAxis dataKey="month" stroke="#666" fontSize={12} />
+                                                <YAxis stroke="#666" fontSize={12} />
+                                                <Bar dataKey="value" fill="#f59e0b" radius={[4, 4, 0, 0]} />
+                                            </BarChart>
+                                        </ResponsiveContainer>
+                                    )}
                                 </div>
                             </div>
                         </div>
@@ -558,12 +631,12 @@ function RouteComponent() {
                                 </div>
 
                                 {/* Tabs */}
-                                <div className="flex gap-1 sm:gap-2 overflow-x-auto scrollbar-hide pb-1"> {/* Add scrollbar-hide class */}
-                                    {['New Orders', 'In Process', 'Completed'].map((tab) => (
+                                <div className="flex gap-2 mb-4">
+                                    {tabs.map((tab) => (
                                         <button
                                             key={tab}
                                             onClick={() => setActiveTab(tab)}
-                                            className={`px-2 sm:px-3 lg:px-4 py-2 rounded-lg font-medium transition-colors whitespace-nowrap text-xs sm:text-sm ${activeTab === tab
+                                            className={`px-4 py-2 rounded-lg font-medium transition-colors ${activeTab === tab
                                                 ? 'bg-yellow-400 text-amber-800'
                                                 : 'text-gray-600 hover:text-gray-800 hover:bg-gray-100'
                                                 }`}
@@ -574,43 +647,70 @@ function RouteComponent() {
                                 </div>
                             </div>
 
-                            {/* Table */}
-                            <div className="w-full overflow-x-auto">
-                                <table className="w-full min-w-[800px]">{/* Add min-width to ensure table doesn't compress too much */}
+                            <div className="overflow-x-auto">
+                                <table className="w-full">
                                     <thead className="bg-gray-50">
                                         <tr>
-                                            <th className="px-3 sm:px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Order ID</th>
-                                            <th className="px-3 sm:px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Customer Name</th>
-                                            <th className="px-3 sm:px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
-                                            <th className="px-3 sm:px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Time</th>
-                                            <th className="px-3 sm:px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Price</th>
-                                            <th className="px-3 sm:px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fulfillment Type</th>
-                                            <th className="px-3 sm:px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Payment Method</th>
-                                            <th className="px-3 sm:px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                                            <th className="px-3 sm:px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Action</th>
+                                            <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Order #</th>
+                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Customer Name</th>
+                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
+                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Time</th>
+                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Price</th>
+                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fulfillment Type</th>
+                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Payment Method</th>
+                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                                            <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Action</th>
                                         </tr>
                                     </thead>
                                     <tbody className="bg-white divide-y divide-gray-200">
-                                        {orders.map((order, index) => (
-                                            <tr key={order.id} className="hover:bg-gray-50">
-                                                <td className="px-3 sm:px-4 lg:px-6 py-4 whitespace-nowrap text-xs sm:text-sm font-medium text-gray-900">{order.id}</td>
-                                                <td className="px-3 sm:px-4 lg:px-6 py-4 whitespace-nowrap text-xs sm:text-sm text-gray-900">{order.customerName}</td>
-                                                <td className="px-3 sm:px-4 lg:px-6 py-4 whitespace-nowrap text-xs sm:text-sm text-gray-900">{order.date}</td>
-                                                <td className="px-3 sm:px-4 lg:px-6 py-4 whitespace-nowrap text-xs sm:text-sm text-gray-900">{order.time}</td>
-                                                <td className="px-3 sm:px-4 lg:px-6 py-4 whitespace-nowrap text-xs sm:text-sm text-gray-900">{order.price}</td>
-                                                <td className="px-3 sm:px-4 lg:px-6 py-4 whitespace-nowrap text-xs sm:text-sm text-gray-900">{order.fulfillmentType}</td>
-                                                <td className="px-3 sm:px-4 lg:px-6 py-4 whitespace-nowrap text-xs sm:text-sm text-gray-900">{order.paymentMethod}</td>
-                                                <td className="px-3 sm:px-4 lg:px-6 py-4 whitespace-nowrap">
-                                                    For Approval
-                                                </td>
-                                                <td className="px-3 sm:px-4 lg:px-6 py-4 whitespace-nowrap">
-                                                    <button className="text-gray-600 hover:text-gray-800 transition-colors">
-                                                        <Eye className="h-4 w-4" />
-                                                    </button>
+                                        {filteredOrdersTab.length > 0 ? (
+                                            filteredOrdersTab.map((order) => (
+                                                <tr key={order.order_id} className="hover:bg-gray-50">
+                                                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 text-center">
+                                                        {order.order_number}
+                                                    </td>
+                                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                                        {order.user.customer_name}
+                                                    </td>
+                                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                                        {order.date}
+                                                    </td>
+                                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                                        {order.time}
+                                                    </td>
+                                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                                        ₱ {order.total_price}
+                                                    </td>
+                                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                                        {order.order_type}
+                                                    </td>
+                                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                                        {order.payment.paymentMethod ?? 'No payment yet'}
+                                                    </td>
+                                                    <td className="px-6 py-4 whitespace-nowrap">
+                                                        <div className="flex gap-2">
+                                                            {order.order_status}
+                                                        </div>
+                                                    </td>
+                                                    <td className="px-6 py-4 text-center whitespace-nowrap">
+                                                        <button
+                                                            onClick={() => openOrderDetails(order)}
+                                                            className="text-gray-600 hover:text-gray-800 transition-colors"
+                                                        >
+                                                            <Eye className="h-6 w-6" />
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                            ))
+                                        ) : (
+                                            <tr>
+                                                <td colSpan={9} className="text-center py-6 text-gray-500">
+                                                    No orders found in this category
                                                 </td>
                                             </tr>
-                                        ))}
+                                        )}
                                     </tbody>
+
                                 </table>
                             </div>
 
@@ -769,6 +869,196 @@ function RouteComponent() {
                     </div>
                 )}
             </div>
+
+            {/* Order Details Modal */}
+            {isOrderDetailsModalOpen && selectedOrder && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+                    <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto">
+                        {/* Modal Header */}
+                        <div className="flex items-center justify-between p-6 border-b border-gray-200">
+                            <div className="flex items-center gap-4">
+                                <span className="text-gray-600 font-medium">FRONT</span>
+                                <span className="text-xl font-bold text-gray-800">Order #: {selectedOrder.order_number}</span>
+                                <span className="bg-black text-white px-4 py-1 rounded-full text-sm font-medium">
+                                    {selectedOrder.order_status}
+                                </span>
+                            </div>
+                            <button
+                                onClick={closeOrderDetails}
+                                className="text-gray-500 hover:text-gray-700 p-2 hover:bg-gray-100 rounded-full transition-colors"
+                            >
+                                <X className="h-6 w-6" />
+                            </button>
+                        </div>
+
+                        {/* Modal Body */}
+                        <div className="p-6 space-y-6">
+                            {/* Customer Info */}
+                            <div>
+                                <h3 className="text-2xl font-bold text-gray-800 mb-2">{selectedOrder.user.customer_name}</h3>
+                                <p className="text-gray-600 text-lg">{formatScheduleTime(selectedOrder.schedule.schedule_date, selectedOrder.schedule.schedule_time)}</p>
+                            </div>
+
+                            {/* Date and Time */}
+                            <div className="flex justify-between items-center text-gray-500">
+                                <span>{selectedOrder.date}</span>
+                                <span>{selectedOrder.time}</span>
+                            </div>
+
+                            {/* Items Table */}
+                            <div className="border-t border-gray-200 pt-4">
+                                <div className="grid grid-cols-3 gap-4 mb-4">
+                                    <span className="font-medium text-gray-700">Items</span>
+                                    <span className="font-medium text-gray-700 text-center">Qty</span>
+                                    <span className="font-medium text-gray-700 text-right">Price</span>
+                                </div>
+
+                                <div className="space-y-3">
+                                    {selectedOrder?.order_item?.length ? (
+                                        selectedOrder.order_item.map((item) => (
+                                            <div key={item.order_item_id} className="grid grid-cols-3 gap-4 items-start">
+                                                <div>
+                                                    <p className="font-medium text-gray-800">{item.menu.name} (₱ {item.menu.price})</p>
+                                                    {item.menu.inclusion && (
+                                                        <p className="text-sm text-gray-600 mb-1.5">inclusions: {item.menu.inclusion}</p>
+                                                    )}
+                                                    {/* 
+                                                                // TODO: Implement add-ons
+                                                                {item.menu.add_ons && (
+                                                                    <p className="text-sm text-gray-600">add-ons: {item.menu.add_ons}</p>
+                                                                )} */}
+                                                </div>
+                                                <div className="text-center font-medium">{item.quantity}</div>
+                                                <div className="text-right font-bold">₱ {(item.subtotal_price * item.quantity).toLocaleString()}</div>
+
+                                            </div>
+                                        ))
+                                    ) : (
+                                        <p className="text-gray-500 text-center italic">No items found.</p>
+                                    )}
+                                    {/* <div className="grid grid-cols-3 gap-4 items-start">
+                                                    <div>
+                                                        <p className="font-medium text-gray-800">{selectedOrder.}</p>
+                                                        <p className="text-sm text-gray-600">add-ons: 20 pcs. Puto</p>
+                                                    </div>
+                                                    <div className="text-center font-medium">2</div>
+                                                    <div className="text-right font-bold">₱ 4,100</div>
+                                                </div> */}
+                                </div>
+                            </div>
+
+                            {/* Pricing Summary */}
+                            <div className="border-t border-gray-200 pt-4 space-y-3">
+                                <div className="flex justify-between items-center">
+                                    <span className="text-lg font-medium">Price</span>
+                                    <span className="text-lg font-bold">₱ {orderPrice}</span>
+                                </div>
+                                {selectedOrder.delivery && (
+                                    <div className="flex justify-between items-center">
+                                        <span className="text-lg font-medium">Delivery fee</span>
+                                        <span className="text-lg font-bold">₱ {selectedOrder.delivery.delivery_fee}</span>
+                                    </div>
+                                )}
+                                <div className="flex justify-between items-center text-xl font-bold border-t border-gray-200 pt-3">
+                                    <span>Total</span>
+                                    <span>₱ {orderPrice + selectedOrder.delivery.delivery_fee}</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Modal Footer */}
+                        <div className="flex items-center justify-between p-6 border-t border-gray-200 bg-gray-50">
+                            <button
+                                onClick={() => {
+                                    setIsOrderDetailsModalOpen(false)
+                                    setShowOrderBackView(true)
+                                }}
+                                className="px-6 py-3 border-2 border-gray-800 text-gray-800 rounded-lg font-medium hover:bg-gray-100 transition-colors"
+                            >
+                                See more
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Order Back View Modal */}
+            {showOrderBackView && selectedOrder && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+                    <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto">
+                        {/* Modal Header */}
+                        <div className="flex items-center justify-between p-6 border-b border-gray-200">
+                            <div className="flex items-center gap-4">
+                                <button
+                                    onClick={() => {
+                                        setShowOrderBackView(false)
+                                        setIsOrderDetailsModalOpen(true)
+                                    }}
+                                    className="text-gray-600 hover:text-gray-800 font-medium"
+                                >
+                                    BACK
+                                </button>
+                                <span className="bg-black text-white px-4 py-1 rounded-full text-sm font-medium">
+                                    {selectedOrder.order_status}
+                                </span>
+                            </div>
+                            <button
+                                onClick={() => {
+                                    setShowOrderBackView(false)
+                                    closeOrderDetails()
+                                }}
+                                className="text-gray-500 hover:text-gray-700 p-2 hover:bg-gray-100 rounded-full transition-colors"
+                            >
+                                <X className="h-6 w-6" />
+                            </button>
+                        </div>
+
+                        {/* Modal Body */}
+                        <div className="p-6 space-y-6">
+                            {/* Delivery Address */}
+                            <div className="flex">
+                                <h4 className="text-lg font-semibold text-gray-800 mr-4 min-w-[200px]">Delivery Address:</h4>
+                                <p className="text-gray-600">{selectedOrder.delivery.address.address_line}, {selectedOrder.delivery.address.barangay}, {selectedOrder.delivery.address.city}</p>
+                            </div>
+
+                            {/* Customer Contact */}
+                            <div className="flex">
+                                <h4 className="text-lg font-semibold text-gray-800 mr-4 min-w-[200px]">Customer Contact #:</h4>
+                                <p className="text-gray-600">{selectedOrder.user.phone_number}</p>
+                            </div>
+
+                            {/* Special Instructions */}
+                            <div className="flex">
+                                <h4 className="text-lg font-semibold text-gray-800 mr-4 min-w-[200px]">Special Instructions:</h4>
+                                <p className="text-gray-600">{selectedOrder.additional_information}</p>
+                            </div>
+
+                            {/* Fulfillment Type */}
+                            <div className="flex">
+                                <h4 className="text-lg font-semibold text-gray-800 mr-4 min-w-[200px]">Fulfillment Type:</h4>
+                                <p className="text-gray-600">{selectedOrder.order_type}</p>
+                            </div>
+
+                        </div>
+
+                        {/* Modal Footer */}
+                        <div className="flex items-center justify-between p-6 border-t border-gray-200 bg-gray-50">
+                            <button
+                                onClick={() => {
+                                    setShowOrderBackView(false)
+                                    setIsOrderDetailsModalOpen(true)
+                                }}
+                                className="px-6 py-3 border-2 border-gray-800 text-gray-800 rounded-lg font-medium hover:bg-gray-100 transition-colors"
+                            >
+                                Go back
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Loading Spinner */}
+            {isLoading && <LoadingSpinner />}
         </ProtectedRoute>
     )
 }

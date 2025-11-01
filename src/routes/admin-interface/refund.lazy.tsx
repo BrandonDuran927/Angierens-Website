@@ -1,5 +1,5 @@
 import { createLazyFileRoute, useLocation, Link } from '@tanstack/react-router'
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import {
   LayoutDashboard,
   ShoppingCart,
@@ -16,6 +16,7 @@ import {
   Filter,
   LucideCalendar
 } from 'lucide-react'
+import { supabase } from '@/lib/supabaseClient'
 
 export const Route = createLazyFileRoute('/admin-interface/refund')({
   component: RouteComponent,
@@ -33,8 +34,8 @@ interface Notification {
 interface RefundRequest {
   id: string
   orderId: string
+  orderNumber: string
   customerName: string
-  item: string
   date: string
   time: string
   confirmation: 'Pending' | 'Approved' | 'Rejected'
@@ -52,6 +53,7 @@ interface RefundRequest {
   downPayment: number
   gcashFees: number
   total: number
+  refundId: string
 }
 
 function RouteComponent() {
@@ -65,6 +67,8 @@ function RouteComponent() {
     dateTo: '',
     status: 'All'
   })
+  const [refundRequests, setRefundRequests] = useState<RefundRequest[]>([])
+  const [loading, setLoading] = useState(true)
 
   const sidebarItems = [
     {
@@ -130,108 +134,155 @@ function RouteComponent() {
     }
   ])
 
-  const [refundRequests, setRefundRequests] = useState<RefundRequest[]>([
-    {
-      id: '1',
-      orderId: '#017',
-      customerName: 'Russel Carlo',
-      item: 'Bilao 1',
-      date: 'May 17, 2025',
-      time: '14:04:23',
-      confirmation: 'Pending',
-      paymentMethod: 'GCash 50%',
-      gcashNumber: '+63 948....',
-      orderMethod: 'Delivery',
-      requestDateTime: 'Sat, May 17, 2025  10:32 AM',
-      items: [
-        {
-          name: 'Sapin-sapin Kutsinta',
-          qty: 1,
-          price: 650
+  // Fetch refund requests from Supabase
+  useEffect(() => {
+    fetchRefundRequests()
+  }, [])
+
+  const fetchRefundRequests = async () => {
+    try {
+      setLoading(true)
+
+      const { data: refunds, error } = await supabase
+        .from('refund')
+        .select(`
+          refund_id,
+          reason,
+          status,
+          request_date,
+          gcash_number,
+          order_id,
+          order:order_id (
+            order_id,
+            order_number,
+            order_type,
+            total_price,
+            created_at,
+            customer_uid,
+            payment_id,
+            delivery_id,
+            users:customer_uid (
+              first_name,
+              middle_name,
+              last_name,
+              phone_number
+            ),
+            payment:payment_id (
+              payment_method,
+              amount_paid,
+              payment_date
+            ),
+            delivery:delivery_id (
+              delivery_fee
+            ),
+            order_item (
+              quantity,
+              subtotal_price,
+              menu:menu_id (
+                name,
+                price
+              )
+            )
+          )
+        `)
+        .order('request_date', { ascending: false })
+
+      if (error) throw error
+
+      const formattedRefunds: RefundRequest[] = refunds.map((refund: any) => {
+        const order = refund.order
+        const user = order.users
+        const payment = order.payment
+        const delivery = order.delivery
+        const orderItems = order.order_item
+
+        // Format customer name
+        const customerName = `${user.first_name} ${user.middle_name ? user.middle_name + ' ' : ''}${user.last_name}`
+
+        // Format phone number for GCash (mask it)
+        const phoneNumber = refund.gcash_number
+        console.log('GCash Number:', phoneNumber)
+        const maskedPhone = phoneNumber ? `+63 ${phoneNumber.substring(0, 3)}....` : ''
+        console.log('Masked GCash Number:', maskedPhone)
+
+        // Calculate price breakdown
+        const priceOfFood = orderItems.reduce((sum: number, item: any) => sum + parseFloat(item.subtotal_price), 0)
+        const deliveryFee = delivery ? parseFloat(delivery.delivery_fee) : 0
+        const amountPaid = payment ? parseFloat(payment.amount_paid) : 0
+
+        // Calculate GCash fees (2% of amount paid)
+        const gcashFees = payment && payment.payment_method !== 'Cash' ? amountPaid * 0.02 : 0
+
+        // Total refund amount = amount paid - gcash fees
+        const totalRefund = amountPaid - gcashFees
+
+        // Format payment method
+        let paymentMethodDisplay = payment ? payment.payment_method : 'N/A'
+        if (payment && payment.payment_method === 'GCash') {
+          const totalAmount = priceOfFood + deliveryFee
+          const percentage = totalAmount > 0 ? ((amountPaid / totalAmount) * 100).toFixed(0) : '0'
+          paymentMethodDisplay = `GCash ${percentage}%`
         }
-      ],
-      priceOfFood: 650,
-      deliveryFee: 75,
-      downPayment: 362.5,
-      gcashFees: 7.25,
-      total: 355.25
-    },
-    {
-      id: '2',
-      orderId: '#018',
-      customerName: 'Maria Santos',
-      item: 'Adobo Rice',
-      date: 'May 16, 2025',
-      time: '12:30:15',
-      confirmation: 'Approved',
-      paymentMethod: 'Cash',
-      gcashNumber: '',
-      orderMethod: 'Pickup',
-      requestDateTime: 'Fri, May 16, 2025  12:35 PM',
-      items: [
-        {
-          name: 'Adobo Rice',
-          qty: 2,
-          price: 120
+
+        // Format dates and times
+        const orderDate = new Date(order.created_at)
+        const requestDate = new Date(refund.request_date)
+
+        const formatDate = (date: Date) => {
+          return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
         }
-      ],
-      priceOfFood: 240,
-      deliveryFee: 0,
-      downPayment: 120,
-      gcashFees: 0,
-      total: 240
-    },
-    {
-      id: '3',
-      orderId: '#019',
-      customerName: 'John Dela Cruz',
-      item: 'Pancit Canton',
-      date: 'May 16, 2025',
-      time: '10:45:30',
-      confirmation: 'Rejected',
-      paymentMethod: 'GCash 100%',
-      gcashNumber: '+63 912....',
-      orderMethod: 'Delivery',
-      requestDateTime: 'Fri, May 16, 2025  10:50 AM',
-      items: [
-        {
-          name: 'Pancit Canton',
-          qty: 1,
-          price: 180
+
+        const formatTime = (date: Date) => {
+          return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })
         }
-      ],
-      priceOfFood: 180,
-      deliveryFee: 75,
-      downPayment: 255,
-      gcashFees: 5.5,
-      total: 249.5
-    },
-    {
-      id: '4',
-      orderId: '#020',
-      customerName: 'Anna Garcia',
-      item: 'Lechon Kawali',
-      date: 'May 15, 2025',
-      time: '16:20:45',
-      confirmation: 'Pending',
-      paymentMethod: 'GCash 75%',
-      gcashNumber: '+63 905....',
-      orderMethod: 'Delivery',
-      requestDateTime: 'Thu, May 15, 2025  16:25 PM',
-      items: [
-        {
-          name: 'Lechon Kawali',
-          qty: 1,
-          price: 320
+
+        const formatRequestDateTime = (date: Date) => {
+          return date.toLocaleDateString('en-US', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' }) + '  ' +
+            date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })
         }
-      ],
-      priceOfFood: 320,
-      deliveryFee: 75,
-      downPayment: 296.25,
-      gcashFees: 6.75,
-      total: 289.5
+
+        // Map refund status
+        let confirmationStatus: 'Pending' | 'Approved' | 'Rejected' = 'Pending'
+        if (refund.status === 'Approved') confirmationStatus = 'Approved'
+        if (refund.status === 'Rejected') confirmationStatus = 'Rejected'
+
+        // Format order items
+        const items = orderItems.map((item: any) => ({
+          name: item.menu.name,
+          qty: item.quantity,
+          price: parseFloat(item.subtotal_price)
+        }))
+
+        return {
+          id: refund.refund_id,
+          refundId: refund.refund_id,
+          orderId: order.order_id,
+          orderNumber: `#${order.order_number.toString().padStart(3, '0')}`,
+          customerName,
+          date: formatDate(orderDate),
+          time: formatTime(orderDate),
+          confirmation: confirmationStatus,
+          paymentMethod: paymentMethodDisplay,
+          gcashNumber: payment && payment.payment_method !== 'On-Site Cash' ? maskedPhone : '',
+          orderMethod: order.order_type === 'Delivery' ? 'Delivery' : 'Pickup',
+          requestDateTime: formatRequestDateTime(requestDate),
+          items,
+          priceOfFood,
+          deliveryFee,
+          downPayment: amountPaid,
+          gcashFees: parseFloat(gcashFees.toFixed(2)),
+          total: parseFloat(totalRefund.toFixed(2))
+        }
+      })
+
+      setRefundRequests(formattedRefunds)
+      console.log('Fetched refund requests:', formattedRefunds)
+    } catch (error) {
+      console.error('Error fetching refund requests:', error)
+    } finally {
+      setLoading(false)
     }
-  ])
+  }
 
   const markAllAsRead = () => {
     setNotifications(prev => prev.map(notif => ({ ...notif, read: true })))
@@ -250,34 +301,46 @@ function RouteComponent() {
     }
   }
 
-  const handleConfirmationChange = (requestId: string, newStatus: 'Approved' | 'Rejected') => {
-    setRefundRequests(prev =>
-      prev.map(request =>
-        request.id === requestId
-          ? { ...request, confirmation: newStatus }
-          : request
-      )
-    )
-  }
+  // const handleConfirmationChange = async (refundId: string, newStatus: 'Approved' | 'Rejected') => {
+  //   try {
+  //     const { error } = await supabase
+  //       .from('refund')
+  //       .update({ status: newStatus })
+  //       .eq('refund_id', refundId)
+
+  //     if (error) throw error
+
+  //     // Update local state
+  //     setRefundRequests(prev =>
+  //       prev.map(request =>
+  //         request.refundId === refundId
+  //           ? { ...request, confirmation: newStatus }
+  //           : request
+  //       )
+  //     )
+  //   } catch (error) {
+  //     console.error('Error updating refund status:', error)
+  //   }
+  // }
 
   const handleOpenReviewModal = (request: RefundRequest) => {
     setSelectedRefund(request)
     setIsReviewModalOpen(true)
   }
 
-  const handleApproveRefund = () => {
-    if (selectedRefund) {
-      handleConfirmationChange(selectedRefund.id, 'Approved')
-      setIsReviewModalOpen(false)
-    }
-  }
+  // const handleApproveRefund = () => {
+  //   if (selectedRefund) {
+  //     handleConfirmationChange(selectedRefund.refundId, 'Approved')
+  //     setIsReviewModalOpen(false)
+  //   }
+  // }
 
-  const handleRejectRefund = () => {
-    if (selectedRefund) {
-      handleConfirmationChange(selectedRefund.id, 'Rejected')
-      setIsReviewModalOpen(false)
-    }
-  }
+  // const handleRejectRefund = () => {
+  //   if (selectedRefund) {
+  //     handleConfirmationChange(selectedRefund.refundId, 'Rejected')
+  //     setIsReviewModalOpen(false)
+  //   }
+  // }
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -294,8 +357,7 @@ function RouteComponent() {
 
   const filteredRequests = refundRequests.filter(request => {
     const matchesSearch = request.customerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      request.orderId.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      request.item.toLowerCase().includes(searchTerm.toLowerCase())
+      request.orderNumber.toLowerCase().includes(searchTerm.toLowerCase())
 
     const matchesFilter = filterModal.status === 'All' || request.confirmation === filterModal.status
 
@@ -309,7 +371,6 @@ function RouteComponent() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
   const [isNotificationOpen, setIsNotificationOpen] = useState(false)
 
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-amber-50 to-orange-100 flex overflow-x-hidden">
       {/* Sidebar - Mobile Overlay */}
@@ -321,9 +382,9 @@ function RouteComponent() {
       )}
       {/* Sidebar */}
       <div className={`
-                                    fixed lg:static inset-y-0 left-0 z-50 w-64 bg-gradient-to-b from-yellow-400 to-amber-500 shadow-lg transform transition-transform duration-300 ease-in-out
-                                    ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
-                                `}>
+        fixed lg:static inset-y-0 left-0 z-50 w-64 bg-gradient-to-b from-yellow-400 to-amber-500 shadow-lg transform transition-transform duration-300 ease-in-out
+        ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
+      `}>
         {/* Logo */}
         <div className="p-6 border-b border-amber-600">
           <div className="flex justify-center items-center gap-3">
@@ -343,7 +404,7 @@ function RouteComponent() {
               <Link
                 key={index}
                 to={item.route}
-                onClick={() => setIsSidebarOpen(false)} // Close sidebar on mobile when link is clicked
+                onClick={() => setIsSidebarOpen(false)}
                 className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left transition-all ${isActive
                   ? 'bg-amber-800 text-yellow-300 shadow-md'
                   : 'text-amber-900 hover:bg-amber-400 hover:text-amber-800'
@@ -381,12 +442,12 @@ function RouteComponent() {
                 <MenuIcon className="h-6 w-6" />
               </button>
               <div>
-                <h2 className="text-xl lg:text-2xl font-bold">SALES</h2>
+                <h2 className="text-xl lg:text-2xl font-bold">REFUND</h2>
               </div>
             </div>
             <div className="flex items-center gap-2 lg:gap-4">
-              <span className="text-amber-200 text-xs lg:text-sm hidden sm:inline">Date: May 16, 2025</span>
-              <span className="text-amber-200 text-xs lg:text-sm hidden sm:inline">Time: 11:00 AM</span>
+              <span className="text-amber-200 text-xs lg:text-sm hidden sm:inline">Date: {new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}</span>
+              <span className="text-amber-200 text-xs lg:text-sm hidden sm:inline">Time: {new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })}</span>
               <div className="w-10 h-10 bg-yellow-400 rounded-full flex items-center justify-center">
                 <div className='relative'>
                   <button
@@ -444,7 +505,7 @@ function RouteComponent() {
           </div>
         </header>
 
-        {/* Sales Content */}
+        {/* Refund Content */}
         <main className="flex-1 p-6 overflow-y-auto">
           {/* Search and Filter */}
           <div className="mb-6 flex gap-4">
@@ -467,68 +528,76 @@ function RouteComponent() {
             </button>
           </div>
 
-          {/* Refund Table */}
-          {/* Refund Table */}
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-            {/* Scroll wrapper */}
-            <div className="overflow-x-auto">
-              {/* Force wide layout */}
-              <div className="min-w-[900px]">
-                {/* Table Header */}
-                <div className="bg-amber-800 text-white">
-                  <div className="grid grid-cols-7 gap-4 p-4 font-medium">
-                    <div>ORDER ID</div>
-                    <div>CUSTOMER NAME</div>
-                    <div>ITEM</div>
-                    <div>DATE</div>
-                    <div>TIME</div>
-                    <div>CONFIRMATION</div>
-                    <div>REFUND BUTTON</div>
-                  </div>
-                </div>
-
-                {/* Table Body */}
-                <div className="divide-y divide-gray-200">
-                  {filteredRequests.map((request) => (
-                    <div
-                      key={request.id}
-                      className="grid grid-cols-7 gap-4 p-4 hover:bg-gray-50"
-                    >
-                      <div className="text-gray-800">{request.orderId}</div>
-                      <div className="text-gray-800">{request.customerName}</div>
-                      <div className="text-gray-800">{request.item}</div>
-                      <div className="text-gray-800">{request.date}</div>
-                      <div className="text-gray-800">{request.time}</div>
-                      <div>
-                        <span
-                          className={`px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(
-                            request.confirmation
-                          )}`}
-                        >
-                          {request.confirmation}
-                        </span>
-                      </div>
-                      <div>
-                        <button
-                          onClick={() => handleOpenReviewModal(request)}
-                          className="bg-yellow-400 text-amber-800 px-3 py-1 rounded text-sm font-medium hover:bg-yellow-500 transition-colors"
-                        >
-                          REVIEW
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-
-                  {filteredRequests.length === 0 && (
-                    <div className="text-center py-8 text-gray-500">
-                      No refund requests found.
-                    </div>
-                  )}
-                </div>
+          {/* Loading State */}
+          {loading ? (
+            <div className="fixed inset-0 bg-black/50 flex justify-center items-center z-[60]">
+              <div className="bg-white rounded-xl shadow-lg p-6 flex flex-col items-center gap-4">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#964B00]"></div>
+                <p className="text-gray-700 font-medium">Processing...</p>
               </div>
             </div>
-          </div>
+          ) : (
+            /* Refund Table */
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+              {/* Scroll wrapper */}
+              <div className="overflow-x-auto">
+                {/* Force wide layout */}
+                <table className="min-w-[900px] w-full table-fixed">
+                  {/* Table Header */}
+                  <thead className="bg-amber-800 text-white">
+                    <tr>
+                      <th className="px-4 py-3 text-left text-sm font-medium tracking-wider">ORDER #</th>
+                      <th className="px-4 py-3 text-left text-sm font-medium tracking-wider">CUSTOMER NAME</th>
+                      <th className="px-4 py-3 text-left text-sm font-medium tracking-wider">DATE</th>
+                      <th className="px-4 py-3 text-left text-sm font-medium tracking-wider">TIME</th>
+                      <th className="px-4 py-3 text-left text-sm font-medium tracking-wider">CONFIRMATION</th>
+                      <th className="px-4 py-3 text-left text-sm font-medium tracking-wider">REFUND BUTTON</th>
+                    </tr>
+                  </thead>
 
+                  {/* Table Body */}
+                  <tbody className="divide-y divide-gray-200">
+                    {filteredRequests.map((request) => (
+                      <tr
+                        key={request.id}
+                        className="hover:bg-gray-50 transition-colors"
+                      >
+                        <td className="px-4 py-3 text-sm text-gray-800">{request.orderNumber}</td>
+                        <td className="px-4 py-3 text-sm text-gray-800">{request.customerName}</td>
+                        <td className="px-4 py-3 text-sm text-gray-800">{request.date}</td>
+                        <td className="px-4 py-3 text-sm text-gray-800">{request.time}</td>
+                        <td className="px-4 py-3 text-sm">
+                          <span
+                            className={`px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(
+                              request.confirmation
+                            )}`}
+                          >
+                            {request.confirmation}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-sm text-center">
+                          <button
+                            onClick={() => handleOpenReviewModal(request)}
+                            className="bg-yellow-400 text-amber-800 px-3 py-1 rounded text-sm font-medium hover:bg-yellow-500 transition-colors"
+                          >
+                            REVIEW
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+
+                    {filteredRequests.length === 0 && (
+                      <tr>
+                        <td colSpan={6} className="text-center py-8 text-gray-500">
+                          No refund requests found.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
         </main>
       </div>
 
@@ -584,7 +653,7 @@ function RouteComponent() {
                 <div key={index} className="grid grid-cols-3 gap-4 text-gray-700 py-2">
                   <span>{item.name}</span>
                   <span className="text-center">{item.qty}</span>
-                  <span className="text-right">₱ {item.price}</span>
+                  <span className="text-right">₱ {item.price.toFixed(2)}</span>
                 </div>
               ))}
             </div>
@@ -595,50 +664,39 @@ function RouteComponent() {
             <div className="space-y-2 mb-6">
               <div className="flex justify-between">
                 <span className="text-gray-800">Price of food:</span>
-                <span className="text-gray-800">₱ {selectedRefund.priceOfFood}</span>
+                <span className="text-gray-800">₱ {selectedRefund.priceOfFood.toFixed(2)}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-800">Delivery fee:</span>
-                <span className="text-gray-800">₱ {selectedRefund.deliveryFee}</span>
+                <span className="text-gray-800">₱ {selectedRefund.deliveryFee.toFixed(2)}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-gray-800">Down payment 50%:</span>
-                <span className="text-gray-800">₱ {selectedRefund.downPayment}</span>
+                <span className="text-gray-800">Amount paid:</span>
+                <span className="text-gray-800">₱ {selectedRefund.downPayment.toFixed(2)}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-gray-800">Gcash fees:</span>
-                <span className="text-gray-800">- ₱ {selectedRefund.gcashFees}</span>
+                <span className="text-gray-800">Gcash fees (2%):</span>
+                <span className="text-gray-800">- ₱ {selectedRefund.gcashFees.toFixed(2)}</span>
               </div>
               <div className="flex justify-between font-bold text-lg border-t pt-2">
-                <span className="text-gray-800">Total:</span>
-                <span className="text-gray-800">₱ {selectedRefund.total}</span>
+                <span className="text-gray-800">Total refund:</span>
+                <span className="text-gray-800">₱ {selectedRefund.total.toFixed(2)}</span>
               </div>
             </div>
 
             {/* Action Buttons */}
             <div className="flex gap-3 pt-4">
-              {selectedRefund.confirmation === 'Pending' ? (
-                <>
-
-                  <button
-                    onClick={handleRejectRefund}
-                    className="flex-1 border-black border-2 text-black py-3 rounded-lg font-medium transition-colors"
-                  >
-                    Close
-                  </button>
-                </>
-              ) : (
-                <button
-                  onClick={() => setIsReviewModalOpen(false)}
-                  className="flex-1 bg-gray-300 text-gray-700 py-3 rounded-lg font-medium hover:bg-gray-400 transition-colors"
-                >
-                  Close
-                </button>
-              )}
+              <button
+                onClick={() => setIsReviewModalOpen(false)}
+                className="flex-1 bg-gray-300 text-gray-700 py-3 rounded-lg font-medium hover:bg-gray-400 transition-colors"
+              >
+                Close
+              </button>
             </div>
           </div>
         </div>
       )}
+
       {/* Filter Modal */}
       {filterModal.isOpen && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">

@@ -61,7 +61,9 @@ interface EmployeeDetails {
 }
 
 interface FormData {
-    fullName: string
+    first_name: string
+    middle_name: string
+    last_name: string
     email: string
     password: string
     phoneNumber: string
@@ -80,7 +82,9 @@ function RouteComponent() {
     const [employeeDetails, setEmployeeDetails] = useState<Record<string, EmployeeDetails>>({})
     const [loading, setLoading] = useState(true)
     const [formData, setFormData] = useState<FormData>({
-        fullName: '',
+        first_name: '',
+        middle_name: '',
+        last_name: '',
         email: '',
         password: '',
         phoneNumber: '',
@@ -107,7 +111,7 @@ function RouteComponent() {
             const { data: usersData, error: usersError } = await supabase
                 .from('users')
                 .select('*')
-                .in('user_role', ['Rider', 'Staff'])
+                .in('user_role', ['rider', 'staff'])
                 .eq('is_active', true)
 
             if (usersError) throw usersError
@@ -115,7 +119,7 @@ function RouteComponent() {
             // Transform data to match Employee interface
             const employeesData: Employee[] = (usersData || []).map((user: any) => ({
                 id: user.user_uid,
-                type: user.user_role === 'Rider' ? 'Rider' : 'Staff',
+                type: user.user_role === 'rider' ? 'rider' : 'staff',
                 name: `${user.first_name} ${user.middle_name ? user.middle_name + ' ' : ''}${user.last_name}`.trim(),
                 email: user.email,
                 phone: user.phone_number,
@@ -128,7 +132,7 @@ function RouteComponent() {
             // Fetch delivery details for each rider
             const detailsMap: Record<string, EmployeeDetails> = {}
             for (const employee of employeesData) {
-                if (employee.type === 'Rider') {
+                if (employee.type === 'rider') {
                     const deliveries = await fetchEmployeeDeliveries(employee.id)
                     detailsMap[employee.id] = {
                         phone: employee.phone,
@@ -291,6 +295,7 @@ function RouteComponent() {
         } catch (error) {
             console.error('Error deactivating employee:', error)
             alert('Failed to deactivate employee. Please try again.')
+            setLoading(false)
         }
     }
 
@@ -426,8 +431,8 @@ function RouteComponent() {
     const filteredEmployees = employees.filter(employee => {
         const matchesSearch = employee.name.toLowerCase().includes(searchTerm.toLowerCase())
         const matchesFilter = filterType === 'All' ||
-            (filterType === 'Riders' && employee.type === 'Rider') ||
-            (filterType === 'Staff' && employee.type === 'Staff')
+            (filterType === 'rider' && employee.type === 'rider') ||
+            (filterType === 'staff' && employee.type === 'staff')
         return matchesSearch && matchesFilter
     })
 
@@ -439,23 +444,37 @@ function RouteComponent() {
     }
 
     const handleCreateAccount = async () => {
+        setLoading(true)
         try {
-            // Create user in Supabase
+            const { data: authData, error: authError } = await supabase.auth.signUp({
+                email: formData.email,
+                password: formData.password,
+                options: {
+                    emailRedirectTo: `${window.location.origin}/login`,
+                },
+            })
+
+            if (authError) throw authError
+
+            const userAuthId = authData?.user?.id
+            if (!userAuthId) throw new Error("Auth signup failed, no user ID returned.")
+
             const { data, error } = await supabase
                 .from('users')
                 .insert([
                     {
-                        first_name: formData.fullName.split(' ')[0],
-                        last_name: formData.fullName.split(' ').slice(1).join(' '),
+                        user_uid: userAuthId,
+                        first_name: formData.first_name,
+                        middle_name: formData.middle_name || '',
+                        last_name: formData.last_name,
                         email: formData.email,
                         phone_number: formData.phoneNumber,
                         user_role: formData.employeeType.toLowerCase(),
                         is_active: true,
-                        birth_date: new Date().toISOString(), // You may want to add a birth date field
-                        gender: 'other' // You may want to add a gender field
                     }
                 ])
                 .select()
+
 
             if (error) throw error
 
@@ -465,9 +484,12 @@ function RouteComponent() {
             await fetchEmployees()
 
             setIsCreateModalOpen(false)
+            setLoading(false)
             // Reset form
             setFormData({
-                fullName: '',
+                first_name: '',
+                middle_name: '',
+                last_name: '',
                 email: '',
                 password: '',
                 phoneNumber: '',
@@ -668,10 +690,11 @@ function RouteComponent() {
                                             className="appearance-none bg-yellow-400 text-black px-3 py-2 pr-8 rounded-lg font-medium border-0 cursor-pointer focus:outline-none focus:ring-2 focus:ring-yellow-500 text-sm sm:text-base"
                                         >
                                             <option value="All">All</option>
-                                            <option value="Riders">Riders</option>
-                                            <option value="Staff">Staff</option>
-                                            <option value="Chef">Chef</option>
+                                            <option value="rider">Rider</option>
+                                            <option value="staff">Staff</option>
+                                            <option value="chef">Chef</option>
                                         </select>
+
                                         <div className="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none">
                                             <svg className="w-4 h-4 text-black" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
@@ -723,8 +746,18 @@ function RouteComponent() {
                                                 key={employee.id}
                                                 className="border-b border-gray-100 hover:bg-gray-50 cursor-pointer transition-colors"
                                             >
-                                                <td className="px-4 sm:px-6 py-3 sm:py-4 text-gray-800 font-medium">{employee.type}</td>
-                                                <td className="px-4 sm:px-6 py-3 sm:py-4 text-gray-800 font-medium">{employee.name}</td>
+                                                <td className="px-4 sm:px-6 py-3 sm:py-4 text-gray-800 font-medium">
+                                                    {employee.type.charAt(0).toUpperCase() + employee.type.slice(1).toLowerCase()}
+                                                </td>
+
+                                                <td className="px-4 sm:px-6 py-3 sm:py-4 text-gray-800 font-medium">
+                                                    {employee.name
+                                                        .toLowerCase()
+                                                        .split(' ')
+                                                        .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+                                                        .join(' ')}
+                                                </td>
+
                                                 <td className="px-4 sm:px-6 py-3 sm:py-4">
                                                     <div
                                                         className="flex justify-center cursor-pointer bg-yellow-500 text-white px-3 sm:px-4 py-1.5 sm:py-2 rounded hover:bg-yellow-600 text-sm sm:text-base"
@@ -751,15 +784,42 @@ function RouteComponent() {
 
                         <div className="space-y-4">
                             {/* Full Name */}
-                            <div>
-                                <label className="block text-black font-medium mb-2">Full Name:</label>
-                                <input
-                                    type="text"
-                                    placeholder="Type the full name of the employee..."
-                                    value={formData.fullName}
-                                    onChange={(e) => handleFormChange('fullName', e.target.value)}
-                                    className="bg-white w-full px-4 py-3 rounded-lg border-0 focus:outline-none focus:ring-2 focus:ring-amber-600"
-                                />
+                            <div className="space-y-4">
+                                {/* First Name */}
+                                <div>
+                                    <label className="block text-black font-medium mb-2">First Name:</label>
+                                    <input
+                                        type="text"
+                                        placeholder="Enter first name"
+                                        value={formData.first_name}
+                                        onChange={(e) => handleFormChange('first_name', e.target.value)}
+                                        className="bg-white w-full px-4 py-3 rounded-lg border-0 focus:outline-none focus:ring-2 focus:ring-amber-600"
+                                    />
+                                </div>
+
+                                {/* Middle Name */}
+                                <div>
+                                    <label className="block text-black font-medium mb-2">Middle Name (optional):</label>
+                                    <input
+                                        type="text"
+                                        placeholder="Enter middle name"
+                                        value={formData.middle_name}
+                                        onChange={(e) => handleFormChange('middle_name', e.target.value)}
+                                        className="bg-white w-full px-4 py-3 rounded-lg border-0 focus:outline-none focus:ring-2 focus:ring-amber-600"
+                                    />
+                                </div>
+
+                                {/* Last Name */}
+                                <div>
+                                    <label className="block text-black font-medium mb-2">Last Name:</label>
+                                    <input
+                                        type="text"
+                                        placeholder="Enter last name"
+                                        value={formData.last_name}
+                                        onChange={(e) => handleFormChange('last_name', e.target.value)}
+                                        className="bg-white w-full px-4 py-3 rounded-lg border-0 focus:outline-none focus:ring-2 focus:ring-amber-600"
+                                    />
+                                </div>
                             </div>
 
                             {/* Email Address */}
@@ -854,8 +914,18 @@ function RouteComponent() {
                         <div className="bg-amber-800 text-white p-6 rounded-t-xl">
                             <div className="flex items-center gap-4">
                                 <div className="flex-1">
-                                    <h2 className="text-2xl font-bold">{selectedEmployee.name}</h2>
-                                    <p className="text-amber-200 text-sm mt-1">{selectedEmployee.type}</p>
+                                    <h2 className="text-2xl font-bold">
+                                        {selectedEmployee.name
+                                            .toLowerCase()
+                                            .split(' ')
+                                            .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+                                            .join(' ')}
+                                    </h2>
+
+                                    <p className="text-amber-200 text-sm mt-1">
+                                        {selectedEmployee.type.charAt(0).toUpperCase() + selectedEmployee.type.slice(1).toLowerCase()}
+                                    </p>
+
                                 </div>
                             </div>
                             <div className="mt-4 space-y-2">

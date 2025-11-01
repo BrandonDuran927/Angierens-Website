@@ -67,6 +67,33 @@ export interface Menu {
   inclusion: string
 }
 
+export interface Review {
+  review_id: string
+  customerName: string
+  status_type: 'Food' | 'Staff' | 'Rider' | 'Delivery'
+  rating: number
+  comment: string
+  is_hidden: boolean
+  order_id: string
+}
+
+export interface DashboardStats {
+  totalRevenue: number
+  totalOrders: number
+  totalMenu: number
+  totalEmployees: number
+}
+
+export interface MonthlyData {
+  month: string
+  value: number
+}
+
+export interface ChartData {
+  revenueData: MonthlyData[]
+  ordersData: MonthlyData[]
+}
+
 export async function fetchOrders(): Promise<Order[]> {
   const { data, error } = await supabase
     .from('order')
@@ -212,4 +239,166 @@ export async function fetchOrders(): Promise<Order[]> {
   })
 
   return formatted
+}
+
+export async function fetchDashboardStats(): Promise<DashboardStats> {
+  try {
+    // Fetch total revenue from completed orders
+    const { data: revenueData, error: revenueError } = await supabase
+      .from('order')
+      .select('total_price')
+      .eq('order_status', 'Completed')
+
+    if (revenueError) {
+      console.error('Revenue error:', revenueError)
+      throw revenueError
+    }
+
+    const totalRevenue =
+      revenueData?.reduce((sum, order) => sum + Number(order.total_price), 0) ||
+      0
+
+    const { count: totalOrders, error: ordersError } = await supabase
+      .from('order')
+      .select('order_id', { count: 'exact', head: true })
+
+    if (ordersError) {
+      console.error('Orders error:', ordersError)
+      throw ordersError
+    }
+
+    const { count: totalMenu, error: menuError } = await supabase
+      .from('menu')
+      .select('menu_id', { count: 'exact', head: true })
+
+    if (menuError) {
+      console.error('Menu error:', menuError)
+      throw menuError
+    }
+
+    const { count: totalEmployees, error: employeesError } = await supabase
+      .from('users')
+      .select('user_uid', { count: 'exact', head: true })
+      .in('user_role', ['staff', 'chef', 'rider'])
+
+    if (employeesError) {
+      console.error('Employees error:', employeesError)
+      throw employeesError
+    }
+
+    console.log('Dashboard stats fetched:', {
+      totalRevenue,
+      totalOrders,
+      totalMenu,
+      totalEmployees,
+    })
+
+    return {
+      totalRevenue: totalRevenue,
+      totalOrders: totalOrders || 0,
+      totalMenu: totalMenu || 0,
+      totalEmployees: totalEmployees || 0,
+    }
+  } catch (error) {
+    console.error('Error fetching dashboard stats:', error)
+    throw error
+  }
+}
+
+export async function fetchChartData(
+  monthsBack: number = 12,
+): Promise<ChartData> {
+  try {
+    const endDate = new Date()
+    const startDate = new Date()
+    startDate.setMonth(startDate.getMonth() - monthsBack)
+
+    // Fetch all orders within the date range
+    const { data: ordersData, error: ordersError } = await supabase
+      .from('order')
+      .select('total_price, created_at, order_status')
+      .gte('created_at', startDate.toISOString())
+      .lte('created_at', endDate.toISOString())
+      .order('created_at', { ascending: true })
+
+    if (ordersError) {
+      console.error('Chart data error:', ordersError)
+      throw ordersError
+    }
+
+    // Generate month labels based on the range
+    const months = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
+    ]
+    const monthLabels: string[] = []
+    const currentDate = new Date(startDate)
+
+    while (currentDate <= endDate) {
+      monthLabels.push(months[currentDate.getMonth()])
+      currentDate.setMonth(currentDate.getMonth() + 1)
+    }
+
+    // Initialize revenue and orders count by month
+    const revenueByMonth: { [key: string]: number } = {}
+    const ordersByMonth: { [key: string]: number } = {}
+
+    monthLabels.forEach((month) => {
+      revenueByMonth[month] = 0
+      ordersByMonth[month] = 0
+    })
+
+    // Process orders data
+    ordersData?.forEach((order) => {
+      const orderDate = new Date(order.created_at)
+      const monthIndex = orderDate.getMonth()
+      const monthName = months[monthIndex]
+
+      // Only count if the month is in our range
+      if (monthLabels.includes(monthName)) {
+        // Count all orders
+        ordersByMonth[monthName]++
+
+        // Sum revenue only for completed orders
+        if (order.order_status === 'Completed') {
+          revenueByMonth[monthName] += Number(order.total_price)
+        }
+      }
+    })
+
+    // Convert to array format for charts
+    const revenueData: MonthlyData[] = monthLabels.map((month) => ({
+      month,
+      value: Math.round(revenueByMonth[month]),
+    }))
+
+    const ordersDataFormatted: MonthlyData[] = monthLabels.map((month) => ({
+      month,
+      value: ordersByMonth[month],
+    }))
+
+    console.log('Chart data fetched:', {
+      revenueData,
+      ordersDataFormatted,
+      monthsBack,
+    })
+
+    return {
+      revenueData,
+      ordersData: ordersDataFormatted,
+    }
+  } catch (error) {
+    console.error('Error fetching chart data:', error)
+    throw error
+  }
 }

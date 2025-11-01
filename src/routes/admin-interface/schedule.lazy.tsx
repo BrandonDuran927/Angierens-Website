@@ -1,12 +1,17 @@
 import { createLazyFileRoute, Link, useLocation } from '@tanstack/react-router'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import {
     LayoutDashboard, LucideCalendar, ShoppingCart, TrendingUp, MessageSquare, Users, Menu as MenuIcon, RefreshCw, LogOut, Bell, ChevronLeft, ChevronRight, Clock, Truck, X
 } from 'lucide-react'
+import { supabase } from '@/lib/supabaseClient'
 
 export const Route = createLazyFileRoute('/admin-interface/schedule')({
     component: RouteComponent,
 })
+
+// Initialize Supabase client
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
 
 interface DayData {
     date: number
@@ -16,6 +21,8 @@ interface DayData {
     isSelected?: boolean
     isPastMonth?: boolean
     isFutureMonth?: boolean
+    scheduleId?: string
+    maxOrders?: number
 }
 
 interface StaffMember {
@@ -31,11 +38,43 @@ interface TimeSlot {
     isAvailable: boolean
 }
 
+interface Order {
+    order_id: string
+    customer_uid: string
+    schedule_id: string
+    order_status: string
+    created_at: string
+    users: {
+        first_name: string
+        last_name: string
+    } | null  // Change from array to single object or null
+    schedule: {
+        schedule_time: string
+    } | null  // Change from array to single object or null
+}
+
+interface ScheduleData {
+    schedule_id: string
+    schedule_date: string
+    schedule_time: string
+    max_orders: number
+    is_available: boolean
+    order_count: number
+}
+
 function RouteComponent() {
+    const monthNames = [
+        'January', 'February', 'March', 'April', 'May', 'June',
+        'July', 'August', 'September', 'October', 'November', 'December'
+    ]
     const location = useLocation()
-    const [currentDate, setCurrentDate] = useState(new Date(2025, 4, 17)) // May 17, 2025
-    const [selectedDate, setSelectedDate] = useState(16)
-    const [selectedMonth, setSelectedMonth] = useState('May 2025')
+    const [currentDate, setCurrentDate] = useState(new Date())
+    const [selectedDate, setSelectedDate] = useState(new Date().getDate())
+    const [selectedMonth, setSelectedMonth] = useState(`${monthNames[new Date().getMonth()]} ${new Date().getFullYear()}`)
+    const [scheduleData, setScheduleData] = useState<ScheduleData[]>([])
+    const [ordersForSelectedDate, setOrdersForSelectedDate] = useState<Order[]>([])
+    const [loading, setLoading] = useState(true)
+    const [selectedScheduleId, setSelectedScheduleId] = useState<string | null>(null)
 
     const sidebarItems = [
         {
@@ -80,36 +119,175 @@ function RouteComponent() {
         }
     ]
 
-    const monthNames = [
-        'January', 'February', 'March', 'April', 'May', 'June',
-        'July', 'August', 'September', 'October', 'November', 'December'
+
+    const colors = [
+        'bg-red-400', 'bg-blue-400', 'bg-green-400', 'bg-purple-400',
+        'bg-pink-400', 'bg-indigo-400', 'bg-yellow-400', 'bg-teal-400'
     ]
 
-    // Generate time slots from 9AM to 5PM (view-only)
-    const generateTimeSlots = (): TimeSlot[] => {
-        const slots: TimeSlot[] = []
-        for (let hour = 9; hour <= 17; hour++) {
-            const period = hour < 12 ? 'AM' : 'PM'
-            const displayHour = hour <= 12 ? hour : hour - 12
-            slots.push({
-                hour: `${displayHour}:00`,
-                period,
-                isAvailable: Math.random() > 0.3 // Random availability for demo
-            })
+    // Fetch schedule data from Supabase
+    const fetchScheduleData = async (year: number, month: number) => {
+        try {
+            setLoading(true)
+            const firstDay = new Date(year, month, 1)
+            const lastDay = new Date(year, month + 1, 0)
+
+            const startDate = firstDay.toISOString().split('T')[0]
+            const endDate = lastDay.toISOString().split('T')[0]
+
+            // Fetch schedules for the month
+            const { data: schedules, error: scheduleError } = await supabase
+                .from('schedule')
+                .select('*')
+                .gte('schedule_date', startDate)
+                .lte('schedule_date', endDate)
+
+            if (scheduleError) throw scheduleError
+
+            // Fetch ALL orders that match the schedule_ids (don't filter by created_at)
+            const scheduleIds = schedules?.map(s => s.schedule_id) || []
+
+            let orderCounts: Record<string, number> = {}
+
+            if (scheduleIds.length > 0) {
+                const { data: orders, error: orderError } = await supabase
+                    .from('order')
+                    .select('schedule_id')
+                    .in('schedule_id', scheduleIds)
+
+                if (orderError) throw orderError
+
+                // Count orders per schedule
+                orderCounts = orders.reduce((acc: Record<string, number>, order) => {
+                    acc[order.schedule_id] = (acc[order.schedule_id] || 0) + 1
+                    return acc
+                }, {})
+            }
+
+            // Combine schedule data with order counts
+            const enrichedSchedules = schedules?.map(schedule => ({
+                ...schedule,
+                order_count: orderCounts[schedule.schedule_id] || 0
+            })) || []
+
+            setScheduleData(enrichedSchedules)
+        } catch (error) {
+            console.error('Error fetching schedule data:', error)
+        } finally {
+            setLoading(false)
         }
-        return slots
+    }
+
+    // Fetch orders for selected date
+    const fetchOrdersForDate = async (year: number, month: number, day: number) => {
+        try {
+            const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+
+            const { data: schedules, error: scheduleError } = await supabase
+                .from('schedule')
+                .select('schedule_id')
+                .eq('schedule_date', dateStr)
+
+            if (scheduleError) throw scheduleError
+
+            if (schedules && schedules.length > 0) {
+                const scheduleIds = schedules.map(s => s.schedule_id)
+                setSelectedScheduleId(schedules[0].schedule_id)
+
+                const { data: orders, error: orderError } = await supabase
+                    .from('order')
+                    .select(`
+                    order_id,
+                    customer_uid,
+                    schedule_id,
+                    order_status,
+                    created_at,
+                    users!order_customer_uid_fkey (
+                        first_name,
+                        last_name
+                    ),
+                    schedule!order_schedule_id_fkey (
+                        schedule_time
+                    )
+                `)
+                    .in('schedule_id', scheduleIds)
+
+                if (orderError) throw orderError
+
+                // Transform the data to match the Order interface
+                const transformedOrders: Order[] = (orders || []).map(order => ({
+                    order_id: order.order_id,
+                    customer_uid: order.customer_uid,
+                    schedule_id: order.schedule_id,
+                    order_status: order.order_status,
+                    created_at: order.created_at,
+                    users: Array.isArray(order.users) ? order.users[0] || null : order.users,
+                    schedule: Array.isArray(order.schedule) ? order.schedule[0] || null : order.schedule
+                }))
+
+                console.log('Fetched Orders:', transformedOrders)
+
+                setOrdersForSelectedDate(transformedOrders)
+            } else {
+                setOrdersForSelectedDate([])
+                setSelectedScheduleId(null)
+            }
+        } catch (error) {
+            console.error('Error fetching orders for date:', error)
+            setOrdersForSelectedDate([])
+        }
+    }
+
+    useEffect(() => {
+        const year = currentDate.getFullYear()
+        const month = currentDate.getMonth()
+        fetchScheduleData(year, month)
+    }, [currentDate])
+
+    useEffect(() => {
+        const year = currentDate.getFullYear()
+        const month = currentDate.getMonth()
+        fetchOrdersForDate(year, month, selectedDate)
+    }, [selectedDate, currentDate])
+
+    const generateTimeSlots = (): TimeSlot[] => {
+        const year = currentDate.getFullYear()
+        const month = currentDate.getMonth()
+        const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(selectedDate).padStart(2, '0')}`
+
+        // Get all schedules for the selected date
+        const schedulesForDate = scheduleData.filter(s => s.schedule_date === dateStr)
+
+        if (schedulesForDate.length === 0) {
+            return []
+        }
+
+        // Map schedules to time slots
+        const slots: TimeSlot[] = schedulesForDate.map(schedule => {
+            // Parse the time (assuming format like "14:00:00" or "09:00:00")
+            const timeParts = schedule.schedule_time.split(':')
+            let hour = parseInt(timeParts[0])
+            const minute = timeParts[1] || '00'
+
+            const period = hour < 12 ? 'AM' : 'PM'
+            const displayHour = hour === 0 ? 12 : (hour <= 12 ? hour : hour - 12)
+
+            return {
+                hour: `${displayHour}:${minute}`,
+                period,
+                isAvailable: schedule.is_available
+            }
+        })
+
+        // Sort by time
+        return slots.sort((a, b) => {
+            const timeA = a.period === 'AM' ? parseInt(a.hour) : parseInt(a.hour) + 12
+            const timeB = b.period === 'AM' ? parseInt(b.hour) : parseInt(b.hour) + 12
+            return timeA - timeB
+        })
     }
 
     const timeSlots = generateTimeSlots()
-
-    const staff: StaffMember[] = [
-        { id: '1', name: 'Caadiang', time: '12 PM', color: 'bg-red-400' },
-        { id: '2', name: 'Brandon', time: '2 PM', color: 'bg-blue-400' },
-        { id: '3', name: 'Prince', time: '3 PM', color: 'bg-green-400' },
-        { id: '4', name: 'Maria', time: '4 PM', color: 'bg-purple-400' },
-        { id: '5', name: 'John', time: '5 PM', color: 'bg-pink-400' },
-        { id: '6', name: 'Sarah', time: '6 PM', color: 'bg-indigo-400' },
-    ]
 
     const generateCalendarData = (): DayData[] => {
         const year = currentDate.getFullYear()
@@ -128,21 +306,30 @@ function RouteComponent() {
         for (let i = startingDayOfWeek - 1; i >= 0; i--) {
             calendarData.push({
                 date: prevMonthDays - i,
-                orders: Math.floor(Math.random() * 20) + 10,
-                isAvailable: Math.random() > 0.2,
+                orders: 0,
+                isAvailable: false,
                 isPastMonth: true
             })
         }
 
-        // Current month days
+        // Current month days - get data from Supabase
         for (let day = 1; day <= daysInMonth; day++) {
-            const isUnavailable = [1, 11, 19, 20, 22].includes(day)
+            const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+            const scheduleForDay = scheduleData.find(s => s.schedule_date === dateStr)
+
+            const today = new Date()
+            const isToday = day === today.getDate() &&
+                month === today.getMonth() &&
+                year === today.getFullYear()
+
             calendarData.push({
                 date: day,
-                orders: Math.floor(Math.random() * 30) + 10,
-                isAvailable: !isUnavailable,
-                isToday: day === 17,
-                isSelected: day === selectedDate
+                orders: scheduleForDay?.order_count || 0,
+                isAvailable: scheduleForDay?.is_available || false,
+                isToday: isToday,
+                isSelected: day === selectedDate,
+                scheduleId: scheduleForDay?.schedule_id,
+                maxOrders: scheduleForDay?.max_orders || 30
             })
         }
 
@@ -152,8 +339,8 @@ function RouteComponent() {
         for (let day = 1; day <= remainingCells; day++) {
             calendarData.push({
                 date: day,
-                orders: Math.floor(Math.random() * 15) + 5,
-                isAvailable: Math.random() > 0.3,
+                orders: 0,
+                isAvailable: false,
                 isFutureMonth: true
             })
         }
@@ -191,6 +378,29 @@ function RouteComponent() {
             hour12: true
         })
     }
+
+    // Get selected day data
+    const selectedDayData = calendarData.find(day =>
+        day.date === selectedDate && !day.isPastMonth && !day.isFutureMonth
+    )
+
+    // Convert orders to staff member format for display
+    const customerOrders: StaffMember[] = ordersForSelectedDate.map((order, index) => {
+        const time = order.schedule?.schedule_time
+            ? new Date(`2000-01-01T${order.schedule.schedule_time}`).toLocaleTimeString('en-US', {
+                hour: 'numeric',
+                minute: '2-digit',
+                hour12: true
+            })
+            : 'N/A'
+
+        return {
+            id: order.order_id,
+            name: `${order.users?.first_name || 'Unknown'} ${order.users?.last_name || 'Customer'}`,
+            time: time,
+            color: colors[index % colors.length]
+        }
+    })
 
     // Sample notifications
     const notifications = [
@@ -311,8 +521,8 @@ function RouteComponent() {
                             </div>
                         </div>
                         <div className="flex items-center gap-2 lg:gap-4">
-                            <span className="text-amber-200 text-xs lg:text-sm hidden sm:inline">Date: May 16, 2025</span>
-                            <span className="text-amber-200 text-xs lg:text-sm hidden sm:inline">Time: 11:00 AM</span>
+                            <span className="text-amber-200 text-xs lg:text-sm hidden sm:inline">Date: {getCurrentDate()}</span>
+                            <span className="text-amber-200 text-xs lg:text-sm hidden sm:inline">Time: {getCurrentTime()}</span>
                             <div className="w-10 h-10 bg-yellow-400 rounded-full flex items-center justify-center">
                                 <div className='relative'>
                                     <button
@@ -373,148 +583,175 @@ function RouteComponent() {
                 {/* Schedule Content */}
                 <div className="flex-1 p-3 md:p-8">
                     <div className="max-w-7xl mx-auto">
-                        <div className="bg-yellow-400 rounded-2xl p-4 md:p-8 shadow-xl">
-                            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-8">
-                                {/* Calendar Section */}
-                                <div className="lg:col-span-2 space-y-3 md:space-y-6">
-                                    {/* Current Date Display */}
-                                    <div className="text-lg md:text-xl font-semibold text-gray-800">
-                                        Saturday, May 24
-                                    </div>
-
-                                    {/* Month Navigation */}
-                                    <div className="flex items-center justify-between border-b-2 border-gray-800 pb-3 md:pb-4">
-                                        <div className="text-lg md:text-xl font-bold text-gray-800">
-                                            {selectedMonth}
-                                        </div>
-                                        <div className="flex gap-2">
-                                            <button
-                                                onClick={() => navigateMonth('prev')}
-                                                className="p-2 hover:bg-yellow-300 rounded-full transition-colors"
-                                            >
-                                                <ChevronLeft className="w-5 h-5" />
-                                            </button>
-                                            <button
-                                                onClick={() => navigateMonth('next')}
-                                                className="p-2 hover:bg-yellow-300 rounded-full transition-colors"
-                                            >
-                                                <ChevronRight className="w-5 h-5" />
-                                            </button>
-                                        </div>
-                                    </div>
-
-                                    {/* Calendar Grid */}
-                                    <div className="grid grid-cols-7 gap-1 md:gap-2">
-                                        {/* Day Headers */}
-                                        {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
-                                            <div key={day} className="text-center font-semibold text-gray-800 p-1 md:p-2 text-xs md:text-base">
-                                                {day}
-                                            </div>
-                                        ))}
-
-                                        {/* Calendar Days */}
-                                        {calendarData.map((day, index) => (
-                                            <button
-                                                key={index}
-                                                onClick={() => setSelectedDate(day.date)}
-                                                className={`
-                                                    relative p-1.5 md:p-3 rounded-lg text-center border-2 transition-all duration-200 active:scale-95 md:hover:scale-105 min-h-[60px] md:min-h-[80px] flex flex-col justify-center gap-0.5 md:gap-1 cursor-pointer
-                                                    ${day.isPastMonth || day.isFutureMonth
-                                                        ? 'text-gray-400 border-transparent bg-white/30'
-                                                        : day.isSelected
-                                                            ? 'bg-amber-600 text-white border-amber-700 shadow-lg'
-                                                            : day.isToday
-                                                                ? 'bg-white border-amber-600 text-gray-800 shadow-md'
-                                                                : 'bg-white border-gray-300 text-gray-800 hover:border-amber-400'
-                                                    }
-                                                `}
-                                            >
-                                                <span className="font-semibold text-sm md:text-lg">{day.date}</span>
-                                                {!day.isPastMonth && !day.isFutureMonth && (
-                                                    <>
-                                                        {day.isAvailable ? (
-                                                            <span className="text-[10px] md:text-xs text-blue-600 font-medium leading-tight">
-                                                                {day.orders}/30
-                                                            </span>
-                                                        ) : (
-                                                            <span className="text-[10px] md:text-xs text-red-500 font-medium leading-tight">
-                                                                Full
-                                                            </span>
-                                                        )}
-                                                    </>
-                                                )}
-                                            </button>
-                                        ))}
-                                    </div>
+                        {loading ? (
+                            <div className="fixed inset-0 bg-black/50 flex justify-center items-center z-[60]">
+                                <div className="bg-white rounded-xl shadow-lg p-6 flex flex-col items-center gap-4">
+                                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#964B00]"></div>
+                                    <p className="text-gray-700 font-medium">Processing...</p>
                                 </div>
-
-                                {/* Right Sidebar - View Only */}
-                                <div className="space-y-4 md:space-y-6">
-                                    {/* Selected Date Info */}
-                                    <div className="bg-green-50 rounded-lg p-4 md:p-6 border border-green-200 shadow-sm">
-                                        <h3 className="text-base md:text-lg font-semibold text-gray-800 mb-2">Selected Date</h3>
-                                        <div className="text-xl md:text-2xl font-bold text-gray-800 mb-4">
-                                            May {selectedDate}, 2025
+                            </div>
+                        ) : (
+                            <div className="bg-yellow-400 rounded-2xl p-4 md:p-8 shadow-xl">
+                                <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-8">
+                                    {/* Calendar Section */}
+                                    <div className="lg:col-span-2 space-y-3 md:space-y-6">
+                                        {/* Current Date Display */}
+                                        <div className="text-lg md:text-xl font-semibold text-gray-800">
+                                            {new Date(currentDate.getFullYear(), currentDate.getMonth(), selectedDate).toLocaleDateString('en-US', {
+                                                weekday: 'long',
+                                                month: 'long',
+                                                day: 'numeric'
+                                            })}
                                         </div>
-                                        <div className="text-base md:text-lg text-gray-700 mb-4">25 Orders</div>
 
-                                        <div className="space-y-3 max-h-48 overflow-y-auto pr-2">
-                                            <h4 className="font-semibold text-gray-800 text-sm md:text-base">Customer Orders</h4>
-                                            {staff.map(member => (
-                                                <div key={member.id} className="flex items-center gap-3">
-                                                    <div className={`w-3 h-8 ${member.color} rounded`}></div>
-                                                    <div>
-                                                        <div className="font-medium text-gray-800 text-sm md:text-base">{member.name}</div>
-                                                        <div className="text-xs md:text-sm text-gray-600">{member.time}</div>
-                                                    </div>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </div>
-
-                                    {/* Availability Status (Read-only) */}
-                                    <div className="bg-green-50 rounded-lg p-4 md:p-6 border border-green-200 shadow-sm">
-                                        <div className="flex items-center justify-between">
-                                            <h3 className="text-base md:text-lg font-semibold text-gray-800">Current Status</h3>
-                                            <div className="flex items-center gap-2">
-                                                <div className="w-3 h-3 bg-green-500 rounded-full"></div>
-                                                <span className="text-green-700 font-medium text-sm md:text-base">Available</span>
+                                        {/* Month Navigation */}
+                                        <div className="flex items-center justify-between border-b-2 border-gray-800 pb-3 md:pb-4">
+                                            <div className="text-lg md:text-xl font-bold text-gray-800">
+                                                {selectedMonth}
+                                            </div>
+                                            <div className="flex gap-2">
+                                                <button
+                                                    onClick={() => navigateMonth('prev')}
+                                                    className="p-2 hover:bg-yellow-300 rounded-full transition-colors"
+                                                >
+                                                    <ChevronLeft className="w-5 h-5" />
+                                                </button>
+                                                <button
+                                                    onClick={() => navigateMonth('next')}
+                                                    className="p-2 hover:bg-yellow-300 rounded-full transition-colors"
+                                                >
+                                                    <ChevronRight className="w-5 h-5" />
+                                                </button>
                                             </div>
                                         </div>
-                                    </div>
 
-                                    {/* Order Limit Display (Read-only) */}
-                                    <div className="bg-blue-50 rounded-lg p-4 md:p-6 border border-blue-200 shadow-sm">
-                                        <h3 className="text-base md:text-lg font-semibold text-gray-800 mb-4">Order Limit</h3>
-                                        <div className="text-xl md:text-2xl font-bold text-blue-700">30 orders/day</div>
-                                        <div className="text-xs md:text-sm text-blue-600 mt-2">Current: 25 orders</div>
-                                    </div>
-
-                                    {/* Time Slots (Read-only) */}
-                                    <div className="bg-purple-50 rounded-lg p-4 md:p-6 border border-purple-200 shadow-sm">
-                                        <h3 className="text-base md:text-lg font-semibold text-gray-800 mb-4">Time Availability</h3>
-                                        <div className="space-y-2 max-h-48 overflow-y-auto pr-2">
-                                            {timeSlots.map((slot, index) => (
-                                                <div key={index} className="flex items-center justify-between p-2 md:p-3 bg-white rounded-lg border border-gray-200 shadow-sm">
-                                                    <span className="text-xs md:text-sm font-medium text-gray-700">
-                                                        {slot.hour} {slot.period}
-                                                    </span>
-                                                    <div className={`
-                                                        px-2 md:px-3 py-1 rounded-full text-xs font-medium
-                                                        ${slot.isAvailable
-                                                            ? 'bg-green-100 text-green-700'
-                                                            : 'bg-red-100 text-red-700'
-                                                        }
-                                                    `}>
-                                                        {slot.isAvailable ? 'Available' : 'Unavailable'}
-                                                    </div>
+                                        {/* Calendar Grid */}
+                                        <div className="grid grid-cols-7 gap-1 md:gap-2">
+                                            {/* Day Headers */}
+                                            {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
+                                                <div key={day} className="text-center font-semibold text-gray-800 p-1 md:p-2 text-xs md:text-base">
+                                                    {day}
                                                 </div>
                                             ))}
+
+                                            {/* Calendar Days */}
+                                            {calendarData.map((day, index) => (
+                                                <button
+                                                    key={index}
+                                                    onClick={() => !day.isPastMonth && !day.isFutureMonth && setSelectedDate(day.date)}
+                                                    className={`
+                                                        relative p-1.5 md:p-3 rounded-lg text-center border-2 transition-all duration-200 active:scale-95 md:hover:scale-105 min-h-[60px] md:min-h-[80px] flex flex-col justify-center gap-0.5 md:gap-1 cursor-pointer
+                                                        ${day.isPastMonth || day.isFutureMonth
+                                                            ? 'text-gray-400 border-transparent bg-white/30'
+                                                            : day.isSelected
+                                                                ? 'bg-amber-600 text-white border-amber-700 shadow-lg'
+                                                                : day.isToday
+                                                                    ? 'bg-white border-amber-600 text-gray-800 shadow-md'
+                                                                    : 'bg-white border-gray-300 text-gray-800 hover:border-amber-400'
+                                                        }
+                                                    `}
+                                                >
+                                                    <span className="font-semibold text-sm md:text-lg">{day.date}</span>
+                                                    {!day.isPastMonth && !day.isFutureMonth && (
+                                                        <>
+                                                            {day.isAvailable ? (
+                                                                <span className="text-[10px] md:text-xs text-blue-600 font-medium leading-tight">
+                                                                    {day.orders}/{day.maxOrders}
+                                                                </span>
+                                                            ) : (
+                                                                <span className="text-[10px] md:text-xs font-medium leading-tight">
+                                                                    N/A
+                                                                </span>
+                                                            )}
+                                                        </>
+                                                    )}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+
+                                    {/* Right Sidebar - View Only */}
+                                    <div className="space-y-4 md:space-y-6">
+                                        {/* Selected Date Info */}
+                                        <div className="bg-green-50 rounded-lg p-4 md:p-6 border border-green-200 shadow-sm">
+                                            <h3 className="text-base md:text-lg font-semibold text-gray-800 mb-2">Selected Date</h3>
+                                            <div className="text-xl md:text-2xl font-bold text-gray-800 mb-4">
+                                                {monthNames[currentDate.getMonth()]} {selectedDate}, {currentDate.getFullYear()}
+                                            </div>
+                                            <div className="text-base md:text-lg text-gray-700 mb-4">
+                                                {selectedDayData?.orders || 0} Orders
+                                            </div>
+
+                                            <div className="space-y-3 max-h-48 overflow-y-auto pr-2">
+                                                <h4 className="font-semibold text-gray-800 text-sm md:text-base">Customer Orders</h4>
+                                                {customerOrders.length > 0 ? (
+                                                    customerOrders.map(member => (
+                                                        <div key={member.id} className="flex items-center gap-3">
+                                                            <div className={`w-3 h-8 ${member.color} rounded`}></div>
+                                                            <div>
+                                                                <div className="font-medium text-gray-800 text-sm md:text-base">{member.name}</div>
+                                                                <div className="text-xs md:text-sm text-gray-600">{member.time}</div>
+                                                            </div>
+                                                        </div>
+                                                    ))
+                                                ) : (
+                                                    <div className="text-sm text-gray-500 text-center py-4">
+                                                        No orders for this date
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+
+                                        {/* Availability Status (Read-only) */}
+                                        <div className="bg-green-50 rounded-lg p-4 md:p-6 border border-green-200 shadow-sm">
+                                            <div className="flex items-center justify-between">
+                                                <h3 className="text-base md:text-lg font-semibold text-gray-800">Current Status</h3>
+                                                <div className="flex items-center gap-2">
+                                                    <div className={`w-3 h-3 ${selectedDayData?.isAvailable ? 'bg-green-500' : 'bg-red-500'} rounded-full`}></div>
+                                                    <span className={`${selectedDayData?.isAvailable ? 'text-green-700' : 'text-red-700'} font-medium text-sm md:text-base`}>
+                                                        {selectedDayData?.isAvailable ? 'Available' : 'Unavailable'}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* Order Limit Display (Read-only) */}
+                                        <div className="bg-blue-50 rounded-lg p-4 md:p-6 border border-blue-200 shadow-sm">
+                                            <h3 className="text-base md:text-lg font-semibold text-gray-800 mb-4">Order Limit</h3>
+                                            <div className="text-xl md:text-2xl font-bold text-blue-700">
+                                                {selectedDayData?.maxOrders || 30} orders/day
+                                            </div>
+                                            <div className="text-xs md:text-sm text-blue-600 mt-2">
+                                                Current: {selectedDayData?.orders || 0} orders
+                                            </div>
+                                        </div>
+
+                                        {/* Time Slots (Read-only) */}
+                                        <div className="bg-purple-50 rounded-lg p-4 md:p-6 border border-purple-200 shadow-sm">
+                                            <h3 className="text-base md:text-lg font-semibold text-gray-800 mb-4">Time Availability</h3>
+                                            <div className="space-y-2 max-h-48 overflow-y-auto pr-2">
+                                                {timeSlots.map((slot, index) => (
+                                                    <div key={index} className="flex items-center justify-between p-2 md:p-3 bg-white rounded-lg border border-gray-200 shadow-sm">
+                                                        <span className="text-xs md:text-sm font-medium text-gray-700">
+                                                            {slot.hour} {slot.period}
+                                                        </span>
+                                                        <div className={`
+                                                            px-2 md:px-3 py-1 rounded-full text-xs font-medium
+                                                            ${slot.isAvailable
+                                                                ? 'bg-green-100 text-green-700'
+                                                                : 'bg-red-100 text-red-700'
+                                                            }
+                                                        `}>
+                                                            {slot.isAvailable ? 'Available' : 'Unavailable'}
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
                             </div>
-                        </div>
+                        )}
                     </div>
                 </div>
             </div>

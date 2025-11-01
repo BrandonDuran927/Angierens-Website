@@ -16,6 +16,7 @@ import {
     LucideCalendar
 } from 'lucide-react'
 import { supabase } from '@/lib/supabaseClient'
+import type { Review } from '@/lib/api'
 
 export const Route = createLazyFileRoute('/admin-interface/reviews')({
     component: RouteComponent,
@@ -28,16 +29,6 @@ interface Notification {
     time: string
     icon: 'heart' | 'message' | 'star'
     read: boolean
-}
-
-interface Review {
-    review_id: string
-    customerName: string
-    status_type: 'Food' | 'Staff' | 'Rider' | 'Delivery'
-    rating: number
-    comment: string
-    is_hidden: boolean
-    order_id: string
 }
 
 function RouteComponent() {
