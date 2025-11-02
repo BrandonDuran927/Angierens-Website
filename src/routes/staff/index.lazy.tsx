@@ -14,20 +14,34 @@ import { useUser } from '@/context/UserContext'
 import { fetchOrders } from '@/lib/api'
 import type { Order } from '@/lib/api'
 import { supabase } from '@/lib/supabaseClient'
+import { useNavigate } from '@tanstack/react-router'
 
 export const Route = createLazyFileRoute('/staff/')({
     component: RouteComponent,
 })
 
+type UserProfile = {
+    user_uid: string;
+    first_name: string;
+    last_name: string;
+    phone_number: string;
+    user_role: string;
+    is_active: boolean;
+    email: string;
+};
+
+
 interface OrderDisplay {
     id: string
     customerName: string
+    scheduledDate: string
+    scheduledTime: string
     date: string
     time: string
     price: string
     fulfillmentType: string
     paymentMethod: string
-    status: 'pending' | 'accepted' | 'rejected'
+    order_status: string
     orderData?: Order
 }
 
@@ -36,6 +50,8 @@ interface OrderForm {
     email: string
     phone: string
     fulfillmentType: string
+    pickDate: string
+    pickTime: string
     selectedMenuItems: SelectedMenuItem[]
     addOns: {
         [key: string]: number
@@ -82,8 +98,10 @@ interface Filters {
 }
 
 function RouteComponent() {
-    const [activeTab, setActiveTab] = useState('New Orders')
-    const [activeTimeTab, setActiveTimeTab] = useState('Today')
+    const navigate = useNavigate();
+    type TabType = 'New Orders' | 'In Process' | 'Completed'
+    const tabs: TabType[] = ['New Orders', 'In Process', 'Completed']
+    const [activeTab, setActiveTab] = useState<TabType>('New Orders')
     const [searchQuery, setSearchQuery] = useState('')
     const [currentPage, setCurrentPage] = useState(1)
     const [isAddOrderModalOpen, setIsAddOrderModalOpen] = useState(false)
@@ -101,6 +119,12 @@ function RouteComponent() {
     const [addOns, setAddOns] = useState<AddOn[]>([])
     const [menuSearchQuery, setMenuSearchQuery] = useState('')
 
+    const statusGroups = {
+        'New Orders': ['Pending'],
+        'In Process': ['Queueing', 'On Delivery', 'Claim Order'],
+        'Completed': ['Cancelled', 'Refunding', 'Refund', 'Completed'],
+    }
+
     const handleReturnPaymentProofUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files && e.target.files[0]) {
             setReturnPaymentProof(e.target.files[0])
@@ -114,7 +138,7 @@ function RouteComponent() {
             const { error } = await supabase
                 .from('order')
                 .update({
-                    order_status: 'Completed',
+                    order_status: 'Cancelled',  // ✅ Use actual database value (or 'Refund' if appropriate)
                     status_updated_at: new Date().toISOString()
                 })
                 .eq('order_id', selectedOrder.orderData.order_id)
@@ -180,11 +204,12 @@ function RouteComponent() {
         email: '',
         phone: '',
         fulfillmentType: '',
+        pickDate: '',
+        pickTime: '',
         selectedMenuItems: [],
         addOns: {}
     })
 
-    // Load orders from Supabase
     const loadOrders = async () => {
         try {
             setLoading(true)
@@ -193,26 +218,26 @@ function RouteComponent() {
             const formattedOrders: OrderDisplay[] = data.map(order => ({
                 id: `#${order.order_number}`,
                 customerName: order.user.customer_name,
-                date: order.schedule.schedule_date
-                    ? new Date(order.schedule.schedule_date).toLocaleDateString('en-US', {
-                        year: 'numeric',
-                        month: 'long',
-                        day: 'numeric'
-                    })
-                    : new Date(order.date).toLocaleDateString('en-US', {
-                        year: 'numeric',
-                        month: 'long',
-                        day: 'numeric'
-                    }),
-                time: order.schedule.schedule_time || order.time,
+                time: order.time,
+                date: new Date(order.date).toLocaleDateString('en-US', {
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric'
+                }),
+                scheduledDate: new Date(order.schedule.schedule_date).toLocaleDateString('en-US', {
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric'
+                }),
+                scheduledTime: order.schedule.schedule_time,
                 price: `₱ ${Number(order.total_price).toLocaleString()}`,
                 fulfillmentType: order.order_type,
-                paymentMethod: order.payment.paymentMethod || 'On-site',
-                status: order.order_status === 'New Orders' ? 'pending' :
-                    order.order_status === 'In Process' ? 'accepted' : 'rejected',
+                paymentMethod: order.payment.paymentMethod || 'On-Site Payment',
+                order_status: order.order_status,
                 orderData: order
             }))
 
+            console.log('Loaded orders:', formattedOrders)
             setOrders(formattedOrders)
         } catch (error) {
             console.error('Error loading orders:', error)
@@ -269,24 +294,16 @@ function RouteComponent() {
 
     const itemsPerPage = 10
 
-    // Filter orders based on active tab and search
     const filteredOrders = orders.filter(order => {
         const matchesSearch = order.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
             order.customerName.toLowerCase().includes(searchQuery.toLowerCase())
 
-        const matchesTab =
-            (activeTab === 'New Orders' && order.status === 'pending') ||
-            (activeTab === 'In Process' && order.status === 'accepted') ||
-            (activeTab === 'Completed' && order.status === 'rejected')
+        // Use statusGroups instead of status matching
+        const matchesTab = statusGroups[activeTab]?.includes(order.order_status)
 
-        const today = new Date().toDateString()
-        const orderDate = new Date(order.orderData?.schedule.schedule_date || order.date).toDateString()
-        const matchesTimeTab =
-            (activeTimeTab === 'Today' && orderDate === today) ||
-            (activeTimeTab === 'Scheduled' && orderDate !== today)
-
-        return matchesSearch && matchesTab && matchesTimeTab
+        return matchesSearch && matchesTab
     })
+
 
     const totalPages = Math.ceil(filteredOrders.length / itemsPerPage)
     const startIndex = (currentPage - 1) * itemsPerPage
@@ -301,7 +318,7 @@ function RouteComponent() {
             const { error } = await supabase
                 .from('order')
                 .update({
-                    order_status: 'In Process',
+                    order_status: 'Queueing',
                     status_updated_at: new Date().toISOString()
                 })
                 .eq('order_id', order.orderData.order_id)
@@ -418,11 +435,41 @@ function RouteComponent() {
     ]
 
     const { user, signOut } = useUser()
+    const [profile, setProfile] = useState<UserProfile | null>(null);
+
+    async function handleLogout() {
+        await signOut();
+        navigate({ to: "/login" });
+    }
+
 
     useEffect(() => {
         console.log("Navigated to /staff")
         console.log("Current logged-in user:", user)
     }, [user])
+
+    useEffect(() => {
+        setLoading(true);
+        const fetchUserProfile = async () => {
+            if (!user) return;
+
+            const { data, error } = await supabase
+                .from("users")
+                .select("*")
+                .eq("user_uid", user.id)
+                .single();
+
+            if (error) {
+                console.error("Error fetching user profile:", error);
+                return;
+            }
+
+            setProfile(data);
+            setLoading(false);
+        };
+
+        fetchUserProfile();
+    }, [user]);
 
     // Add menu item to order
     const addMenuItemToOrder = (menuItem: MenuItem) => {
@@ -541,16 +588,13 @@ function RouteComponent() {
                 userId = newUser.user_uid
             }
 
-            // Create schedule
+            // Create schedule 
             const { data: schedule, error: scheduleError } = await supabase
                 .from('schedule')
                 .insert({
-                    schedule_date: new Date().toISOString().split('T')[0],
-                    schedule_time: new Date().toLocaleTimeString('en-US', {
-                        hour: '2-digit',
-                        minute: '2-digit',
-                        hour12: true
-                    })
+                    schedule_date: orderForm.pickDate,
+                    schedule_time: orderForm.pickTime,
+                    is_available: false
                 })
                 .select()
                 .single()
@@ -559,10 +603,12 @@ function RouteComponent() {
 
             // Create payment
             const { data: payment, error: paymentError } = await supabase
-                .from('payment')
+                .from('payment')  // TODO: Add payment order id FK, maybe create order first then use the id of it for FK
                 .insert({
-                    payment_method: 'On-site',
-                    payment_date: new Date().toISOString()
+                    payment_method: 'On-Site Payment',
+                    payment_date: new Date().toISOString(),
+                    amount_paid: calculateOrderTotal(),
+                    is_paid: true
                 })
                 .select()
                 .single()
@@ -577,7 +623,7 @@ function RouteComponent() {
                     customer_uid: userId,
                     schedule_id: schedule.schedule_id,
                     payment_id: payment.payment_id,
-                    order_status: 'New Orders',
+                    order_status: 'Queueing',
                     order_type: orderForm.fulfillmentType === 'pickup' ? 'Pick-up' : 'Delivery',
                     total_price: totalPrice,
                     additional_information: 'Walk-in customer order'
@@ -627,6 +673,8 @@ function RouteComponent() {
                 email: '',
                 phone: '',
                 fulfillmentType: '',
+                pickDate: '',
+                pickTime: '',
                 selectedMenuItems: [],
                 addOns: {}
             })
@@ -640,21 +688,44 @@ function RouteComponent() {
     const filteredMenuItems = menuItems.filter(item =>
         item.name.toLowerCase().includes(menuSearchQuery.toLowerCase())
     )
+    // Add this function near the top of your component (after the interfaces)
+    const formatScheduleTime = (dateStr: string, timeStr: string): string => {
+        // Convert to Date object for formatting
+        const date = new Date(`${dateStr}T${timeStr}`);
+
+        const formattedTime = date.toLocaleTimeString('en-US', {
+            hour: 'numeric',
+            hour12: true,
+        });
+
+        const formattedDate = date.toLocaleDateString('en-US', {
+            month: 'long',
+            day: 'numeric',
+            year: 'numeric',
+        });
+
+        return `${formattedTime} to be delivered on ${formattedDate}`;
+    }
+
+    const orderPrice = selectedOrder?.orderData?.order_item.reduce((sum, item) => {
+        return sum + Number(item.subtotal_price);
+    }, 0) || 0;
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-amber-50 to-orange-100 flex overflow-hidden">
+        <div className="min-h-screen bg-gradient-to-br from-amber-50 to-orange-100 flex overflow-x-hidden">
+
             <div
                 className={`
-                fixed inset-y-0 left-0 z-50 w-64 bg-yellow-400 transform transition-transform duration-300 ease-in-out
-                ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}
-            `}
+            fixed inset-y-0 left-0 z-50 w-64 bg-yellow-400 transform transition-transform duration-300 ease-in-out
+            ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}
+          `}
             >
                 {/* Header */}
                 <div className="bg-amber-800 text-white px-6 py-4 relative">
                     <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
                             <div className="w-12 h-12 rounded-full flex items-center justify-center">
-                                <img src="/angierens-logo.png" alt="Logo" className="w-12 h-12 rounded-full" />
+                                <img src="/public/angierens-logo.png" alt="Logo" className="w-12 h-12 rounded-full" />
                             </div>
                             <div>
                                 <h2 className="text-lg font-bold">Angieren's</h2>
@@ -672,26 +743,24 @@ function RouteComponent() {
 
                 {/* User Info */}
                 <div className="px-6 py-4 border-b-2 border-amber-600">
-                    <h3 className="font-bold text-lg text-amber-900">
-                        {user?.first_name} {user?.last_name}
-                    </h3>
-                    <p className="text-sm text-amber-800">{user?.phone_number}</p>
-                    <p className="text-sm text-amber-800">{user?.email}</p>
+                    <h3 className="font-bold text-lg text-amber-900">Jenny Frenzzy</h3>
+                    <p className="text-sm text-amber-800">+63 912 212 1209</p>
+                    <p className="text-sm text-amber-800">jennyfrenzzy@gmail.com</p>
                 </div>
 
                 {/* Navigation Menu */}
-                <nav className="flex-1 px-4 py-6 space-y-2 overflow-y-auto">
+                <nav className="flex-1 px-4 py-6 space-y-2">
                     {navigationItems.map((item) => (
                         <Link
                             key={item.name}
                             to={item.route}
                             className={`
-                            flex items-center gap-3 px-4 py-3 rounded-lg text-left font-semibold transition-colors w-full
-                            ${item.active
+                        flex items-center gap-3 px-4 py-3 rounded-lg text-left font-semibold transition-colors w-full
+                        ${item.active
                                     ? 'bg-amber-700 text-white shadow-lg'
                                     : 'text-amber-900 hover:bg-amber-300'
                                 }
-                        `}
+                      `}
                         >
                             {item.icon}
                             {item.name}
@@ -702,8 +771,8 @@ function RouteComponent() {
                 {/* Logout Button */}
                 <div className="px-4 pb-6">
                     <button
-                        onClick={signOut}
-                        className="flex items-center gap-3 px-4 py-3 text-amber-900 hover:bg-red-100 hover:text-red-600 rounded-lg w-full transition-colors"
+                        className="flex items-center gap-3 px-4 py-3 text-amber-900 hover:bg-red-100 hover:text-red-600 rounded-lg w-full transition-colors cursor-pointer"
+                        onClick={handleLogout}
                     >
                         <LogOut className="h-5 w-5" />
                         Logout
@@ -714,16 +783,16 @@ function RouteComponent() {
             {/* Overlay for mobile */}
             {isSidebarOpen && (
                 <div
-                    className="fixed inset-0 bg-black/50 z-40 lg:hidden"
+                    className="fixed inset-0 bg-black/50 z-40"
                     onClick={() => setIsSidebarOpen(false)}
                 />
             )}
 
-            <div className="flex-1 flex flex-col min-h-screen">
-                {/* Header */}
-                <header className="bg-amber-800 text-white p-3 sm:p-4 shadow-md flex-shrink-0">
+            <div className="flex-1 flex flex-col min-w-0">
+                {/* Top Bar */}
+                <header className="bg-amber-800 text-white p-4 shadow-md">
                     <div className="flex justify-between items-center">
-                        <div className="flex items-center gap-2 sm:gap-4">
+                        <div className="flex items-center gap-4">
                             {/* Mobile Menu Button */}
                             <button
                                 onClick={() => setIsSidebarOpen(true)}
@@ -731,96 +800,80 @@ function RouteComponent() {
                             >
                                 <Menu className="h-6 w-6" />
                             </button>
-                            <h1 className="text-lg sm:text-xl lg:text-3xl font-bold">ORDERS</h1>
+                            <div className="flex items-center gap-2">
+                                <h1 className="text-xl lg:text-3xl font-bold">DELIVERIES</h1>
+                            </div>
                         </div>
-                        <div className="flex items-center gap-2 sm:gap-4 lg:gap-6">
-                            <span className="text-amber-200 text-xs lg:text-sm font-semibold hidden md:inline">
-                                {getCurrentDate()}
-                            </span>
-                            <span className="text-amber-200 text-xs lg:text-sm font-semibold hidden md:inline">
-                                {getCurrentTime()}
-                            </span>
-                            <div className="relative">
-                                <button
-                                    onClick={() => setIsNotificationOpen(!isNotificationOpen)}
-                                    className="relative p-2 bg-yellow-400 text-amber-900 hover:bg-yellow-500 rounded-full"
-                                >
-                                    <Bell className="h-5 w-5 sm:h-6 sm:w-6" />
-                                    {notificationCount > 0 && (
-                                        <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
-                                            {notificationCount}
-                                        </span>
-                                    )}
-                                </button>
-                                {/* Notification Dropdown */}
-                                {isNotificationOpen && (
-                                    <div className="absolute right-0 mt-2 w-80 sm:w-96 bg-white rounded-lg shadow-lg border border-gray-200 z-50 max-h-96">
-                                        <div className="p-4 border-b border-gray-200">
-                                            <h3 className="text-lg font-semibold text-gray-800">Notifications</h3>
-                                        </div>
+                        <div className="flex items-center gap-2 lg:gap-6">
+                            <span className="text-amber-200 text-xs lg:text-lg font-semibold hidden sm:inline">Date: {getCurrentDate()}</span>
+                            <span className="text-amber-200 text-xs lg:text-lg font-semibold hidden sm:inline">Time: {getCurrentTime()}</span>
+                            <div className="w-10 h-10 bg-yellow-400 rounded-full flex items-center justify-center">
+                                <div className="relative">
+                                    <button
+                                        onClick={() => setIsNotificationOpen(!isNotificationOpen)}
+                                        className="relative p-2 text-[#7a3d00] hover:bg-yellow-400 rounded-full"
+                                    >
+                                        <Bell className="h-6 w-6" />
+                                        {notificationCount > 0 && (
+                                            <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
+                                                {notificationCount}
+                                            </span>
+                                        )}
+                                    </button>
+                                    {/* Notification Dropdown */}
+                                    {isNotificationOpen && (
+                                        <div className="absolute right-0 mt-2 w-96 bg-white rounded-lg shadow-lg border border-gray-200 z-50">
+                                            <div className="p-4 border-b border-gray-200">
+                                                <h3 className="text-lg font-semibold text-gray-800">Notifications</h3>
+                                            </div>
 
-                                        <div className="max-h-64 overflow-y-auto">
-                                            {notifications.map((notification, index) => (
-                                                <div
-                                                    key={notification.id}
-                                                    className={`p-4 border-b border-gray-100 hover:bg-gray-50 cursor-pointer ${index === notifications.length - 1 ? 'border-b-0' : ''
-                                                        }`}
-                                                >
-                                                    <div className="flex items-start gap-3">
-                                                        <div className="flex-shrink-0 w-10 h-10 bg-yellow-400 rounded-full flex items-center justify-center text-black">
-                                                            {getNotificationIcon(notification.icon)}
-                                                        </div>
-                                                        <div className="flex-1 min-w-0">
-                                                            <p className="text-sm text-gray-800 leading-relaxed">
-                                                                {notification.title}
-                                                            </p>
-                                                            <p className="text-xs text-gray-500 mt-1">
-                                                                {notification.time}
-                                                            </p>
+                                            <div className="max-h-80 overflow-y-auto">
+                                                {notifications.map((notification, index) => (
+                                                    <div
+                                                        key={notification.id}
+                                                        className={`p-4 border-b border-gray-100 hover:bg-gray-50 cursor-pointer ${index === notifications.length - 1 ? 'border-b-0' : ''
+                                                            }`}
+                                                    >
+                                                        <div className="flex items-start gap-3">
+                                                            <div className="flex-shrink-0 w-10 h-10 bg-yellow-400 rounded-full flex items-center justify-center text-black">
+                                                                {getNotificationIcon(notification.icon)}
+                                                            </div>
+                                                            <div className="flex-1 min-w-0">
+                                                                <p className="text-sm text-gray-800 leading-relaxed">
+                                                                    {notification.title}
+                                                                </p>
+                                                                <p className="text-xs text-gray-500 mt-1">
+                                                                    {notification.time}
+                                                                </p>
+                                                            </div>
                                                         </div>
                                                     </div>
-                                                </div>
-                                            ))}
-                                        </div>
+                                                ))}
+                                            </div>
 
-                                        <div className="p-4 border-t border-gray-200">
-                                            <button
-                                                onClick={markAllAsRead}
-                                                className="w-full bg-yellow-400 text-black py-2 px-4 rounded-lg font-medium hover:bg-yellow-500 transition-colors flex items-center justify-center gap-2"
-                                            >
-                                                <Bell className="h-4 w-4" />
-                                                Mark all as read
-                                            </button>
+                                            <div className="p-4 border-t border-gray-200">
+                                                <button
+                                                    onClick={markAllAsRead}
+                                                    className="w-full bg-yellow-400 text-black py-2 px-4 rounded-lg font-medium hover:bg-yellow-500 transition-colors flex items-center justify-center gap-2"
+                                                >
+                                                    <Bell className="h-4 w-4" />
+                                                    Mark all as read
+                                                </button>
+                                            </div>
                                         </div>
-                                    </div>
-                                )}
+                                    )}
+                                </div>
                             </div>
                         </div>
                     </div>
                 </header>
 
-                {/* Time Tabs */}
-                <div className="bg-white border-b border-gray-200 px-3 sm:px-6 pt-3 sm:pt-4 flex-shrink-0">
-                    <div className="flex gap-2 overflow-x-auto">
-                        {['Today', 'Scheduled'].map((tab) => (
-                            <button
-                                key={tab}
-                                onClick={() => setActiveTimeTab(tab)}
-                                className={`px-4 sm:px-6 py-2 rounded-t-lg font-medium transition-colors whitespace-nowrap ${activeTimeTab === tab
-                                    ? 'bg-yellow-400 text-amber-800'
-                                    : 'text-gray-600 hover:text-gray-800 hover:bg-gray-100'
-                                    }`}
-                            >
-                                {tab}
-                            </button>
-                        ))}
-                    </div>
-                </div>
+
 
                 {/* Status Tabs */}
                 <div className="bg-white px-3 sm:px-6 py-3 sm:py-4 border-b border-gray-200 flex-shrink-0">
                     <div className="flex gap-2 overflow-x-auto mb-3 sm:mb-4">
-                        {['New Orders', 'In Process', 'Completed'].map((tab) => (
+                        {tabs.map((tab) => (
                             <button
                                 key={tab}
                                 onClick={() => setActiveTab(tab)}
@@ -867,10 +920,10 @@ function RouteComponent() {
                 {/* Main Content - Mobile First */}
                 <main className="flex-1 p-3 sm:p-4 lg:p-6 overflow-y-auto">
                     {loading ? (
-                        <div className="flex items-center justify-center h-64">
-                            <div className="text-center">
-                                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-amber-800 mx-auto"></div>
-                                <p className="mt-4 text-gray-600">Loading orders...</p>
+                        <div className="fixed inset-0 bg-black/50 flex justify-center items-center z-[60]">
+                            <div className="bg-white rounded-xl shadow-lg p-6 flex flex-col items-center gap-4">
+                                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#964B00]"></div>
+                                <p className="text-gray-700 font-medium">Processing...</p>
                             </div>
                         </div>
                     ) : (
@@ -879,7 +932,6 @@ function RouteComponent() {
                             <div className="space-y-3 sm:space-y-4 lg:hidden">
                                 <div className="bg-yellow-400 p-4 rounded-xl sticky top-0 z-10 shadow-sm">
                                     <div className="flex justify-between items-center">
-                                        <h2 className="text-base sm:text-lg font-bold">{activeTab} {activeTimeTab}</h2>
                                         <span className="text-lg sm:text-xl font-bold">{filteredOrders.length}</span>
                                     </div>
                                 </div>
@@ -929,7 +981,7 @@ function RouteComponent() {
                                                 </div>
                                             </div>
 
-                                            {order.status === 'pending' && (
+                                            {order.order_status === 'Pending' && (
                                                 <div className="flex gap-2">
                                                     <button
                                                         onClick={() => handleRejectOrder(order.id)}
@@ -945,6 +997,7 @@ function RouteComponent() {
                                                     </button>
                                                 </div>
                                             )}
+
                                         </div>
                                     ))
                                 )}
@@ -955,7 +1008,6 @@ function RouteComponent() {
                                 {/* Table Header */}
                                 <div className="bg-yellow-400 p-6 border-b border-gray-200">
                                     <div className="flex justify-between items-center">
-                                        <h2 className="text-xl font-bold">{activeTab} {activeTimeTab}</h2>
                                         <span className="text-2xl font-bold">{filteredOrders.length} Orders</span>
                                     </div>
                                 </div>
@@ -971,7 +1023,7 @@ function RouteComponent() {
                                         <table className="w-full">
                                             <thead className="bg-gray-50">
                                                 <tr>
-                                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Order ID</th>
+                                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Order #</th>
                                                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Customer Name</th>
                                                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
                                                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Time</th>
@@ -984,7 +1036,7 @@ function RouteComponent() {
                                             <tbody className="bg-white divide-y divide-gray-200">
                                                 {currentOrders.map((order) => (
                                                     <tr key={order.id} className="hover:bg-gray-50 transition-colors">
-                                                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{order.id}</td>
+                                                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900s">{order.id}</td>
                                                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{order.customerName}</td>
                                                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{order.date}</td>
                                                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{order.time}</td>
@@ -993,7 +1045,7 @@ function RouteComponent() {
                                                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{order.paymentMethod}</td>
                                                         <td className="px-6 py-4 whitespace-nowrap text-sm">
                                                             <div className="flex gap-2">
-                                                                {order.status === 'pending' && (
+                                                                {order.order_status === 'Pending' && (
                                                                     <>
                                                                         <button
                                                                             onClick={() => handleRejectOrder(order.id)}
@@ -1009,6 +1061,7 @@ function RouteComponent() {
                                                                         </button>
                                                                     </>
                                                                 )}
+
                                                                 <button
                                                                     onClick={() => openOrderDetails(order)}
                                                                     className="text-gray-600 hover:text-gray-800 transition-colors p-1"
@@ -1088,6 +1141,35 @@ function RouteComponent() {
                                             <option value="pickup">Pick-up</option>
                                             <option value="delivery">Delivery</option>
                                         </select>
+                                    </div>
+
+                                    {/* NEW: Pick Date */}
+                                    <div>
+                                        <label className="block text-sm font-semibold text-gray-700 mb-2">
+                                            <Calendar className="inline h-4 w-4 mr-1" />
+                                            Pick Date:
+                                        </label>
+                                        <input
+                                            type="date"
+                                            value={orderForm.pickDate}
+                                            onChange={(e) => setOrderForm(prev => ({ ...prev, pickDate: e.target.value }))}
+                                            min={new Date().toISOString().split('T')[0]}
+                                            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500"
+                                        />
+                                    </div>
+
+                                    {/* NEW: Pick Time */}
+                                    <div>
+                                        <label className="block text-sm font-semibold text-gray-700 mb-2">
+                                            <Clock className="inline h-4 w-4 mr-1" />
+                                            Pick Time:
+                                        </label>
+                                        <input
+                                            type="time"
+                                            value={orderForm.pickTime}
+                                            onChange={(e) => setOrderForm(prev => ({ ...prev, pickTime: e.target.value }))}
+                                            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500"
+                                        />
                                     </div>
 
                                     {/* Add orders section */}
@@ -1269,6 +1351,8 @@ function RouteComponent() {
                                         email: '',
                                         phone: '',
                                         fulfillmentType: '',
+                                        pickDate: '',
+                                        pickTime: '',
                                         selectedMenuItems: [],
                                         addOns: {}
                                     })
@@ -1316,7 +1400,7 @@ function RouteComponent() {
                             <div>
                                 <h3 className="text-2xl font-bold text-gray-800 mb-2">{selectedOrder.customerName}</h3>
                                 <p className="text-gray-600 text-lg">
-                                    {selectedOrder.orderData.schedule.schedule_time} - {selectedOrder.orderData.order_type}
+                                    {formatScheduleTime(selectedOrder.orderData.schedule.schedule_date, selectedOrder.orderData.schedule.schedule_time)}
                                 </p>
                             </div>
 
@@ -1335,18 +1419,22 @@ function RouteComponent() {
                                 </div>
 
                                 <div className="space-y-3">
-                                    {selectedOrder.orderData.order_item.map((item: any) => (
-                                        <div key={item.order_item_id} className="grid grid-cols-3 gap-4 items-start">
-                                            <div>
-                                                <p className="font-medium text-gray-800">{item.menu.name}</p>
-                                                {item.menu.inclusion && (
-                                                    <p className="text-sm text-gray-600">{item.menu.inclusion}</p>
-                                                )}
+                                    {selectedOrder.orderData.order_item?.length ? (
+                                        selectedOrder.orderData.order_item.map((item: any) => (
+                                            <div key={item.order_item_id} className="grid grid-cols-3 gap-4 items-start">
+                                                <div>
+                                                    <p className="font-medium text-gray-800">{item.menu.name} (₱ {item.menu.price})</p>
+                                                    {item.menu.inclusion && (
+                                                        <p className="text-sm text-gray-600 mb-1.5">inclusions: {item.menu.inclusion}</p>
+                                                    )}
+                                                </div>
+                                                <div className="text-center font-medium">{item.quantity}</div>
+                                                <div className="text-right font-bold">₱ {Number(item.subtotal_price).toLocaleString()}</div>
                                             </div>
-                                            <div className="text-center font-medium">{item.quantity}</div>
-                                            <div className="text-right font-bold">₱ {Number(item.subtotal_price).toLocaleString()}</div>
-                                        </div>
-                                    ))}
+                                        ))
+                                    ) : (
+                                        <p className="text-gray-500 text-center italic">No items found.</p>
+                                    )}
                                 </div>
                             </div>
 
@@ -1354,11 +1442,7 @@ function RouteComponent() {
                             <div className="border-t border-gray-200 pt-4 space-y-3">
                                 <div className="flex justify-between items-center">
                                     <span className="text-lg font-medium">Subtotal</span>
-                                    <span className="text-lg font-bold">
-                                        ₱ {selectedOrder.orderData.order_item.reduce(
-                                            (sum: number, item: any) => sum + Number(item.subtotal_price), 0
-                                        ).toLocaleString()}
-                                    </span>
+                                    <span className="text-lg font-bold">₱ {orderPrice?.toLocaleString()}</span>
                                 </div>
                                 {selectedOrder.orderData.delivery && (
                                     <div className="flex justify-between items-center">
@@ -1371,7 +1455,7 @@ function RouteComponent() {
                                 <div className="flex justify-between items-center border-t-2 border-gray-300 pt-3">
                                     <span className="text-xl font-bold">Total</span>
                                     <span className="text-2xl font-bold text-amber-600">
-                                        {selectedOrder.price}
+                                        ₱ {(orderPrice + (selectedOrder.orderData.delivery ? Number(selectedOrder.orderData.delivery.delivery_fee || 0) : 0)).toLocaleString()}
                                     </span>
                                 </div>
                             </div>
@@ -1392,7 +1476,78 @@ function RouteComponent() {
                                     <p className="text-gray-800">{selectedOrder.orderData.additional_information}</p>
                                 </div>
                             )}
+                        </div>
 
+                        {/* Modal Footer */}
+                        <div className="p-6 border-t border-gray-200 bg-gray-50">
+                            <div className="flex items-center justify-between gap-3">
+                                <button
+                                    onClick={() => {
+                                        setIsOrderDetailsModalOpen(false)
+                                        setShowOrderBackView(true)
+                                    }}
+                                    className="px-6 py-3 border-2 border-gray-800 text-gray-800 rounded-lg font-medium hover:bg-gray-100 transition-colors"
+                                >
+                                    See more
+                                </button>
+                                {selectedOrder.order_status === 'Pending' && (
+                                    <div className="flex items-center gap-3">
+                                        <button
+                                            onClick={() => handleRejectOrder(selectedOrder.id)}
+                                            className="px-6 py-2.5 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors font-medium"
+                                        >
+                                            Reject Order
+                                        </button>
+                                        <button
+                                            onClick={() => {
+                                                handleAcceptOrder(selectedOrder.id)
+                                                closeOrderDetails()
+                                            }}
+                                            className="px-6 py-2.5 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors font-medium"
+                                        >
+                                            Accept Order
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Order Back View Modal */}
+            {showOrderBackView && selectedOrder && selectedOrder.orderData && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+                        {/* Modal Header */}
+                        <div className="flex items-center justify-between p-6 border-b border-gray-200">
+                            <div className="flex items-center gap-4">
+                                <button
+                                    onClick={() => {
+                                        setShowOrderBackView(false)
+                                        setIsOrderDetailsModalOpen(true)
+                                    }}
+                                    className="text-gray-600 hover:text-gray-800 font-medium"
+                                >
+                                    BACK
+                                </button>
+                                <span className="bg-black text-white px-4 py-1 rounded-full text-sm font-medium">
+                                    {selectedOrder.orderData.order_status}
+                                </span>
+                            </div>
+                            <button
+                                onClick={() => {
+                                    setShowOrderBackView(false)
+                                    closeOrderDetails()
+                                }}
+                                className="text-gray-500 hover:text-gray-700 p-2 hover:bg-gray-100 rounded-full transition-colors"
+                            >
+                                <X className="h-6 w-6" />
+                            </button>
+                        </div>
+
+                        {/* Modal Body */}
+                        <div className="p-6 space-y-6">
                             {/* Delivery Information */}
                             {selectedOrder.orderData.delivery && (
                                 <div className="bg-yellow-50 p-4 rounded-lg border border-yellow-200">
@@ -1400,39 +1555,50 @@ function RouteComponent() {
                                         <Truck className="h-5 w-5 text-amber-600" />
                                         <h4 className="font-medium text-gray-800">Delivery Information</h4>
                                     </div>
-                                    <div className="space-y-2 text-sm">
-                                        <p>
-                                            <span className="font-medium">Address:</span>{' '}
-                                            {selectedOrder.orderData.delivery.address.address_line}, {selectedOrder.orderData.delivery.address.barangay}, {selectedOrder.orderData.delivery.address.city}, {selectedOrder.orderData.delivery.address.region} {selectedOrder.orderData.delivery.address.postal_code}
-                                        </p>
-                                        {selectedOrder.orderData.order_status && (
-                                            <p><span className="font-medium">Status:</span> {selectedOrder.orderData.order_status}</p>
-                                        )}
+                                    <div className="space-y-2">
+                                        <div className="flex">
+                                            <h4 className="text-sm font-semibold text-gray-700 mr-4 min-w-[150px]">Address:</h4>
+                                            <p className="text-sm text-gray-600">
+                                                {selectedOrder.orderData.delivery.address.address_line}, {selectedOrder.orderData.delivery.address.barangay}, {selectedOrder.orderData.delivery.address.city}, {selectedOrder.orderData.delivery.address.region} {selectedOrder.orderData.delivery.address.postal_code}
+                                            </p>
+                                        </div>
                                     </div>
                                 </div>
                             )}
+
+                            {/* Customer Contact */}
+                            <div className="flex">
+                                <h4 className="text-lg font-semibold text-gray-800 mr-4 min-w-[200px]">Customer Contact #:</h4>
+                                <p className="text-gray-600">{selectedOrder.orderData.user.phone_number}</p>
+                            </div>
+
+                            {/* Special Instructions */}
+                            {selectedOrder.orderData.additional_information && (
+                                <div className="flex">
+                                    <h4 className="text-lg font-semibold text-gray-800 mr-4 min-w-[200px]">Special Instructions:</h4>
+                                    <p className="text-gray-600">{selectedOrder.orderData.additional_information}</p>
+                                </div>
+                            )}
+
+                            {/* Fulfillment Type */}
+                            <div className="flex">
+                                <h4 className="text-lg font-semibold text-gray-800 mr-4 min-w-[200px]">Fulfillment Type:</h4>
+                                <p className="text-gray-600">{selectedOrder.orderData.order_type}</p>
+                            </div>
                         </div>
 
-                        {/* Modal Footer with Actions */}
-                        {selectedOrder.status === 'pending' && (
-                            <div className="flex items-center justify-end gap-3 p-6 border-t border-gray-200 bg-gray-50">
-                                <button
-                                    onClick={() => handleRejectOrder(selectedOrder.id)}
-                                    className="px-6 py-2.5 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors font-medium"
-                                >
-                                    Reject Order
-                                </button>
-                                <button
-                                    onClick={() => {
-                                        handleAcceptOrder(selectedOrder.id)
-                                        closeOrderDetails()
-                                    }}
-                                    className="px-6 py-2.5 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors font-medium"
-                                >
-                                    Accept Order
-                                </button>
-                            </div>
-                        )}
+                        {/* Modal Footer */}
+                        <div className="flex items-center justify-between p-6 border-t border-gray-200 bg-gray-50">
+                            <button
+                                onClick={() => {
+                                    setShowOrderBackView(false)
+                                    setIsOrderDetailsModalOpen(true)
+                                }}
+                                className="px-6 py-3 border-2 border-gray-800 text-gray-800 rounded-lg font-medium hover:bg-gray-100 transition-colors"
+                            >
+                                Go back
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}

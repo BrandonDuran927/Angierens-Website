@@ -4,14 +4,12 @@ import {
     LayoutDashboard, LucideCalendar, ShoppingCart, TrendingUp, MessageSquare, Users, Menu as MenuIcon, RefreshCw, LogOut, Bell, ChevronLeft, ChevronRight, Clock, Truck, X
 } from 'lucide-react'
 import { supabase } from '@/lib/supabaseClient'
+import { useUser } from '@/context/UserContext'
+import { useNavigate } from '@tanstack/react-router'
 
 export const Route = createLazyFileRoute('/admin-interface/schedule')({
     component: RouteComponent,
 })
-
-// Initialize Supabase client
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
 
 interface DayData {
     date: number
@@ -47,10 +45,10 @@ interface Order {
     users: {
         first_name: string
         last_name: string
-    } | null  // Change from array to single object or null
+    } | null
     schedule: {
         schedule_time: string
-    } | null  // Change from array to single object or null
+    } | null
 }
 
 interface ScheduleData {
@@ -63,6 +61,13 @@ interface ScheduleData {
 }
 
 function RouteComponent() {
+    const { user, signOut } = useUser()
+    const navigate = useNavigate();
+
+    async function handleLogout() {
+        await signOut();
+        navigate({ to: "/login" });
+    }
     const monthNames = [
         'January', 'February', 'March', 'April', 'May', 'June',
         'July', 'August', 'September', 'October', 'November', 'December'
@@ -495,7 +500,10 @@ function RouteComponent() {
                 {/* Logout */}
                 <div className='border-t border-amber-600'>
                     <div className='w-auto mx-4'>
-                        <button className="w-full flex items-center gap-3 px-4 py-3 mt-5 bg-gray-200 opacity-75 text-gray-950 rounded-lg hover:bg-amber-700 hover:text-white transition-colors">
+                        <button
+                            className="w-full flex items-center gap-3 px-4 py-3 mt-5 bg-gray-200 opacity-75 text-gray-950 rounded-lg hover:bg-amber-700 hover:text-white transition-colors cursor-pointer"
+                            onClick={handleLogout}
+                        >
                             <LogOut className="h-5 w-5" />
                             <span className="font-medium">Logout</span>
                         </button>

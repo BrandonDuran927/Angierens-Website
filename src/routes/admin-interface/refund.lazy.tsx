@@ -17,6 +17,8 @@ import {
   LucideCalendar
 } from 'lucide-react'
 import { supabase } from '@/lib/supabaseClient'
+import { useUser } from '@/context/UserContext'
+import { useNavigate } from '@tanstack/react-router'
 
 export const Route = createLazyFileRoute('/admin-interface/refund')({
   component: RouteComponent,
@@ -57,6 +59,13 @@ interface RefundRequest {
 }
 
 function RouteComponent() {
+  const { user, signOut } = useUser()
+  const navigate = useNavigate();
+
+  async function handleLogout() {
+    await signOut();
+    navigate({ to: "/login" });
+  }
   const [selectedRefund, setSelectedRefund] = useState<RefundRequest | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
   const [isReviewModalOpen, setIsReviewModalOpen] = useState(false)
@@ -417,10 +426,12 @@ function RouteComponent() {
           })}
         </nav>
 
-        {/* Logout */}
         <div className='border-t border-amber-600'>
           <div className='w-auto mx-4'>
-            <button className="w-full flex items-center gap-3 px-4 py-3 mt-5 bg-gray-200 opacity-75 text-gray-950 rounded-lg hover:bg-amber-700 hover:text-white transition-colors">
+            <button
+              className="w-full flex items-center gap-3 px-4 py-3 mt-5 bg-gray-200 opacity-75 text-gray-950 rounded-lg hover:bg-amber-700 hover:text-white transition-colors cursor-pointer"
+              onClick={handleLogout}
+            >
               <LogOut className="h-5 w-5" />
               <span className="font-medium">Logout</span>
             </button>
@@ -527,35 +538,33 @@ function RouteComponent() {
               Filter
             </button>
           </div>
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+            {/* Scroll wrapper */}
+            <div className="overflow-x-auto">
+              {/* Force wide layout */}
+              <table className="min-w-[900px] w-full table-fixed">
+                {/* Table Header */}
+                <thead className="bg-amber-800 text-white">
+                  <tr>
+                    <th className="px-4 py-3 text-left text-sm font-medium tracking-wider">ORDER #</th>
+                    <th className="px-4 py-3 text-left text-sm font-medium tracking-wider">CUSTOMER NAME</th>
+                    <th className="px-4 py-3 text-left text-sm font-medium tracking-wider">DATE</th>
+                    <th className="px-4 py-3 text-left text-sm font-medium tracking-wider">TIME</th>
+                    <th className="px-4 py-3 text-left text-sm font-medium tracking-wider">CONFIRMATION</th>
+                    <th className="px-4 py-3 text-left text-sm font-medium tracking-wider">REFUND BUTTON</th>
+                  </tr>
+                </thead>
 
-          {/* Loading State */}
-          {loading ? (
-            <div className="fixed inset-0 bg-black/50 flex justify-center items-center z-[60]">
-              <div className="bg-white rounded-xl shadow-lg p-6 flex flex-col items-center gap-4">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#964B00]"></div>
-                <p className="text-gray-700 font-medium">Processing...</p>
-              </div>
-            </div>
-          ) : (
-            /* Refund Table */
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-              {/* Scroll wrapper */}
-              <div className="overflow-x-auto">
-                {/* Force wide layout */}
-                <table className="min-w-[900px] w-full table-fixed">
-                  {/* Table Header */}
-                  <thead className="bg-amber-800 text-white">
-                    <tr>
-                      <th className="px-4 py-3 text-left text-sm font-medium tracking-wider">ORDER #</th>
-                      <th className="px-4 py-3 text-left text-sm font-medium tracking-wider">CUSTOMER NAME</th>
-                      <th className="px-4 py-3 text-left text-sm font-medium tracking-wider">DATE</th>
-                      <th className="px-4 py-3 text-left text-sm font-medium tracking-wider">TIME</th>
-                      <th className="px-4 py-3 text-left text-sm font-medium tracking-wider">CONFIRMATION</th>
-                      <th className="px-4 py-3 text-left text-sm font-medium tracking-wider">REFUND BUTTON</th>
-                    </tr>
-                  </thead>
+                {/* Loading State */}
+                {loading ? (
+                  <div className="fixed inset-0 bg-black/50 flex justify-center items-center z-[60]">
+                    <div className="bg-white rounded-xl shadow-lg p-6 flex flex-col items-center gap-4">
+                      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#964B00]"></div>
+                      <p className="text-gray-700 font-medium">Processing...</p>
+                    </div>
+                  </div>
+                ) : (
 
-                  {/* Table Body */}
                   <tbody className="divide-y divide-gray-200">
                     {filteredRequests.map((request) => (
                       <tr
@@ -594,10 +603,11 @@ function RouteComponent() {
                       </tr>
                     )}
                   </tbody>
-                </table>
-              </div>
+                )}
+              </table>
             </div>
-          )}
+          </div>
+
         </main>
       </div>
 

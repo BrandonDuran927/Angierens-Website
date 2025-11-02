@@ -1,21 +1,27 @@
-import { createLazyFileRoute, Link } from '@tanstack/react-router'
-import { useState } from 'react'
+import { createLazyFileRoute, useLocation, Link } from '@tanstack/react-router'
+import React, { useState, useEffect } from 'react'
 import {
+  Menu,
+  MessageSquare,
+  Menu as MenuIcon,
+  LogOut,
   Bell,
   Star,
   Heart,
-  MessageSquare,
   Eye,
-  Menu,
-  X,
-  Calendar,
-  Settings,
-  User,
-  DollarSign,
   Package,
   Truck,
-  LogOut,
+  Settings,
+  DollarSign,
+  X,
+  Calendar,
+  User,
+  EyeOff
 } from 'lucide-react'
+import { supabase } from '@/lib/supabaseClient'
+import type { Review } from '@/lib/api'
+import { useNavigate } from '@tanstack/react-router'
+import { useUser } from '@/context/UserContext'
 
 export const Route = createLazyFileRoute('/staff/reviews')({
   component: RouteComponent,
@@ -30,249 +36,124 @@ interface Notification {
   read: boolean
 }
 
-interface Review {
-  id: string
-  customerName: string
-  category: 'DELIVERY\'S REVIEW' | 'FOOD\'S REVIEW' | 'RIDER\'S REVIEW' | 'STAFF\'S REVIEW'
-  rating: number
-  comment: string
-  isHidden: boolean
-}
-
 function RouteComponent() {
+  const navigate = useNavigate();
+  const { user, signOut } = useUser()
+
+  async function handleLogout() {
+    await signOut();
+    navigate({ to: "/login" });
+  }
   const [selectedReview, setSelectedReview] = useState<Review | null>(null)
   const [isViewModalOpen, setIsViewModalOpen] = useState(false)
   const [isHiddenReviewsModalOpen, setIsHiddenReviewsModalOpen] = useState(false)
-  const [isNotificationOpen, setIsNotificationOpen] = useState(false)
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false)
+  const [reviews, setReviews] = useState<Review[]>([])
+  const [loading, setLoading] = useState(true)
+  const [processingReviewId, setProcessingReviewId] = useState<string | null>(null)
+  const location = useLocation()
 
-  const notificationCount = 1
+  useEffect(() => {
+    fetchReviews()
 
-  const [notifications, setNotifications] = useState<Notification[]>([
-    {
-      id: '1',
-      type: 'order',
-      title: 'We are now preparing your food (#6). Thank you for trusting Angieren\'s Lutong Bahay.',
-      time: '20 sec ago',
-      icon: 'heart',
-      read: false
-    },
-    {
-      id: '2',
-      type: 'feedback',
-      title: 'View your recent feedback about our delivery.',
-      time: '10 min ago',
-      icon: 'message',
-      read: false
-    },
-    {
-      id: '3',
-      type: 'feedback',
-      title: 'View your recent feedback about our staff.',
-      time: '10 min ago',
-      icon: 'message',
-      read: false
-    },
-    {
-      id: '4',
-      type: 'feedback',
-      title: 'View your recent feedback about our food.',
-      time: '10 min ago',
-      icon: 'message',
-      read: false
-    },
-    {
-      id: '5',
-      type: 'feedback',
-      title: 'View your recent feedback about our rider.',
-      time: '10 min ago',
-      icon: 'message',
-      read: false
-    }
-  ])
-
-  const [reviews, setReviews] = useState<Review[]>([
-    {
-      id: '1',
-      customerName: 'Russel',
-      category: 'DELIVERY\'S REVIEW',
-      rating: 5,
-      comment: 'Thank you for taking the time to share your positive experience with us!',
-      isHidden: false
-    },
-    {
-      id: '2',
-      customerName: 'Carlo',
-      category: 'FOOD\'S REVIEW',
-      rating: 5,
-      comment: 'WOWW',
-      isHidden: false
-    },
-    {
-      id: '3',
-      customerName: 'Trajeco',
-      category: 'RIDER\'S REVIEW',
-      rating: 5,
-      comment: 'Humble',
-      isHidden: false
-    },
-    {
-      id: '4',
-      customerName: 'Marizon',
-      category: 'STAFF\'S REVIEW',
-      rating: 5,
-      comment: 'Thank you',
-      isHidden: false
-    },
-    {
-      id: '5',
-      customerName: 'Prince',
-      category: 'DELIVERY\'S REVIEW',
-      rating: 5,
-      comment: 'Smooth.',
-      isHidden: false
-    },
-    {
-      id: '6',
-      customerName: 'Brandon',
-      category: 'FOOD\'S REVIEW',
-      rating: 5,
-      comment: 'Smooth',
-      isHidden: false
-    },
-    {
-      id: '7',
-      customerName: 'Ring',
-      category: 'RIDER\'S REVIEW',
-      rating: 5,
-      comment: 'Good Man',
-      isHidden: false
-    },
-    {
-      id: '8',
-      customerName: 'Charles',
-      category: 'STAFF\'S REVIEW',
-      rating: 5,
-      comment: 'Thank you for helping',
-      isHidden: false
-    },
-    {
-      id: '9',
-      customerName: 'Duran',
-      category: 'DELIVERY\'S REVIEW',
-      rating: 5,
-      comment: 'Stable Food',
-      isHidden: false
-    },
-    {
-      id: '10',
-      customerName: 'Leonhard',
-      category: 'FOOD\'S REVIEW',
-      rating: 5,
-      comment: 'I love Pancit',
-      isHidden: false
-    },
-    {
-      id: '11',
-      customerName: 'Nozicka',
-      category: 'RIDER\'S REVIEW',
-      rating: 5,
-      comment: 'Well Hardz Person',
-      isHidden: false
-    },
-    {
-      id: '12',
-      customerName: 'Yasuo',
-      category: 'STAFF\'S REVIEW',
-      rating: 5,
-      comment: 'Thank you so much',
-      isHidden: false
-    }
-  ])
-
-  const markAllAsRead = () => {
-    setNotifications(prev => prev.map(notif => ({ ...notif, read: true })))
-  }
-
-  const getNotificationIcon = (iconType: string) => {
-    switch (iconType) {
-      case 'heart':
-        return <Heart className="h-5 w-5" fill="currentColor" />
-      case 'message':
-        return <MessageSquare className="h-5 w-5" />
-      case 'star':
-        return <Star className="h-5 w-5" fill="currentColor" />
-      default:
-        return <Bell className="h-5 w-5" />
-    }
-  }
-
-  const getCategoryColor = (category: string) => {
-    switch (category) {
-      case 'DELIVERY\'S REVIEW':
-        return 'bg-amber-600'
-      case 'FOOD\'S REVIEW':
-        return 'bg-amber-600'
-      case 'RIDER\'S REVIEW':
-        return 'bg-amber-600'
-      case 'STAFF\'S REVIEW':
-        return 'bg-amber-600'
-      default:
-        return 'bg-amber-600'
-    }
-  }
-
-  const renderStars = (rating: number) => {
-    return Array.from({ length: 5 }, (_, i) => (
-      <Star
-        key={i}
-        className={`h-4 w-4 ${i < rating ? 'text-yellow-400 fill-current' : 'text-gray-300'}`}
-      />
-    ))
-  }
-
-  const toggleReviewVisibility = (reviewId: string) => {
-    setReviews(prev =>
-      prev.map(review =>
-        review.id === reviewId
-          ? { ...review, isHidden: !review.isHidden }
-          : review
+    // Subscribe to real-time changes
+    const reviewsSubscription = supabase
+      .channel('reviews_changes')
+      .on('postgres_changes',
+        { event: '*', schema: 'public', table: 'review' },
+        () => {
+          fetchReviews()
+        }
       )
-    )
+      .subscribe()
+
+    return () => {
+      reviewsSubscription.unsubscribe()
+    }
+  }, [])
+
+  const fetchReviews = async () => {
+    try {
+      setLoading(true)
+
+      // Fetch reviews with related order and user data
+      const { data, error } = await supabase
+        .from('review')
+        .select(`
+                    review_id,
+                    review_type,
+                    rating,
+                    comment,
+                    is_hidden,
+                    order_id,
+                    order:order_id (
+                        customer_uid,
+                        user:customer_uid (
+                            first_name
+                        )
+                    )
+                `)
+
+      if (error) {
+        console.error('Error fetching reviews:', error)
+        return
+      }
+
+      console.log('Fetched reviews:', data)
+
+      const transformedReviews: Review[] = (data || []).map((review: any) => ({
+        review_id: review.review_id,
+        customerName: review.order?.user?.first_name || 'Unknown',
+        status_type: review.review_type,
+        rating: Number(review.rating),
+        comment: review.comment || '',
+        is_hidden: review.is_hidden || false,
+        order_id: review.order_id
+      }))
+
+      setReviews(transformedReviews)
+    } catch (error) {
+      console.error('Error fetching reviews:', error)
+    } finally {
+      setLoading(false)
+    }
   }
 
-  const handleViewReview = (review: Review) => {
-    setSelectedReview(review)
-    setIsViewModalOpen(true)
-  }
+  const toggleReviewVisibility = async (reviewId: string, currentHiddenState: boolean) => {
+    try {
+      setProcessingReviewId(reviewId)
 
-  const handleShowHiddenReviews = () => {
-    setIsHiddenReviewsModalOpen(true)
-  }
+      const { error } = await supabase
+        .from('review')
+        .update({ is_hidden: !currentHiddenState })
+        .eq('review_id', reviewId)
 
-  const reviewsByCategory = {
-    'DELIVERY\'S REVIEW': reviews.filter(r => r.category === 'DELIVERY\'S REVIEW' && !r.isHidden),
-    'FOOD\'S REVIEW': reviews.filter(r => r.category === 'FOOD\'S REVIEW' && !r.isHidden),
-    'RIDER\'S REVIEW': reviews.filter(r => r.category === 'RIDER\'S REVIEW' && !r.isHidden),
-    'STAFF\'S REVIEW': reviews.filter(r => r.category === 'STAFF\'S REVIEW' && !r.isHidden)
-  }
+      if (error) {
+        console.error('Error updating review visibility:', error)
+        alert('Failed to update review visibility. Please try again.')
+        return
+      }
 
-  const getCurrentDate = () => {
-    const now = new Date()
-    return now.toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric'
-    })
-  }
+      // Update local state
+      setReviews(prev =>
+        prev.map(review =>
+          review.review_id === reviewId
+            ? { ...review, is_hidden: !currentHiddenState }
+            : review
+        )
+      )
 
-  const getCurrentTime = () => {
-    const now = new Date()
-    return now.toLocaleTimeString('en-US', {
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: true
-    })
+      // Show success message
+      const action = !currentHiddenState ? 'hidden' : 'shown'
+      console.log(`Review ${action} successfully`)
+      setIsViewModalOpen(false)
+    } catch (error) {
+      console.error('Error toggling review visibility:', error)
+      alert('An error occurred. Please try again.')
+      setIsViewModalOpen(false)
+    } finally {
+      setProcessingReviewId(null)
+      setIsViewModalOpen(false)
+    }
   }
 
   const navigationItems = [
@@ -320,6 +201,116 @@ function RouteComponent() {
     },
   ]
 
+  const notificationCount = 1
+
+  const [notifications, setNotifications] = useState<Notification[]>([
+    {
+      id: '1',
+      type: 'order',
+      title: 'We are now preparing your food (#6). Thank you for trusting Angieren\'s Lutong Bahay.',
+      time: '20 sec ago',
+      icon: 'heart',
+      read: false
+    },
+    {
+      id: '2',
+      type: 'feedback',
+      title: 'View your recent feedback about our delivery.',
+      time: '10 min ago',
+      icon: 'message',
+      read: false
+    }
+  ])
+
+
+  const markAllAsRead = () => {
+    setNotifications(prev => prev.map(notif => ({ ...notif, read: true })))
+  }
+
+  const getNotificationIcon = (iconType: string) => {
+    switch (iconType) {
+      case 'heart':
+        return <Heart className="h-5 w-5" fill="currentColor" />
+      case 'message':
+        return <MessageSquare className="h-5 w-5" />
+      case 'star':
+        return <Star className="h-5 w-5" fill="currentColor" />
+      default:
+        return <Bell className="h-5 w-5" />
+    }
+  }
+
+  const getCategoryColor = (category: string) => {
+    switch (category) {
+      case 'DELIVERY\'S REVIEW':
+        return 'bg-amber-600'
+      case 'FOOD\'S REVIEW':
+        return 'bg-amber-600'
+      case 'RIDER\'S REVIEW':
+        return 'bg-amber-600'
+      case 'STAFF\'S REVIEW':
+        return 'bg-amber-600'
+      default:
+        return 'bg-amber-600'
+    }
+  }
+
+  const renderStars = (rating: number) => {
+    return Array.from({ length: 5 }, (_, i) => (
+      <Star
+        key={i}
+        className={`h-4 w-4 ${i < rating ? 'text-yellow-400 fill-current' : 'text-gray-300'}`}
+      />
+    ))
+  }
+
+  const handleViewReview = (review: Review) => {
+    setSelectedReview(review)
+    setIsViewModalOpen(true)
+  }
+
+  const handleShowHiddenReviews = () => {
+    setIsHiddenReviewsModalOpen(true)
+  }
+
+  const reviewsByCategory = {
+    'DELIVERY\'S REVIEW': reviews.filter(r => r.status_type === 'Delivery' && !r.is_hidden),
+    'FOOD\'S REVIEW': reviews.filter(r => r.status_type === 'Food' && !r.is_hidden),
+    'RIDER\'S REVIEW': reviews.filter(r => r.status_type === 'Rider' && !r.is_hidden),
+    'STAFF\'S REVIEW': reviews.filter(r => r.status_type === 'Staff' && !r.is_hidden)
+  }
+
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false)
+  const [isNotificationOpen, setIsNotificationOpen] = useState(false)
+
+  const LoadingSpinner = () => (
+    <div className="fixed inset-0 bg-black/50 flex justify-center items-center z-[60]">
+      <div className="bg-white rounded-xl shadow-lg p-6 flex flex-col items-center gap-4">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#964B00]"></div>
+        <p className="text-gray-700 font-medium">Processing...</p>
+      </div>
+    </div>
+  );
+
+  const getCurrentDate = () => {
+    const now = new Date()
+    return now.toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    })
+  }
+
+  const getCurrentTime = () => {
+    const now = new Date()
+    return now.toLocaleTimeString('en-US', {
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true
+    })
+  }
+
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-amber-50 to-orange-100 flex overflow-x-hidden">
       {/* Sidebar - following the uploaded image design */}
@@ -333,8 +324,8 @@ function RouteComponent() {
         <div className="bg-amber-800 text-white px-6 py-4 relative">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="w-12 h-12 bg-yellow-400 rounded-full flex items-center justify-center">
-                <img src="/api/placeholder/40/40" alt="Logo" className="w-8 h-8 rounded-full" />
+              <div className="w-12 h-12 rounded-full flex items-center justify-center">
+                <img src="/public/angierens-logo.png" alt="Logo" className="w-12 h-12 rounded-full" />
               </div>
               <div>
                 <h2 className="text-lg font-bold">Angieren's</h2>
@@ -377,9 +368,11 @@ function RouteComponent() {
           ))}
         </nav>
 
-        {/* Logout Button */}
         <div className="px-4 pb-6">
-          <button className="flex items-center gap-3 px-4 py-3 text-amber-900 hover:bg-red-100 hover:text-red-600 rounded-lg w-full transition-colors">
+          <button
+            className="flex items-center gap-3 px-4 py-3 text-amber-900 hover:bg-red-100 hover:text-red-600 rounded-lg w-full transition-colors cursor-pointer"
+            onClick={handleLogout}
+          >
             <LogOut className="h-5 w-5" />
             Logout
           </button>
@@ -474,7 +467,7 @@ function RouteComponent() {
           </div>
         </header>
 
-        {/* Reviews Content */}
+        {/* Orders Content */}
         <main className="flex-1 p-6 overflow-y-auto">
           {/* Show Hidden Reviews Button */}
           <div className="mb-6">
@@ -487,138 +480,106 @@ function RouteComponent() {
           </div>
 
           {/* Reviews Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
             {Object.entries(reviewsByCategory).map(([category, categoryReviews]) => (
-              <div key={category} className="space-y-4 bg-amber-800 rounded-lg">
-                <div className='p-5 space-y-4'>
-                  <h3 className={`text-white text-center py-2 px-4 rounded-lg font-semibold ${getCategoryColor(category)}`}>
+              <div
+                key={category}
+                className="space-y-4 bg-amber-800 rounded-lg h-[500px] overflow-y-auto"
+              >
+                <div className="p-5 space-y-4">
+                  <h3
+                    className={`text-white text-center py-2 px-4 rounded-lg font-semibold ${getCategoryColor(
+                      category
+                    )}`}
+                  >
                     {category}
                   </h3>
-                  {categoryReviews.map((review) => (
-                    <div key={review.id} className="bg-white rounded-lg p-4 shadow-sm border border-gray-200">
-                      <div className="mb-3">
-                        <h4 className="font-semibold text-gray-800 mb-1">{review.customerName}</h4>
-                        <div className="flex gap-1">
-                          {renderStars(review.rating)}
+
+                  {categoryReviews.length === 0 ? (
+                    <div className="flex items-center justify-center h-full">
+                      <p className="text-white text-sm italic opacity-80">
+                        No reviews yet
+                      </p>
+                    </div>
+                  ) : (
+                    categoryReviews.map((review) => (
+                      <div
+                        key={review.review_id}
+                        className="bg-white rounded-lg p-4 shadow-sm border border-gray-200"
+                      >
+                        <div className="mb-3">
+                          <h4 className="font-semibold text-gray-800 mb-1">
+                            {review.customerName}
+                          </h4>
+                          <div className="flex gap-1">{renderStars(review.rating)}</div>
+                        </div>
+                        <p className="text-gray-600 text-sm mb-3">{review.comment}</p>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => handleViewReview(review)}
+                            className="bg-yellow-400 text-amber-800 px-3 py-1 rounded text-xs font-medium hover:bg-yellow-500 transition-colors flex items-center gap-1"
+                          >
+                            <Eye className="h-3 w-3" />
+                            VIEW
+                          </button>
+                          <button
+                            onClick={() => toggleReviewVisibility(review.review_id, review.is_hidden)}
+                            disabled={processingReviewId === review.review_id}
+                            className="bg-red-500 text-white px-3 py-1 rounded text-xs font-medium hover:bg-red-600 transition-colors flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            <EyeOff className="h-3 w-3" />
+                            {processingReviewId === review.review_id ? 'HIDING...' : 'HIDE'}
+                          </button>
                         </div>
                       </div>
-                      <p className="text-gray-600 text-sm mb-3">{review.comment}</p>
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => handleViewReview(review)}
-                          className="bg-yellow-400 text-amber-800 px-3 py-1 rounded text-xs font-medium hover:bg-yellow-500 transition-colors flex items-center gap-1"
-                        >
-                          <Eye className="h-3 w-3" />
-                          VIEW
-                        </button>
-                      </div>
-                    </div>
-                  ))}
+                    ))
+                  )}
                 </div>
               </div>
             ))}
           </div>
         </main>
+      </div>
+      {/* View Review Modal */}
+      {isViewModalOpen && selectedReview && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4 shadow-xl">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-semibold text-gray-800">Review Details</h3>
+              <button
+                onClick={() => setIsViewModalOpen(false)}
+                className="text-gray-500 hover:text-gray-700"
+              >
+                ×
+              </button>
+            </div>
 
-        {/* View Review Modal */}
-        {isViewModalOpen && selectedReview && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4 shadow-xl">
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="text-lg font-semibold text-gray-800">Review Details</h3>
+            <div className="space-y-4">
+              <div>
+                <h4 className="font-semibold text-gray-800 mb-2">{selectedReview.customerName}</h4>
+                <div className="flex gap-1 mb-2">
+                  {renderStars(selectedReview.rating)}
+                </div>
+                <span className={`inline-block px-3 py-1 rounded-full text-xs font-medium text-white ${getCategoryColor(selectedReview.status_type)}`}>
+                  {selectedReview.status_type}
+                </span>
+              </div>
+
+              <div className="bg-gray-50 p-4 rounded-lg">
+                <p className="text-gray-600">{selectedReview.comment}</p>
+              </div>
+
+              <div className="flex gap-3 pt-4">
+                <button
+                  onClick={() => toggleReviewVisibility(selectedReview.review_id, selectedReview.is_hidden)}
+                  disabled={processingReviewId === selectedReview.review_id}
+                  className="px-4 py-2 bg-red-500 text-white rounded-lg font-medium hover:bg-red-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                >
+                  <EyeOff className="h-4 w-4" />
+                  {processingReviewId === selectedReview.review_id ? 'Hiding...' : 'Hide Review'}
+                </button>
                 <button
                   onClick={() => setIsViewModalOpen(false)}
-                  className="text-gray-500 hover:text-gray-700"
-                >
-                  <X className="h-6 w-6" />
-                </button>
-              </div>
-
-              <div className="space-y-4">
-                <div>
-                  <h4 className="font-semibold text-gray-800 mb-2">{selectedReview.customerName}</h4>
-                  <div className="flex gap-1 mb-2">
-                    {renderStars(selectedReview.rating)}
-                  </div>
-                  <span className={`inline-block px-3 py-1 rounded-full text-xs font-medium text-white ${getCategoryColor(selectedReview.category)}`}>
-                    {selectedReview.category}
-                  </span>
-                </div>
-
-                <div className="bg-gray-50 p-4 rounded-lg">
-                  <p className="text-gray-600">{selectedReview.comment}</p>
-                </div>
-
-                <div className="flex gap-3 pt-4">
-                  <button
-                    onClick={() => {
-                      toggleReviewVisibility(selectedReview.id)
-                      setIsViewModalOpen(false)
-                    }}
-                    className={`px-4 py-2 rounded-lg font-medium transition-colors ${selectedReview.isHidden
-                      ? 'bg-green-500 text-white hover:bg-green-600'
-                      : 'bg-red-500 text-white hover:bg-red-600'
-                      }`}
-                  >
-                    {selectedReview.isHidden ? 'Show Review' : 'Hide Review'}
-                  </button>
-                  <button
-                    onClick={() => setIsViewModalOpen(false)}
-                    className="px-4 py-2 bg-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-400 transition-colors"
-                  >
-                    Close
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Hidden Reviews Modal */}
-        {isHiddenReviewsModalOpen && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-lg p-6 max-w-4xl w-full mx-4 shadow-xl max-h-[80vh] overflow-y-auto">
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="text-lg font-semibold text-gray-800">Hidden Reviews</h3>
-                <button
-                  onClick={() => setIsHiddenReviewsModalOpen(false)}
-                  className="text-gray-500 hover:text-gray-700"
-                >
-                  <X className="h-6 w-6" />
-                </button>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {reviews.filter(review => review.isHidden).map((review) => (
-                  <div key={review.id} className="bg-gray-50 rounded-lg p-4 border">
-                    <div className="mb-3">
-                      <h4 className="font-semibold text-gray-800 mb-1">{review.customerName}</h4>
-                      <div className="flex gap-1 mb-2">
-                        {renderStars(review.rating)}
-                      </div>
-                      <span className={`inline-block px-2 py-1 rounded-full text-xs font-medium text-white ${getCategoryColor(review.category)}`}>
-                        {review.category}
-                      </span>
-                    </div>
-                    <p className="text-gray-600 text-sm mb-3">{review.comment}</p>
-                    <button
-                      onClick={() => toggleReviewVisibility(review.id)}
-                      className="bg-green-500 text-white px-3 py-1 rounded text-xs font-medium hover:bg-green-600 transition-colors"
-                    >
-                      Show Review
-                    </button>
-                  </div>
-                ))}
-                {reviews.filter(review => review.isHidden).length === 0 && (
-                  <div className="col-span-full text-center text-gray-500 py-8">
-                    No hidden reviews found.
-                  </div>
-                )}
-              </div>
-
-              <div className="flex justify-end pt-4 border-t mt-6">
-                <button
-                  onClick={() => setIsHiddenReviewsModalOpen(false)}
                   className="px-4 py-2 bg-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-400 transition-colors"
                 >
                   Close
@@ -626,8 +587,65 @@ function RouteComponent() {
               </div>
             </div>
           </div>
-        )}
-      </div>
+        </div>
+      )}
+
+      {/* Hidden Reviews Modal */}
+      {isHiddenReviewsModalOpen && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-4xl w-full mx-4 shadow-xl max-h-[80vh] overflow-y-auto">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-semibold text-gray-800">Hidden Reviews</h3>
+              <button
+                onClick={() => setIsHiddenReviewsModalOpen(false)}
+                className="text-gray-500 hover:text-gray-700"
+              >
+                ×
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {reviews.filter(review => review.is_hidden).map((review) => (
+                <div key={review.review_id} className="bg-gray-50 rounded-lg p-4 border">
+                  <div className="mb-3">
+                    <h4 className="font-semibold text-gray-800 mb-1">{review.customerName}</h4>
+                    <div className="flex gap-1 mb-2">
+                      {renderStars(review.rating)}
+                    </div>
+                    <span className={`inline-block px-2 py-1 rounded-full text-xs font-medium text-white ${getCategoryColor(review.status_type)}`}>
+                      {review.status_type}
+                    </span>
+                  </div>
+                  <p className="text-gray-600 text-sm mb-3">{review.comment}</p>
+                  <button
+                    onClick={() => toggleReviewVisibility(review.review_id, review.is_hidden)}
+                    disabled={processingReviewId === review.review_id}
+                    className="bg-green-500 text-white px-3 py-1 rounded text-xs font-medium hover:bg-green-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
+                  >
+                    <Eye className="h-3 w-3" />
+                    {processingReviewId === review.review_id ? 'Showing...' : 'Show Review'}
+                  </button>
+                </div>
+              ))}
+              {reviews.filter(review => review.is_hidden).length === 0 && (
+                <div className="col-span-full text-center text-gray-500 py-8">
+                  No hidden reviews found.
+                </div>
+              )}
+            </div>
+
+            <div className="flex justify-end pt-4 border-t mt-6">
+              <button
+                onClick={() => setIsHiddenReviewsModalOpen(false)}
+                className="px-4 py-2 bg-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-400 transition-colors"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {loading && <LoadingSpinner />}
     </div>
   )
 }

@@ -1,5 +1,6 @@
 import { createLazyFileRoute, Link } from '@tanstack/react-router'
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
+import { createClient } from '@supabase/supabase-js'
 import {
     Search,
     Filter,
@@ -20,6 +21,10 @@ import {
     LogOut,
     Star
 } from 'lucide-react'
+import { supabase } from '@/lib/supabaseClient'
+import { useUser } from '@/context/UserContext'
+import { useNavigate } from '@tanstack/react-router'
+
 
 // Route definition
 export const Route = createLazyFileRoute('/staff/deliveries')({
@@ -28,6 +33,7 @@ export const Route = createLazyFileRoute('/staff/deliveries')({
 
 // Your DeliveryManagement component
 function RouteComponent() {
+    const navigate = useNavigate();
     const [searchQuery, setSearchQuery] = useState('')
     const [activeTab, setActiveTab] = useState('All Assigned Orders')
     const [currentPage, setCurrentPage] = useState(1)
@@ -52,241 +58,117 @@ function RouteComponent() {
     const [isCancellationModalOpen, setIsCancellationModalOpen] = useState(false)
     const [cancellationDetails, setCancellationDetails] = useState<any>(null)
 
+    // NEW: State for fetched data from Supabase
+    const [deliveryOrders, setDeliveryOrders] = useState<any[]>([])
+    const [riders, setRiders] = useState<any[]>([])
+    const [loading, setLoading] = useState(true)
 
-    const deliveryOrders = [
-        {
-            id: '#06',
-            customerName: 'Brandon Duran',
-            assignedRider: null,
-            assignedDate: 'May 16, 2025',
-            assignedTime: '10:30 AM',
-            price: '₱ 2,350',
-            cancellationRequest: 'Pending',
-            status: 'For Delivery',
-            address: '123 Main St, Quezon City',
+    // NEW: Fetch delivery orders from Supabase
+    useEffect(() => {
+        fetchDeliveryOrders()
+        fetchRiders()
+    }, [])
 
-            deliveryTime: '2PM To Be Delivered',
-            contact: '+63 123 123 1234',
-            specialInstructions: 'Please ring the doorbell twice',
-            fulfillmentType: 'Delivery',
-            orderType: 'Today',
-            paymentPercentage: '100',
-            items: [
-                {
-                    name: '5 in 1 Mix in Bilao (Palabok)',
-                    addOns: '20 pcs. Puto',
-                    quantity: 2,
-                    price: 2350
-                }
-            ],
-            deliveryFee: 75,
-            totalAmount: 2425
-        },
-        {
-            id: '#07',
-            customerName: 'Russel Carlo',
-            assignedRider: 'Lenny Wise',
-            assignedDate: 'May 17, 2025',
-            assignedTime: '9:40 AM',
-            price: '₱ 850',
-            cancellationRequest: 'Pending',
-            status: 'Preparing',
-            address: '456 Oak Ave, Makati City',
-            // Add these new properties:
-            deliveryTime: '2PM To Be Delivered',
-            contact: '+63 123 123 1234',
-            specialInstructions: 'Please ring the doorbell twice',
-            fulfillmentType: 'Delivery',
-            orderType: 'Today',
-            paymentPercentage: '100',
-            items: [
-                {
-                    name: '5 in 1 Mix in Bilao (Palabok)',
-                    addOns: '20 pcs. Puto',
-                    quantity: 2,
-                    price: 2350
-                }
-            ],
-            deliveryFee: 75,
-            totalAmount: 2425,
-            cancellationDetails: {
-                date: 'May 20, 2025',
-                time: '11:45 AM',
-                reason: 'Bhos, my 3mergeny kMi, pxensia n',
-                requestedBy: 'Lenny Wise'
-            }
-        },
-        {
-            id: '#08',
-            customerName: 'Charles Caadiang',
-            assignedRider: 'Marky Nayz',
-            assignedDate: 'May 17, 2025',
-            assignedTime: '11:02 AM',
-            price: '₱ 980',
-            cancellationRequest: 'None',
-            status: 'Queueing',
-            address: '789 Pine Rd, Pasig City',
-            // Add these new properties:
-            deliveryTime: '2PM To Be Delivered',
-            contact: '+63 123 123 1234',
-            specialInstructions: 'Please ring the doorbell twice',
-            fulfillmentType: 'Delivery',
-            orderType: 'Today',
-            paymentPercentage: '100',
-            items: [
-                {
-                    name: '5 in 1 Mix in Bilao (Palabok)',
-                    addOns: '20 pcs. Puto',
-                    quantity: 2,
-                    price: 2350
-                }
-            ],
-            deliveryFee: 75,
-            totalAmount: 2425
-        },
-        {
-            id: '#09',
-            customerName: 'Prince Manuel',
-            assignedRider: null,
-            assignedDate: 'May 17, 2025',
-            assignedTime: '11:40 AM',
-            price: '₱ 450',
-            cancellationRequest: 'None',
-            status: 'Ready',
-            address: '321 Elm St, Taguig City',
-            // Add these new properties:
-            deliveryTime: '2PM To Be Delivered',
-            contact: '+63 123 123 1234',
-            specialInstructions: 'Please ring the doorbell twice',
-            fulfillmentType: 'Delivery',
-            orderType: 'Today',
-            paymentPercentage: '100',
-            items: [
-                {
-                    name: '5 in 1 Mix in Bilao (Palabok)',
-                    addOns: '20 pcs. Puto',
-                    quantity: 2,
-                    price: 2350
-                }
-            ],
-            deliveryFee: 75,
-            totalAmount: 2425
-        },
-        {
-            id: '#10',
-            customerName: 'Shiela Anne',
-            assignedRider: null,
-            assignedDate: 'May 18, 2025',
-            assignedTime: '2:00 PM',
-            price: '₱ 450',
-            cancellationRequest: 'None',
-            status: 'Preparing',
-            address: '654 Birch Ln, Manila',
-            // Add these new properties:
-            deliveryTime: '2PM To Be Delivered',
-            contact: '+63 123 123 1234',
-            specialInstructions: 'Please ring the doorbell twice',
-            fulfillmentType: 'Delivery',
-            orderType: 'Today',
-            paymentPercentage: '100',
-            items: [
-                {
-                    name: '5 in 1 Mix in Bilao (Palabok)',
-                    addOns: '20 pcs. Puto',
-                    quantity: 2,
-                    price: 2350
-                }
-            ],
-            deliveryFee: 75,
-            totalAmount: 2425
-        },
-        {
-            id: '#11',
-            customerName: 'Selita Sesina',
-            assignedRider: 'Penny Lise',
-            assignedDate: 'May 19, 2025',
-            assignedTime: '9:05 AM',
-            price: '₱ 850',
-            cancellationRequest: 'None',
-            status: 'Preparing',
-            address: '987 Cedar Ave, Mandaluyong',
-            // Add these new properties:
-            deliveryTime: '2PM To Be Delivered',
-            contact: '+63 123 123 1234',
-            specialInstructions: 'Please ring the doorbell twice',
-            fulfillmentType: 'Delivery',
-            orderType: 'Today',
-            paymentPercentage: '100',
-            items: [
-                {
-                    name: '5 in 1 Mix in Bilao (Palabok)',
-                    addOns: '20 pcs. Puto',
-                    quantity: 2,
-                    price: 2350
-                }
-            ],
-            deliveryFee: 75,
-            totalAmount: 2425
-        },
-        {
-            id: '#12',
-            customerName: 'Karina Mikana',
-            assignedRider: 'Penny Lise',
-            assignedDate: 'May 20, 2025',
-            assignedTime: '10:24 AM',
-            price: '₱ 2450',
-            cancellationRequest: 'None',
-            status: 'Queueing',
-            address: '147 Maple St, San Juan',
-            // Add these new properties:
-            deliveryTime: '2PM To Be Delivered',
-            contact: '+63 123 123 1234',
-            specialInstructions: 'Please ring the doorbell twice',
-            fulfillmentType: 'Delivery',
-            orderType: 'Today',
-            paymentPercentage: '100',
-            items: [
-                {
-                    name: '5 in 1 Mix in Bilao (Palabok)',
-                    addOns: '20 pcs. Puto',
-                    quantity: 2,
-                    price: 2350
-                }
-            ],
-            deliveryFee: 75,
-            totalAmount: 2425
-        },
-        {
-            id: '#13',
-            customerName: 'Elliot Kingsman',
-            assignedRider: 'Marky Nayz',
-            assignedDate: 'May 21, 2025',
-            assignedTime: '2:40 PM',
-            price: '₱ 980',
-            cancellationRequest: 'None',
-            status: 'Queueing',
-            address: '258 Willow Dr, Pasay City',
-            // Add these new properties:
-            deliveryTime: '2PM To Be Delivered',
-            contact: '+63 123 123 1234',
-            specialInstructions: 'Please ring the doorbell twice',
-            fulfillmentType: 'Delivery',
-            orderType: 'Today',
-            paymentPercentage: '100',
-            items: [
-                {
-                    name: '5 in 1 Mix in Bilao (Palabok)',
-                    addOns: '20 pcs. Puto',
-                    quantity: 2,
-                    price: 2350
-                }
-            ],
-            deliveryFee: 75,
-            totalAmount: 2425
-        },
-    ]
+    const fetchDeliveryOrders = async () => {
+        try {
+            setLoading(true)
 
-    const riders = ['Penny Lise', 'Lenny Wise', 'Marky Nayz', 'Jeremy Lyde', 'Morphy Fyde']
+            // Fetch orders with order_type = 'Delivery' and join with related tables
+            const { data, error } = await supabase
+                .from('order')
+                .select(`
+                    *,
+                    customer:users!customer_uid(first_name, last_name, phone_number),
+                    delivery:delivery(
+                        delivery_id,
+                        delivery_time,
+                        delivery_fee,
+                        address:address(address_line, city, region),
+                        rider:users!rider_id(first_name, last_name)
+                    ),
+                    payment:payment(*),
+                    order_item(
+                        *,
+                        menu:menu(*),
+                        order_item_add_on(
+                            *,
+                            add_on:add_on(*)
+                        )
+                    )
+                `)
+                .eq('order_type', 'Delivery')
+                .order('created_at', { ascending: false })
+
+            if (error) throw error
+
+            // Transform the data to match the existing UI structure
+            const transformedOrders = data?.map((order: any) => ({
+                id: `#${order.order_number}`,
+                orderId: order.order_id,
+                customerName: `${order.customer?.first_name || ''} ${order.customer?.last_name || ''}`.trim(),
+                assignedRider: order.delivery?.rider ? `${order.delivery.rider.first_name} ${order.delivery.rider.last_name}` : null,
+                assignedDate: new Date(order.created_at).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }),
+                assignedTime: new Date(order.created_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
+                price: `₱ ${parseFloat(order.total_price).toLocaleString()}`,
+                cancellationRequest: order.failed_delivery_reason ? 'Pending' : 'None',
+                status: order.order_status,
+                address: order.delivery?.address ?
+                    `${order.delivery.address.address_line_1 || ''} ${order.delivery.address.address_line_2 || ''}, ${order.delivery.address.city || ''}, ${order.delivery.address.province || ''}`.trim()
+                    : 'N/A',
+                deliveryTime: order.delivery?.delivery_time ?
+                    new Date(order.delivery.delivery_time).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) + ' To Be Delivered'
+                    : 'TBD',
+                contact: order.customer?.phone_number || 'N/A',
+                specialInstructions: order.additional_information || 'No special instructions',
+                fulfillmentType: order.order_type,
+                orderType: 'Today', // You can calculate this based on created_at vs current date
+                paymentPercentage: order.payment?.is_paid ? '100' : '0',
+                items: order.order_item?.map((item: any) => ({
+                    name: item.menu?.name || 'Unknown Item',
+                    addOns: item.order_item_add_on?.map((addon: any) => addon.add_on?.name).join(', ') || '',
+                    quantity: item.quantity,
+                    price: parseFloat(item.subtotal_price)
+                })) || [],
+                deliveryFee: order.delivery?.delivery_fee ? parseFloat(order.delivery.delivery_fee) : 0,
+                totalAmount: parseFloat(order.total_price),
+                deliveryId: order.delivery_id,
+                cancellationDetails: order.failed_delivery_reason ? {
+                    date: new Date(order.status_updated_at).toLocaleDateString('en-US'),
+                    time: new Date(order.status_updated_at).toLocaleTimeString('en-US'),
+                    requestedBy: order.delivery?.rider ? `${order.delivery.rider.first_name} ${order.delivery.rider.last_name}` : 'Unknown',
+                    reason: order.failed_delivery_reason
+                } : null
+            })) || []
+
+            setDeliveryOrders(transformedOrders)
+        } catch (error) {
+            console.error('Error fetching delivery orders:', error)
+        } finally {
+            setLoading(false)
+        }
+    }
+
+    // NEW: Fetch available riders from users table
+    const fetchRiders = async () => {
+        try {
+            const { data, error } = await supabase
+                .from('users')
+                .select('user_uid, first_name, last_name')
+                .eq('user_role', 'rider') // Assuming 'Rider' is the enum value for riders
+                .eq('is_active', true)
+
+            if (error) throw error
+
+            const riderNames = data?.map((rider: any) =>
+                `${rider.first_name} ${rider.last_name}`
+            ) || []
+
+            setRiders(riderNames)
+        } catch (error) {
+            console.error('Error fetching riders:', error)
+        }
+    }
+
     const statusOptions = ['For Delivery', 'Preparing', 'Queueing', 'Ready', 'Completed']
 
     // Sample notifications
@@ -416,15 +298,73 @@ function RouteComponent() {
         })
     }
 
-    const assignRiderToOrder = (riderId: string, orderId: string) => {
-        // Update the order with the assigned rider
-        // You'll need to implement the logic to update your deliveryOrders array
-        console.log('Assigning rider', riderId, 'to order', orderId)
+    // NEW: Update assignRiderToOrder to save to Supabase
+    const assignRiderToOrder = async (riderName: string, orderId: string) => {
+        try {
+            // Find the rider's user_uid from the riderName
+            const { data: riderData, error: riderError } = await supabase
+                .from('users')
+                .select('user_uid')
+                .eq('user_role', 'Rider')
+                .ilike('first_name', riderName.split(' ')[0])
+                .ilike('last_name', riderName.split(' ')[1])
+                .single()
 
-        // Close modal
-        setIsAssignModalOpen(false)
-        setSelectedOrderForAssign(null)
-        setSelectedRiderForModal('')
+            if (riderError) throw riderError
+
+            // Find the order to get its delivery_id
+            const order = deliveryOrders.find(o => o.id === orderId)
+
+            if (!order?.deliveryId) {
+                // If no delivery record exists, create one first
+                const { data: addressData } = await supabase
+                    .from('address')
+                    .select('address_id')
+                    .limit(1)
+                    .single()
+
+                const { data: newDelivery, error: deliveryCreateError } = await supabase
+                    .from('delivery')
+                    .insert({
+                        rider_id: riderData.user_uid,
+                        address_id: addressData?.address_id,
+                        delivery_fee: 20
+                    })
+                    .select()
+                    .single()
+
+                if (deliveryCreateError) throw deliveryCreateError
+
+                // Update order with new delivery_id
+                const { error: orderUpdateError } = await supabase
+                    .from('order')
+                    .update({ delivery_id: newDelivery.delivery_id })
+                    .eq('order_id', order.orderId)
+
+                if (orderUpdateError) throw orderUpdateError
+            } else {
+                // Update existing delivery record with rider_id
+                const { error: updateError } = await supabase
+                    .from('delivery')
+                    .update({ rider_id: riderData.user_uid })
+                    .eq('delivery_id', order.deliveryId)
+
+                if (updateError) throw updateError
+            }
+
+            // Refresh the orders list
+            await fetchDeliveryOrders()
+
+            // Close modal
+            setIsAssignModalOpen(false)
+            setSelectedOrderForAssign(null)
+            setSelectedRiderForModal('')
+
+            alert('Rider assigned successfully!')
+        } catch (error) {
+            console.error('Error assigning rider:', error)
+            alert('Failed to assign rider. Please try again.')
+        }
     }
 
     const getRiderCurrentOrders = (riderName: string) => {
@@ -461,18 +401,54 @@ function RouteComponent() {
         setIsCancellationModalOpen(true)
     }
 
-    const approveCancellation = () => {
-        console.log('Cancellation approved')
-        setIsCancellationModalOpen(false)
-        setCancellationDetails(null)
-        // Update order status logic here
+    // NEW: Update cancellation functions to update Supabase
+    const approveCancellation = async () => {
+        try {
+            if (!selectedOrder) return
+
+            const { error } = await supabase
+                .from('order')
+                .update({
+                    order_status: 'Cancelled',
+                    status_updated_at: new Date().toISOString()
+                })
+                .eq('order_id', selectedOrder.orderId)
+
+            if (error) throw error
+
+            await fetchDeliveryOrders()
+            setIsCancellationModalOpen(false)
+            setCancellationDetails(null)
+            closeOrderDetails()
+            alert('Cancellation approved successfully!')
+        } catch (error) {
+            console.error('Error approving cancellation:', error)
+            alert('Failed to approve cancellation. Please try again.')
+        }
     }
 
-    const rejectCancellation = () => {
-        console.log('Cancellation rejected')
-        setIsCancellationModalOpen(false)
-        setCancellationDetails(null)
-        // Update order logic here
+    const rejectCancellation = async () => {
+        try {
+            if (!selectedOrder) return
+
+            const { error } = await supabase
+                .from('order')
+                .update({
+                    failed_delivery_reason: null,
+                    status_updated_at: new Date().toISOString()
+                })
+                .eq('order_id', selectedOrder.orderId)
+
+            if (error) throw error
+
+            await fetchDeliveryOrders()
+            setIsCancellationModalOpen(false)
+            setCancellationDetails(null)
+            alert('Cancellation rejected successfully!')
+        } catch (error) {
+            console.error('Error rejecting cancellation:', error)
+            alert('Failed to reject cancellation. Please try again.')
+        }
     }
 
     const navigationItems = [
@@ -520,8 +496,19 @@ function RouteComponent() {
         },
     ]
 
+    const { user, signOut } = useUser()
+
+    async function handleLogout() {
+        await signOut();
+        navigate({ to: "/login" });
+    }
+
+
     return (
         <div className="min-h-screen bg-gradient-to-br from-amber-50 to-orange-100 flex overflow-x-hidden">
+
+            {/* Rest of your existing UI code remains exactly the same */}
+            {/* Sidebar, Header, Main Content, Modals - all unchanged */}
 
             <div
                 className={`
@@ -533,8 +520,8 @@ function RouteComponent() {
                 <div className="bg-amber-800 text-white px-6 py-4 relative">
                     <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
-                            <div className="w-12 h-12 bg-yellow-400 rounded-full flex items-center justify-center">
-                                <img src="/api/placeholder/40/40" alt="Logo" className="w-8 h-8 rounded-full" />
+                            <div className="w-12 h-12 rounded-full flex items-center justify-center">
+                                <img src="/public/angierens-logo.png" alt="Logo" className="w-12 h-12 rounded-full" />
                             </div>
                             <div>
                                 <h2 className="text-lg font-bold">Angieren's</h2>
@@ -579,7 +566,7 @@ function RouteComponent() {
 
                 {/* Logout Button */}
                 <div className="px-4 pb-6">
-                    <button className="flex items-center gap-3 px-4 py-3 text-amber-900 hover:bg-red-100 hover:text-red-600 rounded-lg w-full transition-colors">
+                    <button className="flex items-center gap-3 px-4 py-3 text-amber-900 hover:bg-red-100 hover:text-red-600 rounded-lg w-full transition-colors cursor-pointer">
                         <LogOut className="h-5 w-5" />
                         Logout
                     </button>
@@ -676,7 +663,6 @@ function RouteComponent() {
 
                 {/* Main Content */}
                 <main className="flex-1 p-3 sm:p-4 lg:p-6 overflow-y-auto overflow-x-hidden">
-                    {/* Orders Table */}
                     <div className="bg-white rounded-xl shadow-sm border border-gray-200 min-w-0 overflow-hidden">
                         {/* Table Header */}
                         <div className="p-3 sm:p-4 lg:p-6 border-b border-gray-200">
@@ -732,52 +718,65 @@ function RouteComponent() {
                                         <th className="px-3 sm:px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Action</th>
                                     </tr>
                                 </thead>
-                                <tbody className="bg-white divide-y divide-gray-200">
-                                    {currentOrders.map((order) => (
-                                        <tr key={order.id} className="hover:bg-gray-50">
-                                            <td className="px-3 sm:px-4 lg:px-6 py-4 whitespace-nowrap">{order.id}</td>
-                                            <td className="px-3 sm:px-4 lg:px-6 py-4 whitespace-nowrap">{order.customerName}</td>
-                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                                {order.assignedRider ? (
-                                                    order.assignedRider
-                                                ) : (
-                                                    <div className="flex items-center gap-2">
-                                                        <span className="text-gray-500">N/A</span>
+                                {loading ? (
+                                    <div className="fixed inset-0 bg-black/50 flex justify-center items-center z-[60]">
+                                        <div className="bg-white rounded-xl shadow-lg p-6 flex flex-col items-center gap-4">
+                                            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#964B00]"></div>
+                                            <p className="text-gray-700 font-medium">Processing...</p>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <>
+                                        <tbody className="bg-white divide-y divide-gray-200">
+                                            {currentOrders.map((order) => (
+                                                <tr key={order.id} className="hover:bg-gray-50">
+                                                    <td className="px-3 sm:px-4 lg:px-6 py-4 whitespace-nowrap">{order.id}</td>
+                                                    <td className="px-3 sm:px-4 lg:px-6 py-4 whitespace-nowrap">{order.customerName}</td>
+                                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                                        {order.assignedRider ? (
+                                                            order.assignedRider
+                                                        ) : (
+                                                            <div className="flex items-center gap-2">
+                                                                <span className="text-gray-500">N/A</span>
+                                                                <button
+                                                                    onClick={() => {
+                                                                        setSelectedOrderForAssign(order)
+                                                                        setIsAssignModalOpen(true)
+                                                                    }}
+                                                                    className="px-3 py-1 text-xs bg-blue-100 text-blue-800 rounded-full hover:bg-blue-200 transition-colors"
+                                                                >
+                                                                    + Rider
+                                                                </button>
+                                                            </div>
+                                                        )}
+                                                    </td>
+                                                    {/* Copy paste the remaining <td> elements from old code */}
+                                                    <td className="px-3 sm:px-4 lg:px-6 py-4 whitespace-nowrap">{order.assignedDate}</td>
+                                                    <td className="px-3 sm:px-4 lg:px-6 py-4 whitespace-nowrap">{order.assignedTime}</td>
+                                                    <td className="px-3 sm:px-4 lg:px-6 py-4 whitespace-nowrap font-semibold">{order.price}</td>
+                                                    <td className="px-3 sm:px-4 lg:px-6 py-4 whitespace-nowrap">{order.cancellationRequest}</td>
+                                                    <td className="px-3 sm:px-4 lg:px-6 py-4 whitespace-nowrap">
+                                                        <span className={`px-2 py-1 text-xs font-medium rounded-full ${getStatusColor(order.status)}`}>
+                                                            {order.status}
+                                                        </span>
+                                                    </td>
+                                                    <td className="px-3 sm:px-4 lg:px-6 py-4 whitespace-nowrap">
                                                         <button
-                                                            onClick={() => {
-                                                                setSelectedOrderForAssign(order)
-                                                                setIsAssignModalOpen(true)
-                                                            }}
-                                                            className="px-3 py-1 text-xs bg-blue-100 text-blue-800 rounded-full hover:bg-blue-200 transition-colors"
+                                                            onClick={() => openOrderDetails(order)}
+                                                            className="text-gray-600 hover:text-gray-800 transition-colors"
                                                         >
-                                                            + Rider
+                                                            <Eye className="h-4 w-4" />
                                                         </button>
-                                                    </div>
-                                                )}
-                                            </td>
-                                            <td className="px-3 sm:px-4 lg:px-6 py-4 whitespace-nowrap">{order.assignedDate}</td>
-                                            <td className="px-3 sm:px-4 lg:px-6 py-4 whitespace-nowrap">{order.assignedTime}</td>
-                                            <td className="px-3 sm:px-4 lg:px-6 py-4 whitespace-nowrap font-semibold">{order.price}</td>
-                                            <td className="px-3 sm:px-4 lg:px-6 py-4 whitespace-nowrap">{order.cancellationRequest}</td>
-                                            <td className="px-3 sm:px-4 lg:px-6 py-4 whitespace-nowrap">
-                                                <span className={`px-2 py-1 text-xs font-medium rounded-full ${getStatusColor(order.status)}`}>
-                                                    {order.status}
-                                                </span>
-                                            </td>
-                                            <td className="px-3 sm:px-4 lg:px-6 py-4 whitespace-nowrap">
-                                                <button
-                                                    onClick={() => openOrderDetails(order)}
-                                                    className="text-gray-600 hover:text-gray-800 transition-colors"
-                                                >
-                                                    <Eye className="h-4 w-4" />
-                                                </button>
-                                            </td>
-                                        </tr>
-                                    ))}
-                                </tbody>
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </>
+                                )}
                             </table>
                         </div>
                     </div>
+                    {/* Copy and paste all the modals from old code: Rider Assignment Modal, Filter Modal, Order Details Modal, Cancellation Request Modal, Order Back View Modal - they remain exactly the same */}
 
                     {/* Rider Assignment Modal */}
                     {isAssignModalOpen && selectedOrderForAssign && (
@@ -1362,9 +1361,6 @@ function RouteComponent() {
                     )}
                 </main>
             </div>
-        </div>
+        </div >
     )
 }
-
-
-

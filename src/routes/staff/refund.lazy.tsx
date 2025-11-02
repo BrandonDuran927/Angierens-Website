@@ -1,27 +1,9 @@
 import { createLazyFileRoute, useLocation, Link } from '@tanstack/react-router'
-import React, { useState } from 'react'
-import {
-    LayoutDashboard,
-    ShoppingCart,
-    TrendingUp,
-    MessageSquare,
-    Users,
-    Menu as MenuIcon,
-    X,
-    Bell,
-    Star,
-    Heart,
-    Search,
-    Filter,
-    Menu,
-    Calendar,
-    Settings,
-    User,
-    DollarSign,
-    Package,
-    Truck,
-    LogOut
-} from 'lucide-react'
+import React, { useState, useEffect } from 'react'
+import { MessageSquare, Menu as MenuIcon, X, Bell, Star, Heart, Search, Filter, Menu, Calendar, Settings, User, DollarSign, Package, Truck, LogOut } from 'lucide-react'
+import { supabase } from '@/lib/supabaseClient'
+import { useNavigate } from '@tanstack/react-router'
+import { useUser } from '@/context/UserContext'
 
 export const Route = createLazyFileRoute('/staff/refund')({
     component: RouteComponent,
@@ -39,8 +21,8 @@ interface Notification {
 interface RefundRequest {
     id: string
     orderId: string
+    orderNumber: string
     customerName: string
-    item: string
     date: string
     time: string
     confirmation: 'Pending' | 'Approved' | 'Rejected'
@@ -58,217 +40,30 @@ interface RefundRequest {
     downPayment: number
     gcashFees: number
     total: number
+    refundId: string
 }
 
 function RouteComponent() {
-    const [isNotificationOpen, setIsNotificationOpen] = useState(false)
+    const navigate = useNavigate();
+    const { user, signOut } = useUser()
+
+    async function handleLogout() {
+        await signOut();
+        navigate({ to: "/login" });
+    }
     const [selectedRefund, setSelectedRefund] = useState<RefundRequest | null>(null)
     const [searchTerm, setSearchTerm] = useState('')
     const [isReviewModalOpen, setIsReviewModalOpen] = useState(false)
+    const location = useLocation()
     const [filterModal, setFilterModal] = useState({
         isOpen: false,
         dateFrom: '',
         dateTo: '',
         status: 'All'
     })
-
-
-    const notificationCount = 1
-
-    const [notifications, setNotifications] = useState<Notification[]>([
-        {
-            id: '1',
-            type: 'order',
-            title: 'We are now preparing your food (#6). Thank you for trusting Angieren\'s Lutong Bahay.',
-            time: '20 sec ago',
-            icon: 'heart',
-            read: false
-        },
-        {
-            id: '2',
-            type: 'feedback',
-            title: 'View your recent feedback about our delivery.',
-            time: '10 min ago',
-            icon: 'message',
-            read: false
-        }
-    ])
-
-    const [refundRequests, setRefundRequests] = useState<RefundRequest[]>([
-        {
-            id: '1',
-            orderId: '#017',
-            customerName: 'Russel Carlo',
-            item: 'Bilao 1',
-            date: 'May 17, 2025',
-            time: '14:04:23',
-            confirmation: 'Pending',
-            paymentMethod: 'GCash 50%',
-            gcashNumber: '+63 948....',
-            orderMethod: 'Delivery',
-            requestDateTime: 'Sat, May 17, 2025  10:32 AM',
-            items: [
-                {
-                    name: 'Sapin-sapin Kutsinta',
-                    qty: 1,
-                    price: 650
-                }
-            ],
-            priceOfFood: 650,
-            deliveryFee: 75,
-            downPayment: 362.5,
-            gcashFees: 7.25,
-            total: 355.25
-        },
-        {
-            id: '2',
-            orderId: '#018',
-            customerName: 'Maria Santos',
-            item: 'Adobo Rice',
-            date: 'May 16, 2025',
-            time: '12:30:15',
-            confirmation: 'Approved',
-            paymentMethod: 'Cash',
-            gcashNumber: '',
-            orderMethod: 'Pickup',
-            requestDateTime: 'Fri, May 16, 2025  12:35 PM',
-            items: [
-                {
-                    name: 'Adobo Rice',
-                    qty: 2,
-                    price: 120
-                }
-            ],
-            priceOfFood: 240,
-            deliveryFee: 0,
-            downPayment: 120,
-            gcashFees: 0,
-            total: 240
-        },
-        {
-            id: '3',
-            orderId: '#019',
-            customerName: 'John Dela Cruz',
-            item: 'Pancit Canton',
-            date: 'May 16, 2025',
-            time: '10:45:30',
-            confirmation: 'Rejected',
-            paymentMethod: 'GCash 100%',
-            gcashNumber: '+63 912....',
-            orderMethod: 'Delivery',
-            requestDateTime: 'Fri, May 16, 2025  10:50 AM',
-            items: [
-                {
-                    name: 'Pancit Canton',
-                    qty: 1,
-                    price: 180
-                }
-            ],
-            priceOfFood: 180,
-            deliveryFee: 75,
-            downPayment: 255,
-            gcashFees: 5.5,
-            total: 249.5
-        },
-        {
-            id: '4',
-            orderId: '#020',
-            customerName: 'Anna Garcia',
-            item: 'Lechon Kawali',
-            date: 'May 15, 2025',
-            time: '16:20:45',
-            confirmation: 'Pending',
-            paymentMethod: 'GCash 75%',
-            gcashNumber: '+63 905....',
-            orderMethod: 'Delivery',
-            requestDateTime: 'Thu, May 15, 2025  16:25 PM',
-            items: [
-                {
-                    name: 'Lechon Kawali',
-                    qty: 1,
-                    price: 320
-                }
-            ],
-            priceOfFood: 320,
-            deliveryFee: 75,
-            downPayment: 296.25,
-            gcashFees: 6.75,
-            total: 289.5
-        }
-    ])
-
-    const markAllAsRead = () => {
-        setNotifications(prev => prev.map(notif => ({ ...notif, read: true })))
-    }
-
-    const getNotificationIcon = (iconType: string) => {
-        switch (iconType) {
-            case 'heart':
-                return <Heart className="h-5 w-5" fill="currentColor" />
-            case 'message':
-                return <MessageSquare className="h-5 w-5" />
-            case 'star':
-                return <Star className="h-5 w-5" fill="currentColor" />
-            default:
-                return <Bell className="h-5 w-5" />
-        }
-    }
-
-    const handleConfirmationChange = (requestId: string, newStatus: 'Approved' | 'Rejected') => {
-        setRefundRequests(prev =>
-            prev.map(request =>
-                request.id === requestId
-                    ? { ...request, confirmation: newStatus }
-                    : request
-            )
-        )
-    }
-
-    const handleOpenReviewModal = (request: RefundRequest) => {
-        setSelectedRefund(request)
-        setIsReviewModalOpen(true)
-    }
-
-    const handleApproveRefund = () => {
-        if (selectedRefund) {
-            handleConfirmationChange(selectedRefund.id, 'Approved')
-            setIsReviewModalOpen(false)
-        }
-    }
-
-    const handleRejectRefund = () => {
-        if (selectedRefund) {
-            handleConfirmationChange(selectedRefund.id, 'Rejected')
-            setIsReviewModalOpen(false)
-        }
-    }
-
-    const getStatusColor = (status: string) => {
-        switch (status) {
-            case 'Pending':
-                return 'bg-yellow-500 text-white'
-            case 'Approved':
-                return 'bg-green-500 text-white'
-            case 'Rejected':
-                return 'bg-red-500 text-white'
-            default:
-                return 'bg-gray-500 text-white'
-        }
-    }
-
-    const filteredRequests = refundRequests.filter(request => {
-        const matchesSearch = request.customerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            request.orderId.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            request.item.toLowerCase().includes(searchTerm.toLowerCase())
-
-        const matchesFilter = filterModal.status === 'All' || request.confirmation === filterModal.status
-
-        const requestDate = new Date(request.date)
-        const matchesDateRange = (!filterModal.dateFrom || requestDate >= new Date(filterModal.dateFrom)) &&
-            (!filterModal.dateTo || requestDate <= new Date(filterModal.dateTo))
-
-        return matchesSearch && matchesFilter && matchesDateRange
-    })
+    const [refundRequests, setRefundRequests] = useState<RefundRequest[]>([])
+    const [loading, setLoading] = useState(true)
+    const [isProcessing, setIsProcessing] = useState(false)
 
     const getCurrentDate = () => {
         const now = new Date()
@@ -287,8 +82,6 @@ function RouteComponent() {
             hour12: true
         })
     }
-
-    const [isSidebarOpen, setIsSidebarOpen] = useState(false)
 
     const navigationItems = [
         {
@@ -335,6 +128,276 @@ function RouteComponent() {
         },
     ]
 
+    const notificationCount = 1
+
+    const [notifications, setNotifications] = useState<Notification[]>([
+        {
+            id: '1',
+            type: 'order',
+            title: 'We are now preparing your food (#6). Thank you for trusting Angieren\'s Lutong Bahay.',
+            time: '20 sec ago',
+            icon: 'heart',
+            read: false
+        },
+        {
+            id: '2',
+            type: 'feedback',
+            title: 'View your recent feedback about our delivery.',
+            time: '10 min ago',
+            icon: 'message',
+            read: false
+        }
+    ])
+
+    // Fetch refund requests from Supabase
+    useEffect(() => {
+        fetchRefundRequests()
+    }, [])
+
+    const fetchRefundRequests = async () => {
+        try {
+            setLoading(true)
+
+            const { data: refunds, error } = await supabase
+                .from('refund')
+                .select(`
+          refund_id,
+          reason,
+          status,
+          request_date,
+          gcash_number,
+          order_id,
+          order:order_id (
+            order_id,
+            order_number,
+            order_type,
+            total_price,
+            created_at,
+            customer_uid,
+            payment_id,
+            delivery_id,
+            users:customer_uid (
+              first_name,
+              middle_name,
+              last_name,
+              phone_number
+            ),
+            payment:payment_id (
+              payment_method,
+              amount_paid,
+              payment_date
+            ),
+            delivery:delivery_id (
+              delivery_fee
+            ),
+            order_item (
+              quantity,
+              subtotal_price,
+              menu:menu_id (
+                name,
+                price
+              )
+            )
+          )
+        `)
+                .order('request_date', { ascending: false })
+
+            if (error) throw error
+
+            const formattedRefunds: RefundRequest[] = refunds.map((refund: any) => {
+                const order = refund.order
+                const user = order.users
+                const payment = order.payment
+                const delivery = order.delivery
+                const orderItems = order.order_item
+
+                // Format customer name
+                const customerName = `${user.first_name} ${user.middle_name ? user.middle_name + ' ' : ''}${user.last_name}`
+
+                // Format phone number for GCash (mask it)
+                const phoneNumber = refund.gcash_number
+                console.log('GCash Number:', phoneNumber)
+                const maskedPhone = phoneNumber ? `+63 ${phoneNumber.substring(0, 3)}....` : ''
+                console.log('Masked GCash Number:', maskedPhone)
+
+                // Calculate price breakdown
+                const priceOfFood = orderItems.reduce((sum: number, item: any) => sum + parseFloat(item.subtotal_price), 0)
+                const deliveryFee = delivery ? parseFloat(delivery.delivery_fee) : 0
+                const amountPaid = payment ? parseFloat(payment.amount_paid) : 0
+
+                // Calculate GCash fees (2% of amount paid)
+                const gcashFees = payment && payment.payment_method !== 'Cash' ? amountPaid * 0.02 : 0
+
+                // Total refund amount = amount paid - gcash fees
+                const totalRefund = amountPaid - gcashFees
+
+                // Format payment method
+                let paymentMethodDisplay = payment ? payment.payment_method : 'N/A'
+                if (payment && payment.payment_method === 'GCash') {
+                    const totalAmount = priceOfFood + deliveryFee
+                    const percentage = totalAmount > 0 ? ((amountPaid / totalAmount) * 100).toFixed(0) : '0'
+                    paymentMethodDisplay = `GCash ${percentage}%`
+                }
+
+                // Format dates and times
+                const orderDate = new Date(order.created_at)
+                const requestDate = new Date(refund.request_date)
+
+                const formatDate = (date: Date) => {
+                    return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
+                }
+
+                const formatTime = (date: Date) => {
+                    return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })
+                }
+
+                const formatRequestDateTime = (date: Date) => {
+                    return date.toLocaleDateString('en-US', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' }) + '  ' +
+                        date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })
+                }
+
+                // Map refund status
+                let confirmationStatus: 'Pending' | 'Approved' | 'Rejected' = 'Pending'
+                if (refund.status === 'Approved') confirmationStatus = 'Approved'
+                if (refund.status === 'Rejected') confirmationStatus = 'Rejected'
+
+                // Format order items
+                const items = orderItems.map((item: any) => ({
+                    name: item.menu.name,
+                    qty: item.quantity,
+                    price: parseFloat(item.subtotal_price)
+                }))
+
+                return {
+                    id: refund.refund_id,
+                    refundId: refund.refund_id,
+                    orderId: order.order_id,
+                    orderNumber: `#${order.order_number.toString().padStart(3, '0')}`,
+                    customerName,
+                    date: formatDate(orderDate),
+                    time: formatTime(orderDate),
+                    confirmation: confirmationStatus,
+                    paymentMethod: paymentMethodDisplay,
+                    gcashNumber: payment && payment.payment_method !== 'On-Site Cash' ? maskedPhone : '',
+                    orderMethod: order.order_type === 'Delivery' ? 'Delivery' : 'Pickup',
+                    requestDateTime: formatRequestDateTime(requestDate),
+                    items,
+                    priceOfFood,
+                    deliveryFee,
+                    downPayment: amountPaid,
+                    gcashFees: parseFloat(gcashFees.toFixed(2)),
+                    total: parseFloat(totalRefund.toFixed(2))
+                }
+            })
+
+            setRefundRequests(formattedRefunds)
+            console.log('Fetched refund requests:', formattedRefunds)
+        } catch (error) {
+            console.error('Error fetching refund requests:', error)
+        } finally {
+            setLoading(false)
+        }
+    }
+
+    const markAllAsRead = () => {
+        setNotifications(prev => prev.map(notif => ({ ...notif, read: true })))
+    }
+
+    const getNotificationIcon = (iconType: string) => {
+        switch (iconType) {
+            case 'heart':
+                return <Heart className="h-5 w-5" fill="currentColor" />
+            case 'message':
+                return <MessageSquare className="h-5 w-5" />
+            case 'star':
+                return <Star className="h-5 w-5" fill="currentColor" />
+            default:
+                return <Bell className="h-5 w-5" />
+        }
+    }
+
+    const handleConfirmationChange = async (refundId: string, newStatus: 'Approved' | 'Rejected') => {
+        try {
+            setIsProcessing(true)
+
+            const { error } = await supabase
+                .from('refund')
+                .update({ status: newStatus })
+                .eq('refund_id', refundId)
+
+            if (error) throw error
+
+            // Update local state
+            setRefundRequests(prev =>
+                prev.map(request =>
+                    request.refundId === refundId
+                        ? { ...request, confirmation: newStatus }
+                        : request
+                )
+            )
+
+            // Update selected refund if it's the one being modified
+            if (selectedRefund && selectedRefund.refundId === refundId) {
+                setSelectedRefund({ ...selectedRefund, confirmation: newStatus })
+            }
+
+            // Show success message
+            alert(`Refund request has been ${newStatus.toLowerCase()} successfully!`)
+        } catch (error) {
+            console.error('Error updating refund status:', error)
+            alert('Failed to update refund status. Please try again.')
+        } finally {
+            setIsProcessing(false)
+        }
+    }
+
+    const handleOpenReviewModal = (request: RefundRequest) => {
+        setSelectedRefund(request)
+        setIsReviewModalOpen(true)
+    }
+
+    const handleApproveRefund = () => {
+        if (selectedRefund) {
+            handleConfirmationChange(selectedRefund.refundId, 'Approved')
+            setIsReviewModalOpen(false)
+        }
+    }
+
+    const handleRejectRefund = () => {
+        if (selectedRefund) {
+            handleConfirmationChange(selectedRefund.refundId, 'Rejected')
+            setIsReviewModalOpen(false)
+        }
+    }
+
+    const getStatusColor = (status: string) => {
+        switch (status) {
+            case 'Pending':
+                return 'bg-yellow-500 text-white'
+            case 'Approved':
+                return 'bg-green-500 text-white'
+            case 'Rejected':
+                return 'bg-red-500 text-white'
+            default:
+                return 'bg-gray-500 text-white'
+        }
+    }
+
+    const filteredRequests = refundRequests.filter(request => {
+        const matchesSearch = request.customerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            request.orderNumber.toLowerCase().includes(searchTerm.toLowerCase())
+
+        const matchesFilter = filterModal.status === 'All' || request.confirmation === filterModal.status
+
+        const requestDate = new Date(request.date)
+        const matchesDateRange = (!filterModal.dateFrom || requestDate >= new Date(filterModal.dateFrom)) &&
+            (!filterModal.dateTo || requestDate <= new Date(filterModal.dateTo))
+
+        return matchesSearch && matchesFilter && matchesDateRange
+    })
+
+    const [isSidebarOpen, setIsSidebarOpen] = useState(false)
+    const [isNotificationOpen, setIsNotificationOpen] = useState(false)
 
     return (
         <div className="min-h-screen bg-gradient-to-br from-amber-50 to-orange-100 flex overflow-x-hidden">
@@ -349,8 +412,8 @@ function RouteComponent() {
                 <div className="bg-amber-800 text-white px-6 py-4 relative">
                     <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
-                            <div className="w-12 h-12 bg-yellow-400 rounded-full flex items-center justify-center">
-                                <img src="/api/placeholder/40/40" alt="Logo" className="w-8 h-8 rounded-full" />
+                            <div className="w-12 h-12 rounded-full flex items-center justify-center">
+                                <img src="/public/angierens-logo.png" alt="Logo" className="w-12 h-12 rounded-full" />
                             </div>
                             <div>
                                 <h2 className="text-lg font-bold">Angieren's</h2>
@@ -393,9 +456,11 @@ function RouteComponent() {
                     ))}
                 </nav>
 
-                {/* Logout Button */}
                 <div className="px-4 pb-6">
-                    <button className="flex items-center gap-3 px-4 py-3 text-amber-900 hover:bg-red-100 hover:text-red-600 rounded-lg w-full transition-colors">
+                    <button
+                        className="flex items-center gap-3 px-4 py-3 text-amber-900 hover:bg-red-100 hover:text-red-600 rounded-lg w-full transition-colors cursor-pointer"
+                        onClick={handleLogout}
+                    >
                         <LogOut className="h-5 w-5" />
                         Logout
                     </button>
@@ -491,9 +556,9 @@ function RouteComponent() {
                 </header>
 
                 {/* Refund Content */}
-                <main className="flex-1 p-3 sm:p-4 lg:p-6 overflow-y-auto overflow-x-hidden">
-                    {/* Search + Filter */}
-                    <div className="mb-6 flex flex-col sm:flex-row gap-3 sm:gap-4">
+                <main className="flex-1 p-6 overflow-y-auto">
+                    {/* Search and Filter */}
+                    <div className="mb-6 flex gap-4">
                         <div className="bg-white flex-1 relative">
                             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
                             <input
@@ -501,99 +566,112 @@ function RouteComponent() {
                                 placeholder="Search a name, order, or etc"
                                 value={searchTerm}
                                 onChange={(e) => setSearchTerm(e.target.value)}
-                                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-400 focus:border-transparent text-sm sm:text-base"
+                                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-400 focus:border-transparent"
                             />
                         </div>
                         <button
                             onClick={() => setFilterModal({ ...filterModal, isOpen: true })}
-                            className="bg-white flex items-center justify-center sm:justify-start gap-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 text-sm sm:text-base"
+                            className="bg-white flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
                         >
                             <Filter className="h-4 w-4" />
-                            <span className="hidden sm:inline">Filter</span>
+                            Filter
                         </button>
                     </div>
-
-                    {/* Refund Table (scrollable on small screens) */}
-                    <div className="bg-white rounded-xl shadow-sm border border-gray-200 min-w-0 overflow-hidden">
-                        {/* Scrollable Table */}
-                        <div className="w-full overflow-x-auto">
-                            <table className="min-w-[800px] w-full text-sm sm:text-base">
+                    <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+                        {/* Scroll wrapper */}
+                        <div className="overflow-x-auto">
+                            {/* Force wide layout */}
+                            <table className="min-w-[900px] w-full table-fixed">
+                                {/* Table Header */}
                                 <thead className="bg-amber-800 text-white">
                                     <tr>
-                                        <th className="px-6 py-4 text-left font-medium">ORDER ID</th>
-                                        <th className="px-6 py-4 text-left font-medium">CUSTOMER</th>
-                                        <th className="px-6 py-4 text-left font-medium">ITEM</th>
-                                        <th className="px-6 py-4 text-left font-medium">DATE</th>
-                                        <th className="px-6 py-4 text-left font-medium">TIME</th>
-                                        <th className="px-6 py-4 text-left font-medium">STATUS</th>
-                                        <th className="px-6 py-4 text-center font-medium">ACTIONS</th>
+                                        <th className="px-4 py-3 text-left text-sm font-medium tracking-wider">ORDER #</th>
+                                        <th className="px-4 py-3 text-left text-sm font-medium tracking-wider">CUSTOMER NAME</th>
+                                        <th className="px-4 py-3 text-left text-sm font-medium tracking-wider">DATE</th>
+                                        <th className="px-4 py-3 text-left text-sm font-medium tracking-wider">TIME</th>
+                                        <th className="px-4 py-3 text-left text-sm font-medium tracking-wider">CONFIRMATION</th>
+                                        <th className="px-4 py-3 text-center text-sm font-medium tracking-wider">REFUND BUTTON</th>
                                     </tr>
                                 </thead>
-                                <tbody className="divide-y divide-gray-200">
-                                    {filteredRequests.map((request) => (
-                                        <tr key={request.id} className="hover:bg-gray-50">
-                                            <td className="p-4">{request.orderId}</td>
-                                            <td className="p-4">{request.customerName}</td>
-                                            <td className="p-4">{request.item}</td>
-                                            <td className="p-4">{request.date}</td>
-                                            <td className="p-4">{request.time}</td>
-                                            <td className="p-4">
-                                                <span
-                                                    className={`px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(
-                                                        request.confirmation
-                                                    )}`}
-                                                >
-                                                    {request.confirmation}
-                                                </span>
-                                            </td>
-                                            <td className="p-4">
-                                                <button
-                                                    onClick={() => handleOpenReviewModal(request)}
-                                                    className="bg-yellow-400 text-amber-800 px-3 py-1 rounded text-sm font-medium hover:bg-yellow-500 transition-colors"
-                                                >
-                                                    REVIEW
-                                                </button>
-                                            </td>
-                                        </tr>
-                                    ))}
-                                    {filteredRequests.length === 0 && (
-                                        <tr>
-                                            <td colSpan={7} className="text-center py-8 text-gray-500">
-                                                No refund requests found.
-                                            </td>
-                                        </tr>
-                                    )}
-                                </tbody>
+
+                                {/* Loading State */}
+                                {loading ? (
+                                    <div className="fixed inset-0 bg-black/50 flex justify-center items-center z-[60]">
+                                        <div className="bg-white rounded-xl shadow-lg p-6 flex flex-col items-center gap-4">
+                                            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#964B00]"></div>
+                                            <p className="text-gray-700 font-medium">Processing...</p>
+                                        </div>
+                                    </div>
+                                ) : (
+
+                                    <tbody className="divide-y divide-gray-200">
+                                        {filteredRequests.map((request) => (
+                                            <tr
+                                                key={request.id}
+                                                className="hover:bg-gray-50 transition-colors"
+                                            >
+                                                <td className="px-4 py-3 text-sm text-gray-800">{request.orderNumber}</td>
+                                                <td className="px-4 py-3 text-sm text-gray-800">{request.customerName}</td>
+                                                <td className="px-4 py-3 text-sm text-gray-800">{request.date}</td>
+                                                <td className="px-4 py-3 text-sm text-gray-800">{request.time}</td>
+                                                <td className="px-4 py-3 text-sm">
+                                                    <span
+                                                        className={`px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(
+                                                            request.confirmation
+                                                        )}`}
+                                                    >
+                                                        {request.confirmation}
+                                                    </span>
+                                                </td>
+                                                <td className="px-4 py-3 text-sm text-center">
+                                                    <button
+                                                        onClick={() => handleOpenReviewModal(request)}
+                                                        className="bg-yellow-400 text-amber-800 px-3 py-1 rounded text-sm font-medium hover:bg-yellow-500 transition-colors"
+                                                    >
+                                                        REVIEW
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        ))}
+
+                                        {filteredRequests.length === 0 && (
+                                            <tr>
+                                                <td colSpan={6} className="text-center py-8 text-gray-500">
+                                                    No refund requests found.
+                                                </td>
+                                            </tr>
+                                        )}
+                                    </tbody>
+                                )}
                             </table>
                         </div>
                     </div>
+
                 </main>
             </div>
 
             {/* Review Modal */}
             {isReviewModalOpen && selectedRefund && (
-                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 px-4">
-                    <div className="bg-white rounded-lg p-4 sm:p-6 max-w-lg w-full shadow-xl">
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-lg p-6 max-w-lg w-full mx-4 shadow-xl max-h-[90vh] overflow-y-auto">
                         {/* Header */}
                         <div className="flex justify-between items-center mb-6 pb-4 border-b border-yellow-400">
-                            <h3 className="text-lg sm:text-xl font-bold text-gray-800">Refund Details</h3>
+                            <h3 className="text-xl font-bold text-gray-800">Refund Details</h3>
                             <button
                                 onClick={() => setIsReviewModalOpen(false)}
-                                className="text-gray-500 hover:text-gray-700 text-xl sm:text-2xl"
+                                className="text-gray-500 hover:text-gray-700 text-2xl"
                             >
                                 ×
                             </button>
                         </div>
 
                         {/* Customer Details */}
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+                        <div className="grid grid-cols-2 gap-4 mb-6">
                             <div>
                                 <p className="text-gray-800 font-medium">{selectedRefund.customerName}</p>
-                                <p className="text-gray-600 text-sm">
-                                    Payment Method: {selectedRefund.paymentMethod}
-                                </p>
+                                <p className="text-gray-600 text-sm">Payment Method: {selectedRefund.paymentMethod}</p>
                             </div>
-                            <div className="text-left sm:text-right">
+                            <div className="text-right">
                                 {selectedRefund.gcashNumber && (
                                     <p className="text-gray-600 text-sm">Gcash #: {selectedRefund.gcashNumber}</p>
                                 )}
@@ -602,12 +680,12 @@ function RouteComponent() {
                         </div>
 
                         {/* Date and Time */}
-                        <div className="flex flex-col sm:flex-row justify-between mb-6">
+                        <div className="flex justify-between mb-6">
                             <div>
                                 <p className="text-gray-800">{selectedRefund.date}</p>
                                 <p className="text-gray-600 text-sm">Request date and time:</p>
                             </div>
-                            <div className="text-left sm:text-right">
+                            <div className="text-right">
                                 <p className="text-gray-800">{selectedRefund.time}</p>
                                 <p className="text-gray-600 text-sm">{selectedRefund.requestDateTime}</p>
                             </div>
@@ -615,19 +693,16 @@ function RouteComponent() {
 
                         {/* Items Table */}
                         <div className="mb-6">
-                            <div className="grid grid-cols-3 gap-4 font-medium text-gray-800 mb-2 text-sm sm:text-base">
+                            <div className="grid grid-cols-3 gap-4 font-medium text-gray-800 mb-2">
                                 <span>Items</span>
                                 <span className="text-center">Qty</span>
                                 <span className="text-right">Price</span>
                             </div>
                             {selectedRefund.items.map((item, index) => (
-                                <div
-                                    key={index}
-                                    className="grid grid-cols-3 gap-4 text-gray-700 py-2 text-sm sm:text-base"
-                                >
+                                <div key={index} className="grid grid-cols-3 gap-4 text-gray-700 py-2">
                                     <span>{item.name}</span>
                                     <span className="text-center">{item.qty}</span>
-                                    <span className="text-right">₱ {item.price}</span>
+                                    <span className="text-right">₱ {item.price.toFixed(2)}</span>
                                 </div>
                             ))}
                         </div>
@@ -635,50 +710,52 @@ function RouteComponent() {
                         <hr className="border-gray-300 mb-4" />
 
                         {/* Pricing Breakdown */}
-                        <div className="space-y-2 mb-6 text-sm sm:text-base">
+                        <div className="space-y-2 mb-6">
                             <div className="flex justify-between">
                                 <span className="text-gray-800">Price of food:</span>
-                                <span className="text-gray-800">₱ {selectedRefund.priceOfFood}</span>
+                                <span className="text-gray-800">₱ {selectedRefund.priceOfFood.toFixed(2)}</span>
                             </div>
                             <div className="flex justify-between">
                                 <span className="text-gray-800">Delivery fee:</span>
-                                <span className="text-gray-800">₱ {selectedRefund.deliveryFee}</span>
+                                <span className="text-gray-800">₱ {selectedRefund.deliveryFee.toFixed(2)}</span>
                             </div>
                             <div className="flex justify-between">
-                                <span className="text-gray-800">Down payment 50%:</span>
-                                <span className="text-gray-800">₱ {selectedRefund.downPayment}</span>
+                                <span className="text-gray-800">Amount paid:</span>
+                                <span className="text-gray-800">₱ {selectedRefund.downPayment.toFixed(2)}</span>
                             </div>
                             <div className="flex justify-between">
-                                <span className="text-gray-800">Gcash fees:</span>
-                                <span className="text-gray-800">- ₱ {selectedRefund.gcashFees}</span>
+                                <span className="text-gray-800">Gcash fees (2%):</span>
+                                <span className="text-gray-800">- ₱ {selectedRefund.gcashFees.toFixed(2)}</span>
                             </div>
-                            <div className="flex justify-between font-bold text-base sm:text-lg border-t pt-2">
-                                <span className="text-gray-800">Total:</span>
-                                <span className="text-gray-800">₱ {selectedRefund.total}</span>
+                            <div className="flex justify-between font-bold text-lg border-t pt-2">
+                                <span className="text-gray-800">Total refund:</span>
+                                <span className="text-gray-800">₱ {selectedRefund.total.toFixed(2)}</span>
                             </div>
                         </div>
 
                         {/* Action Buttons */}
-                        <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 pt-4">
+                        <div className="flex gap-3 pt-4">
                             {selectedRefund.confirmation === 'Pending' ? (
                                 <>
                                     <button
-                                        onClick={handleApproveRefund}
-                                        className="flex-1 bg-green-500 text-white py-2 sm:py-3 rounded-lg font-medium hover:bg-green-600 transition-colors text-sm sm:text-base"
+                                        onClick={handleRejectRefund}
+                                        disabled={isProcessing}
+                                        className="flex-1 bg-red-500 text-white py-3 rounded-lg font-medium hover:bg-red-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                                     >
-                                        Approve
+                                        {isProcessing ? 'Processing...' : 'Reject'}
                                     </button>
                                     <button
-                                        onClick={handleRejectRefund}
-                                        className="flex-1 bg-red-500 text-white py-2 sm:py-3 rounded-lg font-medium hover:bg-red-600 transition-colors text-sm sm:text-base"
+                                        onClick={handleApproveRefund}
+                                        disabled={isProcessing}
+                                        className="flex-1 bg-green-500 text-white py-3 rounded-lg font-medium hover:bg-green-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                                     >
-                                        Cancel
+                                        {isProcessing ? 'Processing...' : 'Approve'}
                                     </button>
                                 </>
                             ) : (
                                 <button
                                     onClick={() => setIsReviewModalOpen(false)}
-                                    className="flex-1 bg-gray-300 text-gray-700 py-2 sm:py-3 rounded-lg font-medium hover:bg-gray-400 transition-colors text-sm sm:text-base"
+                                    className="flex-1 bg-gray-300 text-gray-700 py-3 rounded-lg font-medium hover:bg-gray-400 transition-colors"
                                 >
                                     Close
                                 </button>
@@ -690,13 +767,13 @@ function RouteComponent() {
 
             {/* Filter Modal */}
             {filterModal.isOpen && (
-                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 px-4">
-                    <div className="bg-white rounded-lg p-4 sm:p-6 max-w-md w-full shadow-xl">
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+                    <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4 shadow-xl">
                         <div className="flex justify-between items-center mb-6 pb-4 border-b border-yellow-400">
-                            <h3 className="text-lg sm:text-xl font-bold text-gray-800">Filter Options</h3>
+                            <h3 className="text-xl font-bold text-gray-800">Filter Options</h3>
                             <button
                                 onClick={() => setFilterModal({ ...filterModal, isOpen: false })}
-                                className="text-gray-500 hover:text-gray-700 text-xl sm:text-2xl"
+                                className="text-gray-500 hover:text-gray-700 text-2xl"
                             >
                                 ×
                             </button>
@@ -705,14 +782,14 @@ function RouteComponent() {
                         {/* Date Range */}
                         <div className="mb-6">
                             <label className="block text-sm font-medium text-gray-700 mb-2">Date Range</label>
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div className="grid grid-cols-2 gap-3">
                                 <div>
                                     <label className="block text-xs text-gray-600 mb-1">From</label>
                                     <input
                                         type="date"
                                         value={filterModal.dateFrom}
                                         onChange={(e) => setFilterModal({ ...filterModal, dateFrom: e.target.value })}
-                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-400 focus:border-transparent text-sm sm:text-base"
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-400 focus:border-transparent"
                                     />
                                 </div>
                                 <div>
@@ -721,7 +798,7 @@ function RouteComponent() {
                                         type="date"
                                         value={filterModal.dateTo}
                                         onChange={(e) => setFilterModal({ ...filterModal, dateTo: e.target.value })}
-                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-400 focus:border-transparent text-sm sm:text-base"
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-400 focus:border-transparent"
                                     />
                                 </div>
                             </div>
@@ -736,7 +813,7 @@ function RouteComponent() {
                                         key={status}
                                         onClick={() => setFilterModal({ ...filterModal, status })}
                                         className={`w-full text-left px-3 py-2 rounded hover:bg-gray-100 ${filterModal.status === status ? 'bg-yellow-100 text-amber-800' : 'text-gray-700'
-                                            } text-sm sm:text-base`}
+                                            }`}
                                     >
                                         {status}
                                     </button>
@@ -745,18 +822,16 @@ function RouteComponent() {
                         </div>
 
                         {/* Action Buttons */}
-                        <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 pt-4">
+                        <div className="flex gap-3 pt-4">
                             <button
-                                onClick={() =>
-                                    setFilterModal({ isOpen: false, dateFrom: '', dateTo: '', status: 'All' })
-                                }
-                                className="flex-1 bg-gray-300 text-gray-700 py-2 rounded-lg font-medium hover:bg-gray-400 transition-colors text-sm sm:text-base"
+                                onClick={() => setFilterModal({ isOpen: false, dateFrom: '', dateTo: '', status: 'All' })}
+                                className="flex-1 bg-gray-300 text-gray-700 py-2 rounded-lg font-medium hover:bg-gray-400 transition-colors"
                             >
                                 Clear
                             </button>
                             <button
                                 onClick={() => setFilterModal({ ...filterModal, isOpen: false })}
-                                className="flex-1 bg-yellow-400 text-amber-800 py-2 rounded-lg font-medium hover:bg-yellow-500 transition-colors text-sm sm:text-base"
+                                className="flex-1 bg-yellow-400 text-amber-800 py-2 rounded-lg font-medium hover:bg-yellow-500 transition-colors"
                             >
                                 Apply
                             </button>
@@ -765,6 +840,5 @@ function RouteComponent() {
                 </div>
             )}
         </div>
-    );
-
+    )
 }

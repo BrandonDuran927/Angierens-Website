@@ -1,5 +1,5 @@
 import { createLazyFileRoute, Link } from '@tanstack/react-router'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import {
   Edit, Save, Menu, Bell, Clock, X,
   Calendar,
@@ -11,16 +11,39 @@ import {
   LogOut,
   Star
 } from 'lucide-react'
+import { supabase } from '@/lib/supabaseClient'
+import { useNavigate } from '@tanstack/react-router'
+import { useUser } from '@/context/UserContext'
+
 
 export const Route = createLazyFileRoute('/staff/my-info')({
   component: RouteComponent,
 })
 
+interface UserData {
+  user_uid: string
+  first_name: string
+  middle_name: string | null
+  last_name: string
+  email: string
+  phone_number: string
+}
+
 function RouteComponent() {
+  const { user, signOut } = useUser()
+
+  async function handleLogout() {
+    await signOut();
+    navigate({ to: "/login" });
+  }
+
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null)
+  const [loading, setLoading] = useState(true)
+
   // Only editable fields are in state
   const [editableData, setEditableData] = useState({
-    phoneNumber: '+63 912 212 1209',
-    email: 'jennyfrenzzy@gmail.com',
+    phoneNumber: '',
+    email: '',
     newPassword: '',
     retypePassword: ''
   })
@@ -38,18 +61,82 @@ function RouteComponent() {
   const [currentPassword, setCurrentPassword] = useState('')
   const [otpCode, setOtpCode] = useState('')
   const [pendingEdit, setPendingEdit] = useState('')
+  const [sentCode, setSentCode] = useState('')
+  const navigate = useNavigate()
 
   // Store original values for cancel functionality
   const [originalValues, setOriginalValues] = useState({
-    phoneNumber: '+63 912 212 1209',
-    email: 'jennyfrenzzy@gmail.com'
+    phoneNumber: '',
+    email: ''
   })
 
   // Static user data (non-editable)
-  const staticData = {
-    firstName: 'Jenny',
+  const [staticData, setStaticData] = useState({
+    firstName: '',
     middleName: '',
-    lastName: 'Frenzzy'
+    lastName: ''
+  })
+
+  useEffect(() => {
+    fetchCurrentUser()
+  }, [])
+
+  const fetchCurrentUser = async () => {
+    try {
+      setLoading(true)
+
+      // Get current authenticated user
+      const { data: { user }, error: authError } = await supabase.auth.getUser()
+
+      if (authError || !user) {
+        console.error('Error getting authenticated user:', authError)
+        alert('Please log in to view your information')
+        navigate({ to: '/login' })
+        return
+      }
+
+      setCurrentUserId(user.id)
+
+      // Fetch user data from users table
+      const { data: userData, error: userError } = await supabase
+        .from('users')
+        .select('user_uid, first_name, middle_name, last_name, email, phone_number')
+        .eq('user_uid', user.id)
+        .single()
+
+      if (userError) {
+        console.error('Error fetching user data:', userError)
+        alert('Failed to load user information')
+        return
+      }
+
+      if (userData) {
+        // Set static (non-editable) data
+        setStaticData({
+          firstName: userData.first_name || '',
+          middleName: userData.middle_name || '',
+          lastName: userData.last_name || ''
+        })
+
+        // Set editable data
+        setEditableData(prev => ({
+          ...prev,
+          phoneNumber: userData.phone_number || '',
+          email: userData.email || ''
+        }))
+
+        // Set original values
+        setOriginalValues({
+          phoneNumber: userData.phone_number || '',
+          email: userData.email || ''
+        })
+      }
+    } catch (error) {
+      console.error('Error in fetchCurrentUser:', error)
+      alert('An error occurred while loading your information')
+    } finally {
+      setLoading(false)
+    }
   }
 
   const handleInputChange = (field: string, value: string) => {
@@ -93,55 +180,51 @@ function RouteComponent() {
     }
   }
 
-  const verifyPassword = () => {
-    // Simulate password verification (replace with actual API call)
+  const verifyPassword = async () => {
     if (currentPassword.trim() === '') {
       alert('Please enter your current password!')
       return
     }
 
-    // Mock password verification - in reality, verify against backend
-    if (currentPassword !== 'password123') {
-      alert('Incorrect password!')
-      return
+    try {
+      // Verify password by attempting to sign in
+      const { data: { user }, error: authError } = await supabase.auth.getUser()
+
+      if (authError || !user) {
+        alert('Session expired. Please log in again.')
+        return
+      }
+
+      // Attempt to re-authenticate with current password
+      const { error } = await supabase.auth.signInWithPassword({
+        email: originalValues.email,
+        password: currentPassword
+      })
+
+      if (error) {
+        alert('Incorrect password!')
+        return
+      }
+
+      // Password verified, proceed based on the field being edited
+      if (pendingEdit === 'phoneNumber') {
+        // For phone number, show OTP modal
+        setShowPasswordModal(false)
+        setShowOtpModal(true)
+      } else {
+        // For email or password change, directly allow editing
+        setShowPasswordModal(false)
+        setEditingFields(prev => ({
+          ...prev,
+          [pendingEdit]: true
+        }))
+      }
+
+      setCurrentPassword('')
+    } catch (error) {
+      console.error('Error verifying password:', error)
+      alert('An error occurred while verifying your password')
     }
-
-    // Password verified, proceed based on the field being edited
-    if (pendingEdit === 'phoneNumber') {
-      // For phone number, show OTP modal
-      setShowPasswordModal(false)
-      setShowOtpModal(true)
-    } else {
-      // For email or password change, directly allow editing
-      setShowPasswordModal(false)
-      setEditingFields(prev => ({
-        ...prev,
-        [pendingEdit]: true
-      }))
-    }
-
-    setCurrentPassword('')
-  }
-
-  const verifyOtp = () => {
-    if (otpCode.trim() === '') {
-      alert('Please enter the OTP code!')
-      return
-    }
-
-    // Mock OTP verification - in reality, verify against backend
-    if (otpCode !== '123456') {
-      alert('Invalid OTP code!')
-      return
-    }
-
-    // OTP verified, allow phone number editing
-    setShowOtpModal(false)
-    setEditingFields(prev => ({
-      ...prev,
-      phoneNumber: true
-    }))
-    setOtpCode('')
   }
 
   const closePasswordModal = () => {
@@ -150,13 +233,12 @@ function RouteComponent() {
     setPendingEdit('')
   }
 
-  const closeOtpModal = () => {
-    setShowOtpModal(false)
-    setOtpCode('')
-    setPendingEdit('')
-  }
+  const saveField = async (field: string) => {
+    if (!currentUserId) {
+      alert('User not authenticated')
+      return
+    }
 
-  const saveField = (field: string) => {
     if (field === 'phoneNumber' || field === 'email') {
       // Basic validation
       if (field === 'email' && !editableData.email.includes('@')) {
@@ -169,22 +251,59 @@ function RouteComponent() {
         return
       }
 
-      // Update original value
-      setOriginalValues(prev => ({
-        ...prev,
-        [field]: editableData[field as keyof typeof editableData]
-      }))
+      try {
+        setLoading(true)
 
-      setEditingFields(prev => ({
-        ...prev,
-        [field]: false
-      }))
+        // Update in users table
+        const updateData = field === 'phoneNumber'
+          ? { phone_number: editableData.phoneNumber }
+          : { email: editableData.email }
 
-      alert(`${field === 'phoneNumber' ? 'Phone number' : 'Email address'} updated successfully!`)
+        const { error: updateError } = await supabase
+          .from('users')
+          .update(updateData)
+          .eq('user_uid', currentUserId)
+
+        if (updateError) {
+          console.error('Error updating user data:', updateError)
+          alert('Failed to update. Please try again.')
+          return
+        }
+
+        // If updating email, also update auth email
+        if (field === 'email') {
+          const { error: authError } = await supabase.auth.updateUser({
+            email: editableData.email
+          })
+
+          if (authError) {
+            console.error('Error updating auth email:', authError)
+            alert('Profile updated but email verification may be required. Please check your inbox.')
+          }
+        }
+
+        // Update original value
+        setOriginalValues(prev => ({
+          ...prev,
+          [field]: editableData[field as keyof typeof editableData] as string
+        }))
+
+        setEditingFields(prev => ({
+          ...prev,
+          [field]: false
+        }))
+
+        alert(`${field === 'phoneNumber' ? 'Phone number' : 'Email address'} updated successfully!`)
+      } catch (error) {
+        console.error('Error saving field:', error)
+        alert('An error occurred while saving your changes')
+      } finally {
+        setLoading(false)
+      }
     }
   }
 
-  const handleChangePassword = () => {
+  const handleChangePassword = async () => {
     if (editableData.newPassword !== editableData.retypePassword) {
       alert('Passwords do not match!')
       return
@@ -198,18 +317,35 @@ function RouteComponent() {
       return
     }
 
-    // Handle password change logic here
-    console.log('Password changed successfully')
-    setEditableData(prev => ({
-      ...prev,
-      newPassword: '',
-      retypePassword: ''
-    }))
-    setEditingFields(prev => ({
-      ...prev,
-      password: false
-    }))
-    alert('Password changed successfully!')
+    try {
+      setLoading(true)
+
+      const { error } = await supabase.auth.updateUser({
+        password: editableData.newPassword
+      })
+
+      if (error) {
+        console.error('Error updating password:', error)
+        alert('Failed to update password. Please try again.')
+        return
+      }
+
+      setEditableData(prev => ({
+        ...prev,
+        newPassword: '',
+        retypePassword: ''
+      }))
+      setEditingFields(prev => ({
+        ...prev,
+        password: false
+      }))
+      alert('Password changed successfully!')
+    } catch (error) {
+      console.error('Error changing password:', error)
+      alert('An error occurred while changing your password')
+    } finally {
+      setLoading(false)
+    }
   }
 
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
@@ -319,6 +455,76 @@ function RouteComponent() {
     },
   ]
 
+  const formatPhoneNumber = (number: string): string => {
+    const cleaned = number.replace(/\s+/g, '')
+
+    if (cleaned.startsWith('0')) {
+      return '+63' + cleaned.substring(1)
+    }
+
+    return cleaned
+  }
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+
+    try {
+      const formattedNumber = formatPhoneNumber(editableData.phoneNumber)
+
+      const { data, error } = await supabase.functions.invoke('send-otp', {
+        body: { phoneNumber: formattedNumber }
+      })
+
+      if (error) throw error
+      console.log("Data sent:", data)
+      setSentCode(data)
+
+      setShowOtpModal(true)
+    } catch (error) {
+      console.error('Error sending OTP:', error)
+    }
+  }
+
+  const closeOtpModal = () => {
+    setShowOtpModal(false)
+    setSentCode('')
+    setOtpCode('')
+  }
+
+  const verifyOtp = async () => {
+    try {
+      const formattedNumber = formatPhoneNumber(editableData.phoneNumber)
+
+      const { data, error } = await supabase.functions.invoke('verify-otp', {
+        body: { phoneNumber: formattedNumber, otpCode },
+      })
+
+      if (error) throw error
+
+      if (data.status === 'approved') {
+        alert('OTP verified successfully!')
+        closeOtpModal()
+
+        // Save the phone number after OTP verification
+        await saveField('phoneNumber')
+      } else {
+        alert('Invalid or expired OTP.')
+      }
+    } catch (error) {
+      console.error('Error verifying OTP:', error)
+      alert('Failed to verify OTP. Please try again.')
+    }
+  }
+
+  const LoadingSpinner = () => (
+    <div className="fixed inset-0 bg-black/50 flex justify-center items-center z-[60]">
+      <div className="bg-white rounded-xl shadow-lg p-6 flex flex-col items-center gap-4">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#964B00]"></div>
+        <p className="text-gray-700 font-medium">Loading...</p>
+      </div>
+    </div>
+  )
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-amber-50 to-orange-100 flex overflow-x-hidden">
       {/* Password Verification Modal */}
@@ -387,7 +593,10 @@ function RouteComponent() {
               />
             </div>
             <div className="text-center mb-4">
-              <button className="text-[#964B00] text-sm hover:underline">
+              <button
+                onClick={handleSubmit}
+                className="text-[#964B00] text-sm hover:underline"
+              >
                 Resend OTP
               </button>
             </div>
@@ -420,8 +629,8 @@ function RouteComponent() {
         <div className="bg-amber-800 text-white px-6 py-4 relative">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="w-12 h-12 bg-yellow-400 rounded-full flex items-center justify-center">
-                <img src="/api/placeholder/40/40" alt="Logo" className="w-8 h-8 rounded-full" />
+              <div className="w-12 h-12 rounded-full flex items-center justify-center">
+                <img src="/public/angierens-logo.png" alt="Logo" className="w-12 h-12 rounded-full" />
               </div>
               <div>
                 <h2 className="text-lg font-bold">Angieren's</h2>
@@ -439,9 +648,11 @@ function RouteComponent() {
 
         {/* User Info */}
         <div className="px-6 py-4 border-b-2 border-amber-600">
-          <h3 className="font-bold text-lg text-amber-900">Jenny Frenzzy</h3>
-          <p className="text-sm text-amber-800">+63 912 212 1209</p>
-          <p className="text-sm text-amber-800">jennyfrenzzy@gmail.com</p>
+          <h3 className="font-bold text-lg text-amber-900">
+            {staticData.firstName} {staticData.lastName}
+          </h3>
+          <p className="text-sm text-amber-800">{editableData.phoneNumber}</p>
+          <p className="text-sm text-amber-800">{editableData.email}</p>
         </div>
 
         {/* Navigation Menu */}
@@ -463,9 +674,11 @@ function RouteComponent() {
           ))}
         </nav>
 
-        {/* Logout Button */}
         <div className="px-4 pb-6">
-          <button className="flex items-center gap-3 px-4 py-3 text-amber-900 hover:bg-red-100 hover:text-red-600 rounded-lg w-full transition-colors">
+          <button
+            className="flex items-center gap-3 px-4 py-3 text-amber-900 hover:bg-red-100 hover:text-red-600 rounded-lg w-full transition-colors cursor-pointer"
+            onClick={handleLogout}
+          >
             <LogOut className="h-5 w-5" />
             Logout
           </button>
@@ -628,7 +841,7 @@ function RouteComponent() {
                       />
                       <div className="flex gap-2">
                         <button
-                          onClick={() => saveField('phoneNumber')}
+                          onClick={handleSubmit}
                           className="p-2 bg-green-600 hover:bg-green-700 text-white rounded-lg"
                         >
                           <Save className="h-5 w-5" />
@@ -769,7 +982,8 @@ function RouteComponent() {
           </div>
         </div>
       </div>
+
+      {loading && <LoadingSpinner />}
     </div>
   )
-
 }
