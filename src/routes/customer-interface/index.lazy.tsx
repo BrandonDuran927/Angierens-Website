@@ -3,24 +3,25 @@ import { useState, useEffect } from 'react'
 import { Search, ShoppingCart, Bell, ChevronDown, X, Plus, Minus, Heart, MessageSquare, Star, Menu } from 'lucide-react'
 import { useUser } from '@/context/UserContext'
 import { useNavigate } from '@tanstack/react-router'
+import { supabase } from '@/lib/supabaseClient'
 
 // Type definitions
 interface MenuItem {
-  id: number
+  menu_id: string
   name: string
   price: number
-  image: string
-  category: string
+  image_url: string | null
+  category: string | null
   description: string
-  inclusions: string[],
-  src: string
+  inclusion: string | null
+  is_available: boolean
+  size: string | null
 }
 
 interface AddOnOption {
-  id: string
+  add_on: string
   name: string
   price: number
-  unit: string
 }
 
 interface AddOns {
@@ -65,15 +66,93 @@ function RouteComponent() {
   const [orderQuantity, setOrderQuantity] = useState(1)
   const [addOns, setAddOns] = useState<AddOns>({})
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
+  const [menuItems, setMenuItems] = useState<MenuItem[]>([])
+  const [addOnOptions, setAddOnOptions] = useState<AddOnOption[]>([])
+  const [loading, setLoading] = useState(true)
+  const [categories, setCategories] = useState<string[]>(['All Categories'])
 
-  const categories = [
-    'All Categories',
-    'Bilao Mix',
-    'Baked Mac',
-    'Special Dishes',
-    'Beverages',
-    'Desserts'
-  ]
+  // Fetch menu items from Supabase
+  useEffect(() => {
+    fetchMenuItems()
+    fetchAddOns()
+    if (user) {
+      fetchCartCount()
+    }
+  }, [user])
+
+  const fetchMenuItems = async () => {
+    try {
+      setLoading(true)
+      const { data, error } = await supabase
+        .from('menu')
+        .select('*')
+        .eq('is_available', true)
+        .order('category', { ascending: true })
+
+      if (error) throw error
+
+      if (data) {
+        setMenuItems(data)
+
+        // Extract unique categories
+        const uniqueCategories = ['All Categories', ...new Set(data.map(item => item.category).filter(Boolean) as string[])]
+        setCategories(uniqueCategories)
+        console.log('Fetched menu items:', data)
+      }
+    } catch (error) {
+      console.error('Error fetching menu items:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const fetchAddOns = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('add_on')
+        .select('*')
+        .order('name', { ascending: true })
+
+      if (error) throw error
+
+      if (data) {
+        setAddOnOptions(data)
+      }
+    } catch (error) {
+      console.error('Error fetching add-ons:', error)
+    }
+  }
+
+  const fetchCartCount = async () => {
+    if (!user?.id) return
+
+    try {
+      // Get or create cart for user
+      let { data: cartData, error: cartError } = await supabase
+        .from('cart')
+        .select('cart_id')
+        .eq('customer_uid', user.id)
+        .single()
+
+      if (cartError && cartError.code !== 'PGRST116') {
+        throw cartError
+      }
+
+      if (cartData) {
+        // Count cart items
+        const { data: itemsData, error: itemsError } = await supabase
+          .from('cart_item')
+          .select('cart_item_id')
+          .eq('cart_id', cartData.cart_id)
+
+        if (itemsError) throw itemsError
+
+        setCartCount(itemsData?.length || 0)
+      }
+    } catch (error) {
+      console.error('Error fetching cart count:', error)
+    }
+  }
 
   const [notifications, setNotifications] = useState<Notification[]>([
     {
@@ -135,108 +214,6 @@ function RouteComponent() {
     }
   }
 
-  const addOnOptions: AddOnOption[] = [
-    { id: 'puto', name: 'Puto', price: 250, unit: '20pcs' },
-    { id: 'sapin-sapin', name: 'Sapin-sapin', price: 150, unit: '10pcs' },
-    { id: 'kutsinta', name: 'Kutsinta', price: 200, unit: '15pcs' },
-    { id: 'biko', name: 'Biko', price: 180, unit: '1 tray' },
-    { id: 'leche-flan', name: 'Leche Flan', price: 300, unit: '1 whole' },
-    { id: 'ube-halaya', name: 'Ube Halaya', price: 250, unit: '1 tray' }
-  ]
-
-  const menuItems: MenuItem[] = [
-    {
-      id: 1,
-      name: '5 in 1 Mix in Bilao (PALABOK)',
-      price: 1850,
-      image: '/api/placeholder/300/200',
-      category: 'Bilao Mix',
-      description: 'A hearty bilao with classic palabok, crispy pork shanghai, juicy pork BBQ, and cheesy cordon bleu — perfect for any celebration!',
-      inclusions: [
-        '40 pcs. Pork Shanghai',
-        '12 pcs. Pork BBQ',
-        '30 pcs. Pork Shanghai',
-        '30 slices Cordon Bleu'
-      ],
-      src: "/public/menu-page img/pancit malabonbon.png"
-    },
-    {
-      id: 2,
-      name: '5 in 1 Mix in Bilao (SPAGHETTI)',
-      price: 1900,
-      image: '/api/placeholder/300/200',
-      category: 'Bilao Mix',
-      description: 'Delicious spaghetti with our signature meat sauce, served with crispy sides for a complete meal experience.',
-      inclusions: [
-        '40 pcs. Pork Shanghai',
-        '12 pcs. Pork BBQ',
-        '30 pcs. Pork Shanghai',
-        '30 slices Cordon Bleu'
-      ],
-      src: "/public/menu-page img/spaghetto.png"
-    },
-    {
-      id: 3,
-      name: '5 in 1 Mix in Bilao (VALENCIANA)',
-      price: 1900,
-      image: '/api/placeholder/300/200',
-      category: 'Bilao Mix',
-      description: 'Traditional valenciana rice dish with mixed meats and vegetables, served with delicious side dishes.',
-      inclusions: [
-        '40 pcs. Pork Shanghai',
-        '12 pcs. Pork BBQ',
-        '30 pcs. Pork Shanghai',
-        '30 slices Cordon Bleu'
-      ],
-      src: "/public/menu-page img/valencia.png"
-    },
-    {
-      id: 4,
-      name: '5 in 1 Mix in Bilao (SOTANGHON GUISADO)',
-      price: 2000,
-      image: '/api/placeholder/300/200',
-      category: 'Bilao Mix',
-      description: 'Savory sotanghon noodles with mixed vegetables and meat, perfect for family gatherings.',
-      inclusions: [
-        '40 pcs. Pork Shanghai',
-        '12 pcs. Pork BBQ',
-        '30 pcs. Pork Shanghai',
-        '30 slices Cordon Bleu'
-      ],
-      src: "/public/menu-page img/sotanghonney.png"
-    },
-    {
-      id: 5,
-      name: '5 in 1 BAKEDMAC',
-      price: 2100,
-      image: '/api/placeholder/300/200',
-      category: 'Baked Mac',
-      description: 'Creamy baked macaroni with cheese and meat, served with complementary Filipino favorites.',
-      inclusions: [
-        '40 pcs. Pork Shanghai',
-        '12 pcs. Pork BBQ',
-        '30 pcs. Buttered Puto',
-        '30 slices Cordon Bleu'
-      ],
-      src: "/public/menu-page img/baked mac.png"
-    },
-    {
-      id: 6,
-      name: '5 in 1 Mix in Bilao (SPECIAL PANSIT MALABON)',
-      price: 1900,
-      image: '/api/placeholder/300/200',
-      category: 'Special Dishes',
-      description: 'Authentic Pansit Malabon with thick rice noodles, seafood, and special sauce, served with sides.',
-      inclusions: [
-        '40 pcs. Pork Shanghai',
-        '12 pcs. Pork BBQ',
-        '30 pcs. Pork Shanghai',
-        '30 slices Cordon Bleu'
-      ],
-      src: "/public/menu-page img/special.png"
-    }
-  ]
-
   const filteredItems = menuItems.filter(item => {
     const matchesCategory = selectedCategory === 'All Categories' || item.category === selectedCategory
     const matchesSearch = item.name.toLowerCase().includes(searchQuery.toLowerCase())
@@ -267,19 +244,102 @@ function RouteComponent() {
   const calculateTotal = () => {
     if (!selectedItem) return 0
 
-    const basePrice = selectedItem.price * orderQuantity
+    const basePrice = Number(selectedItem.price) * orderQuantity
     const addOnPrice = Object.entries(addOns).reduce((total, [addOnId, quantity]) => {
-      const addOn = addOnOptions.find(ao => ao.id === addOnId)
-      return total + (addOn ? addOn.price * (quantity as number) : 0)
+      const addOn = addOnOptions.find(ao => ao.add_on === addOnId)
+      return total + (addOn ? Number(addOn.price) * (quantity as number) : 0)
     }, 0)
 
     return basePrice + addOnPrice
   }
 
-  const addToCart = () => {
-    setCartCount(prev => prev + 1)
-    closeModal()
-    // Add your cart logic here
+  const addToCart = async () => {
+    if (!user?.id) {
+      alert('Please sign in to add items to cart')
+      navigate({ to: '/login' })
+      return
+    }
+
+    if (!selectedItem) return
+
+    try {
+      // Get or create cart for user
+      let { data: cartData, error: cartError } = await supabase
+        .from('cart')
+        .select('cart_id')
+        .eq('customer_uid', user.id)
+        .single()
+
+      if (cartError && cartError.code === 'PGRST116') {
+        // Cart doesn't exist, create one
+        const { data: newCart, error: createError } = await supabase
+          .from('cart')
+          .insert([{
+            customer_uid: user.id,
+            created_at: new Date().toISOString()
+          }])
+          .select()
+          .single()
+
+        if (createError) throw createError
+        cartData = newCart
+      } else if (cartError) {
+        throw cartError
+      }
+
+      if (!cartData) throw new Error('Failed to get or create cart')
+
+      // Add cart item
+      const { data: cartItem, error: itemError } = await supabase
+        .from('cart_item')
+        .insert([{
+          cart_id: cartData.cart_id,
+          menu_id: selectedItem.menu_id,
+          quantity: orderQuantity,
+          price: Number(selectedItem.price)
+        }])
+        .select()
+        .single()
+
+      if (itemError) throw itemError
+
+      // Add cart item add-ons if any
+      const addOnEntries = Object.entries(addOns).filter(([_, qty]) => qty > 0)
+
+      if (addOnEntries.length > 0) {
+        const addOnInserts = addOnEntries.map(([addOnId, quantity]) => {
+          const addOn = addOnOptions.find(ao => ao.add_on === addOnId)
+          return {
+            cart_item_id: cartItem.cart_item_id,
+            add_on_id: addOnId,
+            quantity: quantity,
+            price: addOn ? Number(addOn.price) : 0
+          }
+        })
+
+        const { error: addOnError } = await supabase
+          .from('cart_item_add_on')
+          .insert(addOnInserts)
+
+        if (addOnError) throw addOnError
+      }
+
+      // Update cart count
+      await fetchCartCount()
+
+      closeModal()
+      alert('Item added to cart successfully!')
+    } catch (error) {
+      console.error('Error adding to cart:', error)
+      alert('Failed to add item to cart. Please try again.')
+    }
+  }
+
+  // Parse inclusions from text to array
+  const parseInclusions = (inclusion: string | null): string[] => {
+    if (!inclusion) return []
+    // Split by newline or comma, filter out empty strings
+    return inclusion.split(/[\n,]/).map(item => item.trim()).filter(Boolean)
   }
 
   // Navigation items with their corresponding routes
@@ -291,15 +351,14 @@ function RouteComponent() {
     { name: 'MY INFO', route: '/customer-interface/my-info', active: false },
   ];
 
-
   const logoStyle: React.CSSProperties = {
-    width: '140px', // equivalent to w-35 (35 * 4px = 140px)
-    height: '140px', // equivalent to h-35 (35 * 4px = 140px)
+    width: '140px',
+    height: '140px',
     backgroundImage: "url('/angierens-logo.png')",
     backgroundSize: 'cover',
     backgroundPosition: 'center',
     position: 'absolute' as const,
-    top: '8px', // equivalent to top-2
+    top: '8px',
     left: '16px'
   };
 
@@ -330,6 +389,20 @@ function RouteComponent() {
   }
 `;
 
+  // Add this helper function near the top of your component, after the state declarations
+  const getImageUrl = (imageUrl: string | null): string => {
+    if (!imageUrl) return '/api/placeholder/300/200'
+
+    // If it's already a full URL, return it
+    if (imageUrl.startsWith('http://') || imageUrl.startsWith('https://')) {
+      return imageUrl
+    }
+
+    // Construct the Supabase storage URL
+    // Encode the filename to handle spaces and special characters
+    const encodedFileName = encodeURIComponent(imageUrl)
+    return `https://tvuawpgcpmqhsmwbwypy.supabase.co/storage/v1/object/public/menu-images/${encodedFileName}`
+  }
 
   return (
     <div className="min-h-screen min-w-[320px] bg-gradient-to-br from-amber-50 to-orange-100">
@@ -512,14 +585,14 @@ function RouteComponent() {
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-3 sm:px-4 md:px-6 lg:px-8 py-6 sm:py-8 mb-[50px]">
-        {/* Page Header - Better tablet layout */}
+        {/* Page Header */}
         <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-6 sm:mb-8 gap-4">
           <div className="flex-1">
             <h2 className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-900">Explore Our Best Menu!</h2>
             <p className="text-gray-600 mt-2 text-sm sm:text-base">Discover our authentic Filipino dishes made with love</p>
           </div>
 
-          {/* Search Bar - Better tablet sizing */}
+          {/* Search Bar */}
           <div className="relative w-full md:w-72 lg:w-80">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
             <input
@@ -532,7 +605,7 @@ function RouteComponent() {
           </div>
         </div>
 
-        {/* Category Filter - Better tablet sizing */}
+        {/* Category Filter */}
         <div className="mb-6 sm:mb-8">
           <div className="relative inline-block w-full sm:w-auto">
             <select
@@ -550,59 +623,80 @@ function RouteComponent() {
           </div>
         </div>
 
-        {/* Menu Items Grid - Better tablet grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-4 md:gap-6 lg:gap-8">
-          {filteredItems.map((item) => (
-            <div key={item.id} className="bg-white rounded-2xl shadow-lg overflow-hidden hover:shadow-xl transition-shadow duration-300">
-              {/* Price Tag */}
-              <div className="relative">
-                <div className="absolute top-4 left-4 bg-yellow-400 text-black px-3 sm:px-4 py-1 sm:py-2 rounded-full font-bold text-base sm:text-lg z-10">
-                  ₱ {item.price.toLocaleString()}
-                </div>
-
-                {/* Food Image Container */}
-                <div className="relative h-48 sm:h-64 overflow-hidden">
-                  <img
-                    src={item.src}
-                    alt={item.name}
-                    className="w-full h-full object-cover"
-                  />
-                  {/* Optional overlay for better price tag visibility */}
-                  <div className="absolute inset-0 bg-black/10"></div>
-                </div>
-              </div>
-
-              {/* Content */}
-              <div className="p-4 sm:p-6">
-                <h3 className="text-lg sm:text-xl font-bold text-gray-900 mb-3">{item.name}</h3>
-
-                {/* Inclusions */}
-                <div className="mb-4">
-                  <p className="text-sm font-semibold text-gray-700 mb-2">Inclusion:</p>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-1 text-xs text-gray-600">
-                    {item.inclusions.map((inclusion, index) => (
-                      <p key={index}>{inclusion}</p>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Order Button */}
-                <button
-                  onClick={() => openOrderModal(item)}
-                  className="w-full bg-yellow-400 text-black px-4 sm:px-6 py-2 sm:py-3 rounded-lg font-bold hover:bg-yellow-500 transition-colors duration-200 shadow-md text-sm sm:text-base"
-                >
-                  ORDER NOW
-                </button>
-              </div>
+        {/* Loading State */}
+        {loading ? (
+          <div className="fixed inset-0 bg-black/50 flex justify-center items-center z-[60]">
+            <div className="bg-white rounded-xl shadow-lg p-6 flex flex-col items-center gap-4">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#964B00]"></div>
+              <p className="text-gray-700 font-medium">Processing...</p>
             </div>
-          ))}
-        </div>
-
-        {/* No Results */}
-        {filteredItems.length === 0 && (
-          <div className="text-center py-12">
-            <p className="text-gray-500 text-lg">No items found matching your search.</p>
           </div>
+        ) : (
+          <>
+            {/* Menu Items Grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-4 md:gap-6 lg:gap-8">
+              {filteredItems.map((item) => {
+                const inclusions = parseInclusions(item.inclusion)
+                return (
+                  <div key={item.menu_id} className="bg-white rounded-2xl shadow-lg overflow-hidden hover:shadow-xl transition-shadow duration-300">
+                    {/* Price Tag */}
+                    <div className="relative">
+                      <div className="absolute top-4 left-4 bg-yellow-400 text-black px-3 sm:px-4 py-1 sm:py-2 rounded-full font-bold text-base sm:text-lg z-10">
+                        ₱ {Number(item.price).toLocaleString()}
+                      </div>
+
+                      {/* Food Image Container */}
+                      <div className="relative h-48 sm:h-64 overflow-hidden">
+                        <img
+                          src={getImageUrl(item.image_url)}
+                          alt={item.name}
+                          className="w-full h-full object-cover"
+                        />
+                        <div className="absolute inset-0 bg-black/10"></div>
+                      </div>
+                    </div>
+
+                    {/* Content */}
+                    <div className="p-4 sm:p-6">
+                      <h3 className="text-lg sm:text-xl font-bold text-gray-900 mb-3">{item.name}</h3>
+
+                      {/* Description */}
+                      {item.description && (
+                        <p className="text-sm text-gray-600 mb-3">{item.description}</p>
+                      )}
+
+                      {/* Inclusions */}
+                      {inclusions.length > 0 && (
+                        <div className="mb-4">
+                          <p className="text-sm font-semibold text-gray-700 mb-2">Inclusion:</p>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-1 text-xs text-gray-600">
+                            {inclusions.map((inclusion, index) => (
+                              <p key={index}>{inclusion}</p>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Order Button */}
+                      <button
+                        onClick={() => openOrderModal(item)}
+                        className="w-full bg-yellow-400 text-black px-4 sm:px-6 py-2 sm:py-3 rounded-lg font-bold hover:bg-yellow-500 transition-colors duration-200 shadow-md text-sm sm:text-base"
+                      >
+                        ORDER NOW
+                      </button>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+
+            {/* No Results */}
+            {filteredItems.length === 0 && (
+              <div className="text-center py-12">
+                <p className="text-gray-500 text-lg">No items found matching your search.</p>
+              </div>
+            )}
+          </>
         )}
       </main>
 
@@ -626,14 +720,16 @@ function RouteComponent() {
                   </button>
                 </div>
 
-                <div className="mb-6">
-                  <h3 className="text-base sm:text-lg font-semibold text-gray-800 mb-3">Inclusion:</h3>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    {selectedItem.inclusions.map((inclusion: string, index: number) => (
-                      <p key={index} className="text-gray-600 text-sm">{inclusion}</p>
-                    ))}
+                {parseInclusions(selectedItem.inclusion).length > 0 && (
+                  <div className="mb-6">
+                    <h3 className="text-base sm:text-lg font-semibold text-gray-800 mb-3">Inclusion:</h3>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      {parseInclusions(selectedItem.inclusion).map((inclusion: string, index: number) => (
+                        <p key={index} className="text-gray-600 text-sm">{inclusion}</p>
+                      ))}
+                    </div>
                   </div>
-                </div>
+                )}
 
                 {/* Quantity selector */}
                 <div className="flex flex-col sm:flex-row sm:items-center gap-4 mb-6">
@@ -669,30 +765,30 @@ function RouteComponent() {
                 </div>
               </div>
 
-              {/* Right side - Add-ons - Full width on mobile */}
+              {/* Right side - Add-ons */}
               <div className="w-full lg:w-80 bg-gray-50 p-4 sm:p-6 border-t lg:border-t-0 lg:border-l">
                 <h3 className="text-base sm:text-lg font-semibold text-gray-800 mb-4">Add-ons:</h3>
                 <div className="space-y-3">
                   {addOnOptions.map((addOn) => (
-                    <div key={addOn.id} className="flex items-center justify-between">
+                    <div key={addOn.add_on} className="flex items-center justify-between">
                       <div className="flex-1">
                         <button className="bg-yellow-400 text-black px-3 py-1 rounded-full text-sm font-medium">
                           {addOn.name}
                         </button>
                         <div className="text-xs text-gray-600 mt-1">
-                          ₱{addOn.price} / {addOn.unit}
+                          ₱{Number(addOn.price).toLocaleString()}
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
                         <button
-                          onClick={() => updateAddOnQuantity(addOn.id, (addOns[addOn.id] || 0) - 1)}
+                          onClick={() => updateAddOnQuantity(addOn.add_on, (addOns[addOn.add_on] || 0) - 1)}
                           className="w-8 h-8 rounded-full border-2 border-gray-300 flex items-center justify-center hover:bg-gray-100"
                         >
                           <Minus className="h-3 w-3" />
                         </button>
-                        <span className="w-8 text-center text-sm">{addOns[addOn.id] || 0}</span>
+                        <span className="w-8 text-center text-sm">{addOns[addOn.add_on] || 0}</span>
                         <button
-                          onClick={() => updateAddOnQuantity(addOn.id, (addOns[addOn.id] || 0) + 1)}
+                          onClick={() => updateAddOnQuantity(addOn.add_on, (addOns[addOn.add_on] || 0) + 1)}
                           className="w-8 h-8 rounded-full border-2 border-gray-300 flex items-center justify-center hover:bg-gray-100"
                         >
                           <Plus className="h-3 w-3" />

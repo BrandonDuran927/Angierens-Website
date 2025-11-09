@@ -43,6 +43,7 @@ interface OrderDisplay {
     paymentMethod: string
     order_status: string
     orderData?: Order
+    proofOfPaymentUrl?: string | null
 }
 
 interface OrderForm {
@@ -118,6 +119,9 @@ function RouteComponent() {
     const [menuItems, setMenuItems] = useState<MenuItem[]>([])
     const [addOns, setAddOns] = useState<AddOn[]>([])
     const [menuSearchQuery, setMenuSearchQuery] = useState('')
+    const [showViewReceiptModal, setShowViewReceiptModal] = useState(false)
+    const [viewReceiptUrl, setViewReceiptUrl] = useState<string>('')
+
 
     const statusGroups = {
         'New Orders': ['Pending'],
@@ -234,7 +238,8 @@ function RouteComponent() {
                 fulfillmentType: order.order_type,
                 paymentMethod: order.payment.paymentMethod || 'On-Site Payment',
                 order_status: order.order_status,
-                orderData: order
+                orderData: order,
+                proofOfPaymentUrl: order.payment.proof_of_payment_url || null
             }))
 
             console.log('Loaded orders:', formattedOrders)
@@ -710,6 +715,16 @@ function RouteComponent() {
     const orderPrice = selectedOrder?.orderData?.order_item.reduce((sum, item) => {
         return sum + Number(item.subtotal_price);
     }, 0) || 0;
+
+    const handleOpenViewReceipt = (receiptUrl: string) => {
+        setViewReceiptUrl(receiptUrl)
+        setShowViewReceiptModal(true)
+    }
+
+    const handleCloseViewReceipt = () => {
+        setShowViewReceiptModal(false)
+        setViewReceiptUrl('')
+    }
 
     return (
         <div className="min-h-screen bg-gradient-to-br from-amber-50 to-orange-100 flex overflow-x-hidden">
@@ -1466,8 +1481,27 @@ function RouteComponent() {
                                     <CreditCard className="h-5 w-5 text-gray-600" />
                                     <span className="font-medium text-gray-700">Payment Method</span>
                                 </div>
-                                <p className="text-lg font-semibold text-gray-800">{selectedOrder.paymentMethod}</p>
+
+                                <p className="text-lg font-semibold text-gray-800 mb-3">
+                                    {selectedOrder.paymentMethod}
+                                </p>
+
+                                {selectedOrder.proofOfPaymentUrl && (
+                                    <button
+                                        onClick={(e) => {
+                                            e.preventDefault();
+                                            e.stopPropagation();
+                                            if (selectedOrder.proofOfPaymentUrl) {
+                                                handleOpenViewReceipt(selectedOrder.proofOfPaymentUrl);
+                                            }
+                                        }}
+                                        className="px-3 sm:px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 text-sm sm:text-base whitespace-nowrap"
+                                    >
+                                        View Receipt
+                                    </button>
+                                )}
                             </div>
+
 
                             {/* Additional Information */}
                             {selectedOrder.orderData.additional_information && (
@@ -1780,6 +1814,39 @@ function RouteComponent() {
                     >
                         Next
                     </button>
+                </div>
+            )}
+            {/* View Receipt Modal */}
+            {showViewReceiptModal && (
+                <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-hidden">
+                        <div className="p-4 border-b border-gray-200 flex items-center justify-between">
+                            <h2 className="text-xl font-bold text-black">Payment Receipt</h2>
+                            <button
+                                onClick={handleCloseViewReceipt}
+                                className="text-gray-500 hover:text-gray-700 text-2xl font-bold"
+                            >
+                                ×
+                            </button>
+                        </div>
+
+                        <div className="p-4 overflow-auto max-h-[calc(90vh-120px)]">
+                            <img
+                                src={viewReceiptUrl}
+                                alt="Payment Receipt"
+                                className="w-full h-auto rounded-lg"
+                            />
+                        </div>
+
+                        <div className="p-4 border-t border-gray-200 flex justify-end">
+                            <button
+                                onClick={handleCloseViewReceipt}
+                                className="bg-gray-300 hover:bg-gray-400 text-gray-800 font-medium py-2 px-6 rounded-lg transition-colors"
+                            >
+                                Close
+                            </button>
+                        </div>
+                    </div>
                 </div>
             )}
         </div>

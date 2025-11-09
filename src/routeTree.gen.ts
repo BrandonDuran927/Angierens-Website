@@ -13,6 +13,7 @@ import { createFileRoute } from '@tanstack/react-router'
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as PostsIndexRouteImport } from './routes/posts/index'
 import { Route as PostsPostIdRouteImport } from './routes/posts/$postId'
+import { Route as CustomerInterfacePaymentRouteImport } from './routes/customer-interface/payment'
 
 const SignupLazyRouteImport = createFileRoute('/signup')()
 const LoginLazyRouteImport = createFileRoute('/login')()
@@ -31,9 +32,6 @@ const StaffRefundLazyRouteImport = createFileRoute('/staff/refund')()
 const StaffMyInfoLazyRouteImport = createFileRoute('/staff/my-info')()
 const StaffMenuLazyRouteImport = createFileRoute('/staff/menu')()
 const StaffDeliveriesLazyRouteImport = createFileRoute('/staff/deliveries')()
-const CustomerInterfacePaymentLazyRouteImport = createFileRoute(
-  '/customer-interface/payment',
-)()
 const CustomerInterfaceOrderLazyRouteImport = createFileRoute(
   '/customer-interface/order',
 )()
@@ -169,14 +167,6 @@ const StaffDeliveriesLazyRoute = StaffDeliveriesLazyRouteImport.update({
 } as any).lazy(() =>
   import('./routes/staff/deliveries.lazy').then((d) => d.Route),
 )
-const CustomerInterfacePaymentLazyRoute =
-  CustomerInterfacePaymentLazyRouteImport.update({
-    id: '/customer-interface/payment',
-    path: '/customer-interface/payment',
-    getParentRoute: () => rootRouteImport,
-  } as any).lazy(() =>
-    import('./routes/customer-interface/payment.lazy').then((d) => d.Route),
-  )
 const CustomerInterfaceOrderLazyRoute =
   CustomerInterfaceOrderLazyRouteImport.update({
     id: '/customer-interface/order',
@@ -267,6 +257,14 @@ const PostsPostIdRoute = PostsPostIdRouteImport.update({
   path: '/posts/$postId',
   getParentRoute: () => rootRouteImport,
 } as any)
+const CustomerInterfacePaymentRoute =
+  CustomerInterfacePaymentRouteImport.update({
+    id: '/customer-interface/payment',
+    path: '/customer-interface/payment',
+    getParentRoute: () => rootRouteImport,
+  } as any).lazy(() =>
+    import('./routes/customer-interface/payment.lazy').then((d) => d.Route),
+  )
 const CustomerInterfaceFeedbackIndexLazyRoute =
   CustomerInterfaceFeedbackIndexLazyRouteImport.update({
     id: '/customer-interface/feedback/',
@@ -319,6 +317,7 @@ export interface FileRoutesByFullPath {
   '/about': typeof AboutLazyRoute
   '/login': typeof LoginLazyRoute
   '/signup': typeof SignupLazyRoute
+  '/customer-interface/payment': typeof CustomerInterfacePaymentRoute
   '/posts/$postId': typeof PostsPostIdRoute
   '/admin-interface/menu': typeof AdminInterfaceMenuLazyRoute
   '/admin-interface/orders': typeof AdminInterfaceOrdersLazyRoute
@@ -331,7 +330,6 @@ export interface FileRoutesByFullPath {
   '/customer-interface/home': typeof CustomerInterfaceHomeLazyRoute
   '/customer-interface/my-info': typeof CustomerInterfaceMyInfoLazyRoute
   '/customer-interface/order': typeof CustomerInterfaceOrderLazyRoute
-  '/customer-interface/payment': typeof CustomerInterfacePaymentLazyRoute
   '/staff/deliveries': typeof StaffDeliveriesLazyRoute
   '/staff/menu': typeof StaffMenuLazyRoute
   '/staff/my-info': typeof StaffMyInfoLazyRoute
@@ -354,6 +352,7 @@ export interface FileRoutesByTo {
   '/about': typeof AboutLazyRoute
   '/login': typeof LoginLazyRoute
   '/signup': typeof SignupLazyRoute
+  '/customer-interface/payment': typeof CustomerInterfacePaymentRoute
   '/posts/$postId': typeof PostsPostIdRoute
   '/admin-interface/menu': typeof AdminInterfaceMenuLazyRoute
   '/admin-interface/orders': typeof AdminInterfaceOrdersLazyRoute
@@ -366,7 +365,6 @@ export interface FileRoutesByTo {
   '/customer-interface/home': typeof CustomerInterfaceHomeLazyRoute
   '/customer-interface/my-info': typeof CustomerInterfaceMyInfoLazyRoute
   '/customer-interface/order': typeof CustomerInterfaceOrderLazyRoute
-  '/customer-interface/payment': typeof CustomerInterfacePaymentLazyRoute
   '/staff/deliveries': typeof StaffDeliveriesLazyRoute
   '/staff/menu': typeof StaffMenuLazyRoute
   '/staff/my-info': typeof StaffMyInfoLazyRoute
@@ -390,6 +388,7 @@ export interface FileRoutesById {
   '/about': typeof AboutLazyRoute
   '/login': typeof LoginLazyRoute
   '/signup': typeof SignupLazyRoute
+  '/customer-interface/payment': typeof CustomerInterfacePaymentRoute
   '/posts/$postId': typeof PostsPostIdRoute
   '/admin-interface/menu': typeof AdminInterfaceMenuLazyRoute
   '/admin-interface/orders': typeof AdminInterfaceOrdersLazyRoute
@@ -402,7 +401,6 @@ export interface FileRoutesById {
   '/customer-interface/home': typeof CustomerInterfaceHomeLazyRoute
   '/customer-interface/my-info': typeof CustomerInterfaceMyInfoLazyRoute
   '/customer-interface/order': typeof CustomerInterfaceOrderLazyRoute
-  '/customer-interface/payment': typeof CustomerInterfacePaymentLazyRoute
   '/staff/deliveries': typeof StaffDeliveriesLazyRoute
   '/staff/menu': typeof StaffMenuLazyRoute
   '/staff/my-info': typeof StaffMyInfoLazyRoute
@@ -427,6 +425,7 @@ export interface FileRouteTypes {
     | '/about'
     | '/login'
     | '/signup'
+    | '/customer-interface/payment'
     | '/posts/$postId'
     | '/admin-interface/menu'
     | '/admin-interface/orders'
@@ -439,7 +438,6 @@ export interface FileRouteTypes {
     | '/customer-interface/home'
     | '/customer-interface/my-info'
     | '/customer-interface/order'
-    | '/customer-interface/payment'
     | '/staff/deliveries'
     | '/staff/menu'
     | '/staff/my-info'
@@ -462,6 +460,7 @@ export interface FileRouteTypes {
     | '/about'
     | '/login'
     | '/signup'
+    | '/customer-interface/payment'
     | '/posts/$postId'
     | '/admin-interface/menu'
     | '/admin-interface/orders'
@@ -474,7 +473,6 @@ export interface FileRouteTypes {
     | '/customer-interface/home'
     | '/customer-interface/my-info'
     | '/customer-interface/order'
-    | '/customer-interface/payment'
     | '/staff/deliveries'
     | '/staff/menu'
     | '/staff/my-info'
@@ -497,6 +495,7 @@ export interface FileRouteTypes {
     | '/about'
     | '/login'
     | '/signup'
+    | '/customer-interface/payment'
     | '/posts/$postId'
     | '/admin-interface/menu'
     | '/admin-interface/orders'
@@ -509,7 +508,6 @@ export interface FileRouteTypes {
     | '/customer-interface/home'
     | '/customer-interface/my-info'
     | '/customer-interface/order'
-    | '/customer-interface/payment'
     | '/staff/deliveries'
     | '/staff/menu'
     | '/staff/my-info'
@@ -533,6 +531,7 @@ export interface RootRouteChildren {
   AboutLazyRoute: typeof AboutLazyRoute
   LoginLazyRoute: typeof LoginLazyRoute
   SignupLazyRoute: typeof SignupLazyRoute
+  CustomerInterfacePaymentRoute: typeof CustomerInterfacePaymentRoute
   PostsPostIdRoute: typeof PostsPostIdRoute
   AdminInterfaceMenuLazyRoute: typeof AdminInterfaceMenuLazyRoute
   AdminInterfaceOrdersLazyRoute: typeof AdminInterfaceOrdersLazyRoute
@@ -545,7 +544,6 @@ export interface RootRouteChildren {
   CustomerInterfaceHomeLazyRoute: typeof CustomerInterfaceHomeLazyRoute
   CustomerInterfaceMyInfoLazyRoute: typeof CustomerInterfaceMyInfoLazyRoute
   CustomerInterfaceOrderLazyRoute: typeof CustomerInterfaceOrderLazyRoute
-  CustomerInterfacePaymentLazyRoute: typeof CustomerInterfacePaymentLazyRoute
   StaffDeliveriesLazyRoute: typeof StaffDeliveriesLazyRoute
   StaffMenuLazyRoute: typeof StaffMenuLazyRoute
   StaffMyInfoLazyRoute: typeof StaffMyInfoLazyRoute
@@ -671,13 +669,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof StaffDeliveriesLazyRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/customer-interface/payment': {
-      id: '/customer-interface/payment'
-      path: '/customer-interface/payment'
-      fullPath: '/customer-interface/payment'
-      preLoaderRoute: typeof CustomerInterfacePaymentLazyRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/customer-interface/order': {
       id: '/customer-interface/order'
       path: '/customer-interface/order'
@@ -762,6 +753,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PostsPostIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/customer-interface/payment': {
+      id: '/customer-interface/payment'
+      path: '/customer-interface/payment'
+      fullPath: '/customer-interface/payment'
+      preLoaderRoute: typeof CustomerInterfacePaymentRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/customer-interface/feedback/': {
       id: '/customer-interface/feedback/'
       path: '/customer-interface/feedback'
@@ -805,6 +803,7 @@ const rootRouteChildren: RootRouteChildren = {
   AboutLazyRoute: AboutLazyRoute,
   LoginLazyRoute: LoginLazyRoute,
   SignupLazyRoute: SignupLazyRoute,
+  CustomerInterfacePaymentRoute: CustomerInterfacePaymentRoute,
   PostsPostIdRoute: PostsPostIdRoute,
   AdminInterfaceMenuLazyRoute: AdminInterfaceMenuLazyRoute,
   AdminInterfaceOrdersLazyRoute: AdminInterfaceOrdersLazyRoute,
@@ -817,7 +816,6 @@ const rootRouteChildren: RootRouteChildren = {
   CustomerInterfaceHomeLazyRoute: CustomerInterfaceHomeLazyRoute,
   CustomerInterfaceMyInfoLazyRoute: CustomerInterfaceMyInfoLazyRoute,
   CustomerInterfaceOrderLazyRoute: CustomerInterfaceOrderLazyRoute,
-  CustomerInterfacePaymentLazyRoute: CustomerInterfacePaymentLazyRoute,
   StaffDeliveriesLazyRoute: StaffDeliveriesLazyRoute,
   StaffMenuLazyRoute: StaffMenuLazyRoute,
   StaffMyInfoLazyRoute: StaffMyInfoLazyRoute,

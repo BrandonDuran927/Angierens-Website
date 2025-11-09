@@ -34,6 +34,7 @@ export interface Payment {
   payment_id: string
   paymentMethod: string | null
   payment_date: string
+  proof_of_payment_url: string | null
 }
 
 export interface Address {
@@ -126,7 +127,8 @@ export async function fetchOrders(): Promise<Order[]> {
     payment:payment_id (
       payment_id,
       payment_method,
-      payment_date
+      payment_date,
+      proof_of_payment_url
     ),
 
     delivery:delivery_id (
@@ -207,6 +209,7 @@ export async function fetchOrders(): Promise<Order[]> {
         payment_id: paymentObj?.payment_id ?? '',
         paymentMethod: paymentObj?.payment_method ?? null,
         payment_date: paymentObj?.payment_date ?? '',
+        proof_of_payment_url: paymentObj?.proof_of_payment_url ?? null,
       },
 
       delivery: {

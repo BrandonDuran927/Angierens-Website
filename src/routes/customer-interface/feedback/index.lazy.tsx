@@ -1,9 +1,10 @@
 import { Link, createLazyFileRoute } from '@tanstack/react-router'
-import { ShoppingCart, Bell, Search, Filter, Eye, Edit, Heart, MessageSquare, Star, X, Menu } from 'lucide-react'
+import { ShoppingCart, Bell, Search, Filter, Eye, Heart, MessageSquare, Star, X, Menu } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import { useUser } from '@/context/UserContext'
 import { useNavigate } from '@tanstack/react-router'
 import { ProtectedRoute } from '@/components/ProtectedRoute'
+import { supabase } from '@/lib/supabaseClient'
 
 export const Route = createLazyFileRoute('/customer-interface/feedback/')({
   component: RouteComponent,
@@ -12,10 +13,11 @@ export const Route = createLazyFileRoute('/customer-interface/feedback/')({
 interface FeedbackItem {
   id: string
   orderId: string
-  itemName: string
-  status: 'Completed'
+  orderNumber: number
+  status: string
   date: string
   time: string
+  completedDate: string | null
   feedback: string
 }
 
@@ -50,6 +52,8 @@ function RouteComponent() {
   const [selectedDate, setSelectedDate] = useState<Date | null>(null)
   const [selectedCategory, setSelectedCategory] = useState('')
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
+  const [feedbackItems, setFeedbackItems] = useState<FeedbackItem[]>([])
+  const [isLoading, setIsLoading] = useState(true)
 
   const [notifications, setNotifications] = useState<Notification[]>([
     {
@@ -102,31 +106,98 @@ function RouteComponent() {
     { name: 'MY INFO', route: '/customer-interface/my-info', active: false },
   ]
 
-  const [feedbackItems] = useState<FeedbackItem[]>([
-    {
-      id: '1',
-      orderId: '#05',
-      itemName: 'Package 1...',
-      status: 'Completed',
-      date: 'May 15, 2025',
-      time: '12:42:21',
-      feedback: 'Delivery and Staff'
-    },
-    {
-      id: '2',
-      orderId: '#08',
-      itemName: 'Package 1...',
-      status: 'Completed',
-      date: 'May 15, 2025',
-      time: '12:42:21',
-      feedback: 'Food and Delivery'
+  // Fetch orders from Supabase
+  useEffect(() => {
+    const fetchOrders = async () => {
+      if (!user?.id) {
+        setIsLoading(false)
+        return
+      }
+
+      try {
+        setIsLoading(true)
+
+        // Fetch orders for the current user where status is 'Completed'
+        const { data, error } = await supabase
+          .from('order')
+          .select('*')
+          .eq('customer_uid', user.id)
+          .eq('order_status', 'Completed')
+          .order('completed_date', { ascending: false })
+
+        if (error) {
+          console.error('Error fetching orders:', error)
+          return
+        }
+
+        if (data) {
+          // Transform the data to match our FeedbackItem interface
+          const transformedData: FeedbackItem[] = data.map(order => {
+            const createdDate = new Date(order.created_at)
+            const completedDateTime = order.completed_date ? new Date(order.completed_date) : null
+
+            return {
+              id: order.order_id,
+              orderId: `#${order.order_number}`,
+              orderNumber: order.order_number,
+              status: order.order_status,
+              date: createdDate.toLocaleDateString('en-US', {
+                year: 'numeric',
+                month: 'short',
+                day: 'numeric'
+              }),
+              time: createdDate.toLocaleTimeString('en-US', {
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit',
+                hour12: false
+              }),
+              completedDate: completedDateTime ? completedDateTime.toLocaleString('en-US', {
+                year: 'numeric',
+                month: 'short',
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit',
+                hour12: false
+              }) : 'N/A',
+              feedback: 'N/A' // You can add a feedback field to your order table or create a separate feedback table
+            }
+          })
+
+          setFeedbackItems(transformedData)
+        }
+      } catch (err) {
+        console.error('Unexpected error fetching orders:', err)
+      } finally {
+        setIsLoading(false)
+      }
     }
-  ])
+
+    fetchOrders()
+  }, [user])
 
   const filteredFeedbacks = feedbackItems.filter(item => {
-    const matchesSearch = item.orderId.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      item.itemName.toLowerCase().includes(searchQuery.toLowerCase())
-    return matchesSearch
+    let matches = true
+
+    // Search filter
+    if (searchQuery) {
+      matches = matches && (
+        item.orderId.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        item.orderNumber.toString().includes(searchQuery)
+      )
+    }
+
+    // Date filter
+    if (selectedDate) {
+      const itemDate = new Date(item.date)
+      const filterDate = new Date(selectedDate)
+      matches = matches && (
+        itemDate.toDateString() === filterDate.toDateString()
+      )
+    }
+
+    return matches
   })
 
   const markAllAsRead = () => {
@@ -147,13 +218,13 @@ function RouteComponent() {
   }
 
   const logoStyle: React.CSSProperties = {
-    width: '140px', // equivalent to w-35 (35 * 4px = 140px)
-    height: '140px', // equivalent to h-35 (35 * 4px = 140px)
+    width: '140px',
+    height: '140px',
     backgroundImage: "url('/angierens-logo.png')",
     backgroundSize: 'cover',
     backgroundPosition: 'center',
     position: 'absolute' as const,
-    top: '8px', // equivalent to top-2
+    top: '8px',
     left: '16px'
   };
 
@@ -183,6 +254,16 @@ function RouteComponent() {
       }
     }
   `;
+
+  const applyFilters = () => {
+    setIsFilterModalOpen(false)
+  }
+
+  const resetFilters = () => {
+    setSelectedDate(null)
+    setSelectedCategory('')
+    setIsFilterModalOpen(false)
+  }
 
   return (
     <ProtectedRoute>
@@ -399,10 +480,10 @@ function RouteComponent() {
                 <div className="bg-[#B8860B] text-white flex-shrink-0">
                   <div className="grid grid-cols-7 gap-4 p-4 font-semibold text-center text-sm">
                     <div>ORDER ID</div>
-                    <div>ITEM NAME</div>
                     <div>STATUS</div>
                     <div>DATE</div>
                     <div>TIME</div>
+                    <div>COMPLETED AT</div>
                     <div>REVIEW</div>
                     <div>ACTION BUTTON</div>
                   </div>
@@ -410,7 +491,11 @@ function RouteComponent() {
 
                 {/* Table Body */}
                 <div className="flex-1 overflow-y-auto divide-y divide-gray-200">
-                  {filteredFeedbacks.length === 0 ? (
+                  {isLoading ? (
+                    <div className="flex items-center justify-center h-40 text-gray-400 text-lg">
+                      Loading feedback...
+                    </div>
+                  ) : filteredFeedbacks.length === 0 ? (
                     <div className="flex items-center justify-center h-40 text-gray-400 text-lg">
                       No feedback found
                     </div>
@@ -421,10 +506,10 @@ function RouteComponent() {
                         className={`grid grid-cols-7 gap-4 p-4 text-center items-center text-sm ${index % 2 === 0 ? 'bg-orange-50' : 'bg-white'}`}
                       >
                         <div className="font-medium text-gray-800">{item.orderId}</div>
-                        <div className="text-gray-700 truncate">{item.itemName}</div>
                         <div className="text-gray-700">{item.status}</div>
                         <div className="text-gray-700">{item.date}</div>
                         <div className="text-gray-700">{item.time}</div>
+                        <div className="text-gray-700">{item.completedDate}</div>
                         <div className="text-gray-700 truncate">{item.feedback}</div>
                         <div className="flex gap-2 justify-center">
                           <Link
@@ -446,7 +531,11 @@ function RouteComponent() {
             {/* Mobile/Tablet Card View */}
             <div className="lg:hidden">
               <div className="max-h-[600px] overflow-y-auto p-4 space-y-3">
-                {filteredFeedbacks.length === 0 ? (
+                {isLoading ? (
+                  <div className="flex items-center justify-center h-40 text-gray-400 text-base">
+                    Loading feedback...
+                  </div>
+                ) : filteredFeedbacks.length === 0 ? (
                   <div className="flex items-center justify-center h-40 text-gray-400 text-base">
                     No feedback found
                   </div>
@@ -459,7 +548,7 @@ function RouteComponent() {
                       {/* Mobile Card Header */}
                       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-3">
                         <div className="font-semibold text-gray-800 text-base mb-1 sm:mb-0">
-                          Order #{item.orderId}
+                          Order {item.orderId}
                         </div>
                         <div className="flex gap-2">
                           <Link
@@ -470,17 +559,12 @@ function RouteComponent() {
                             <Eye className="h-4 w-4" />
                             VIEW
                           </Link>
-
                         </div>
                       </div>
 
                       {/* Mobile Card Content */}
                       <div className="space-y-2 text-sm">
                         <div className="flex flex-col sm:flex-row sm:gap-4">
-                          <div className="sm:flex-1">
-                            <span className="font-medium text-gray-600">Item:</span>
-                            <span className="ml-2 text-gray-700">{item.itemName}</span>
-                          </div>
                           <div className="sm:flex-1">
                             <span className="font-medium text-gray-600">Status:</span>
                             <span className="ml-2 text-gray-700">{item.status}</span>
@@ -496,6 +580,11 @@ function RouteComponent() {
                             <span className="font-medium text-gray-600">Time:</span>
                             <span className="ml-2 text-gray-700">{item.time}</span>
                           </div>
+                        </div>
+
+                        <div>
+                          <span className="font-medium text-gray-600">Completed At:</span>
+                          <span className="ml-2 text-gray-700">{item.completedDate}</span>
                         </div>
 
                         <div>
@@ -516,45 +605,31 @@ function RouteComponent() {
         {/* Filter Modal */}
         {isFilterModalOpen && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-            <div className="bg-white rounded-lg shadow-lg max-w-md w-full p-6">
+            <div className="bg-white rounded-lg shadow-lg max-w-md w-full p-6 mx-4">
               <h2 className="text-2xl font-bold mb-4 border-b pb-2">Filter Feedback</h2>
-
-              <div className="mb-4">
-                <label className="block font-medium mb-1">Select category:</label>
-                <select
-                  value={selectedCategory}
-                  onChange={(e) => setSelectedCategory(e.target.value)}
-                  className="w-full border border-gray-300 rounded px-3 py-2"
-                >
-                  <option value="">All categories</option>
-                  <option value="food">Food Quality</option>
-                  <option value="delivery">Delivery</option>
-                  <option value="staff">Staff Service</option>
-                </select>
-              </div>
 
               <div className="mb-4">
                 <label className="block font-medium mb-1">Select date:</label>
                 <input
                   type="date"
                   value={selectedDate?.toISOString().split('T')[0] || ''}
-                  onChange={(e) => setSelectedDate(new Date(e.target.value))}
+                  onChange={(e) => setSelectedDate(e.target.value ? new Date(e.target.value) : null)}
                   className="w-full px-3 py-2 rounded border border-gray-300"
                 />
               </div>
 
               <div className="flex justify-end gap-3 mt-6">
                 <button
-                  onClick={() => setIsFilterModalOpen(false)}
+                  onClick={resetFilters}
                   className="px-4 py-2 border border-gray-400 rounded hover:bg-gray-100"
                 >
-                  Cancel
+                  Reset
                 </button>
                 <button
-                  onClick={() => setIsFilterModalOpen(false)}
+                  onClick={applyFilters}
                   className="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600"
                 >
-                  Confirm
+                  Apply
                 </button>
               </div>
             </div>

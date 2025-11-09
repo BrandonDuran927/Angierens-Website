@@ -316,40 +316,63 @@ function RouteComponent() {
         }
     }
 
-    const handleConfirmationChange = async (refundId: string, newStatus: 'Approved' | 'Rejected') => {
+    const handleConfirmationChange = async (
+        refundId: string,
+        newStatus: 'Approved' | 'Rejected'
+    ) => {
         try {
-            setIsProcessing(true)
+            setIsProcessing(true);
 
-            const { error } = await supabase
+            // 1. Update refund table first
+            const { error: refundError, data: refundData } = await supabase
                 .from('refund')
                 .update({ status: newStatus })
                 .eq('refund_id', refundId)
+                .select('order_id') // Fetch the related order_id so we can update it next
+                .single();
 
-            if (error) throw error
+            if (refundError) throw refundError;
 
-            // Update local state
+            // 2. If refund is approved, update order status to 'Refund'
+            if (newStatus === 'Approved' && refundData?.order_id) {
+                const { error: orderError } = await supabase
+                    .from('order')
+                    .update({
+                        order_status: 'Refund',
+                        status_updated_at: new Date().toISOString(), // keep consistent with schema
+                    })
+                    .eq('order_id', refundData.order_id);
+
+                if (orderError) throw orderError;
+            }
+
+            // 3. Update local UI state
             setRefundRequests(prev =>
                 prev.map(request =>
                     request.refundId === refundId
                         ? { ...request, confirmation: newStatus }
                         : request
                 )
-            )
+            );
 
-            // Update selected refund if it's the one being modified
             if (selectedRefund && selectedRefund.refundId === refundId) {
-                setSelectedRefund({ ...selectedRefund, confirmation: newStatus })
+                setSelectedRefund({ ...selectedRefund, confirmation: newStatus });
             }
 
-            // Show success message
-            alert(`Refund request has been ${newStatus.toLowerCase()} successfully!`)
+            // 4. Notify user
+            alert(
+                newStatus === 'Approved'
+                    ? 'Refund approved and order status updated to Refund.'
+                    : 'Refund request rejected successfully.'
+            );
         } catch (error) {
-            console.error('Error updating refund status:', error)
-            alert('Failed to update refund status. Please try again.')
+            console.error('Error updating refund status:', error);
+            alert('Failed to update refund status. Please try again.');
         } finally {
-            setIsProcessing(false)
+            setIsProcessing(false);
         }
-    }
+    };
+
 
     const handleOpenReviewModal = (request: RefundRequest) => {
         setSelectedRefund(request)

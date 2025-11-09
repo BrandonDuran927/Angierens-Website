@@ -5,6 +5,7 @@ import { useState, useEffect } from 'react'
 import { useUser } from '@/context/UserContext'
 import { useNavigate } from '@tanstack/react-router'
 import { ProtectedRoute } from '@/components/ProtectedRoute'
+import { supabase } from '@/lib/supabaseClient'
 
 
 export const Route = createLazyFileRoute(
@@ -15,14 +16,19 @@ export const Route = createLazyFileRoute(
 
 interface FeedbackData {
   orderId: string
+  orderNumber: number | null
   deliveryRating: number
   deliveryFeedback: string
+  deliveryReviewId: string | null
   foodRating: number
   foodFeedback: string
+  foodReviewId: string | null
   staffRating: number
   staffFeedback: string
+  staffReviewId: string | null
   riderRating: number
   riderFeedback: string
+  riderReviewId: string | null
 }
 
 interface Notification {
@@ -39,7 +45,7 @@ function RouteComponent() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    console.log("Navigated to /customer-interface")
+    console.log("Navigated to /customer-interface/feedback")
     console.log("Current logged-in user:", user)
   }, [user])
 
@@ -56,6 +62,8 @@ function RouteComponent() {
   const [sendAnonymously, setSendAnonymously] = useState(false)
   const [isNotificationOpen, setIsNotificationOpen] = useState(false)
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
+  const [isLoading, setIsLoading] = useState(true)
+  const [isSaving, setIsSaving] = useState(false)
 
 
   const [notifications, setNotifications] = useState<Notification[]>([
@@ -126,18 +134,110 @@ function RouteComponent() {
     { name: 'MY INFO', route: '/customer-interface/my-info', active: false },
   ]
 
-  // Sample data - in real app, this would come from API based on feedbackId
   const [feedbackData, setFeedbackData] = useState<FeedbackData>({
     orderId: feedbackId,
-    deliveryRating: 5,
-    deliveryFeedback: 'The delivery is very fast, at nakikita ko kung nasaan na yung order ko :) :) 5 star ka sakin!',
-    foodRating: 4,
-    foodFeedback: 'The food was delicious and well-prepared. Great packaging too!',
-    staffRating: 5,
-    staffFeedback: 'Very friendly and accommodating staff. Excellent customer service!',
-    riderRating: 5,
-    riderFeedback: 'Professional rider, arrived on time and handled the order carefully.'
+    orderNumber: null,
+    deliveryRating: 0,
+    deliveryFeedback: '',
+    deliveryReviewId: null,
+    foodRating: 0,
+    foodFeedback: '',
+    foodReviewId: null,
+    staffRating: 0,
+    staffFeedback: '',
+    staffReviewId: null,
+    riderRating: 0,
+    riderFeedback: '',
+    riderReviewId: null
   })
+
+  // Fetch order and reviews from Supabase
+  useEffect(() => {
+    const fetchOrderAndReviews = async () => {
+      if (!feedbackId) {
+        setIsLoading(false)
+        return
+      }
+
+      try {
+        setIsLoading(true)
+
+        // Fetch order details
+        const { data: orderData, error: orderError } = await supabase
+          .from('order')
+          .select('order_number')
+          .eq('order_id', feedbackId)
+          .single()
+
+        if (orderError) {
+          console.error('Error fetching order:', orderError)
+          setIsLoading(false)
+          return
+        }
+
+        // Fetch all reviews for this order
+        const { data: reviewsData, error: reviewsError } = await supabase
+          .from('review')
+          .select('*')
+          .eq('order_id', feedbackId)
+
+        if (reviewsError) {
+          console.error('Error fetching reviews:', reviewsError)
+        }
+
+        // Initialize feedback data with order info
+        const newFeedbackData: FeedbackData = {
+          orderId: feedbackId,
+          orderNumber: orderData?.order_number || null,
+          deliveryRating: 0,
+          deliveryFeedback: '',
+          deliveryReviewId: null,
+          foodRating: 0,
+          foodFeedback: '',
+          foodReviewId: null,
+          staffRating: 0,
+          staffFeedback: '',
+          staffReviewId: null,
+          riderRating: 0,
+          riderFeedback: '',
+          riderReviewId: null
+        }
+
+        // Map reviews to feedback data
+        if (reviewsData && reviewsData.length > 0) {
+          reviewsData.forEach(review => {
+            const type = review.review_type.toLowerCase() as 'delivery' | 'food' | 'staff' | 'rider'
+
+            if (type === 'delivery') {
+              newFeedbackData.deliveryRating = review.rating
+              newFeedbackData.deliveryFeedback = review.comment
+              newFeedbackData.deliveryReviewId = review.review_id
+            } else if (type === 'food') {
+              newFeedbackData.foodRating = review.rating
+              newFeedbackData.foodFeedback = review.comment
+              newFeedbackData.foodReviewId = review.review_id
+            } else if (type === 'staff') {
+              newFeedbackData.staffRating = review.rating
+              newFeedbackData.staffFeedback = review.comment
+              newFeedbackData.staffReviewId = review.review_id
+            } else if (type === 'rider') {
+              newFeedbackData.riderRating = review.rating
+              newFeedbackData.riderFeedback = review.comment
+              newFeedbackData.riderReviewId = review.review_id
+            }
+          })
+        }
+
+        setFeedbackData(newFeedbackData)
+      } catch (err) {
+        console.error('Unexpected error fetching data:', err)
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    fetchOrderAndReviews()
+  }, [feedbackId])
 
   const tabs = [
     { id: 'delivery', label: 'Delivery Review', rating: feedbackData.deliveryRating, feedback: feedbackData.deliveryFeedback },
@@ -166,11 +266,97 @@ function RouteComponent() {
     }))
   }
 
-  const handleSubmit = () => {
-    // Handle feedback submission
-    console.log('Submitting feedback:', feedbackData)
-    setIsEditing(false)
-    // In real app, make API call here
+  const handleSubmit = async () => {
+    if (!isEditing) return
+
+    try {
+      setIsSaving(true)
+
+      // Get the review ID for the current tab
+      const reviewIdKey = `${activeTab}ReviewId` as keyof FeedbackData
+      const existingReviewId = feedbackData[reviewIdKey]
+      const ratingKey = `${activeTab}Rating` as keyof FeedbackData
+      const commentKey = `${activeTab}Feedback` as keyof FeedbackData
+      const rating = feedbackData[ratingKey] as number
+      const comment = feedbackData[commentKey] as string
+
+      // Validate that user has entered something
+      if (rating === 0) {
+        alert('Please provide a rating')
+        setIsSaving(false)
+        return
+      }
+
+      if (!comment || comment.trim() === '') {
+        alert('Please provide a comment')
+        setIsSaving(false)
+        return
+      }
+
+      // Map activeTab to review_type enum
+      const reviewTypeMap: { [key: string]: string } = {
+        delivery: 'Delivery',
+        food: 'Food',
+        staff: 'Staff',
+        rider: 'Rider'
+      }
+
+      const reviewType = reviewTypeMap[activeTab]
+
+      if (existingReviewId) {
+        // Update existing review
+        const { error } = await supabase
+          .from('review')
+          .update({
+            rating: rating,
+            comment: comment,
+            is_hidden: sendAnonymously
+          })
+          .eq('review_id', existingReviewId)
+
+        if (error) {
+          console.error('Error updating review:', error)
+          alert('Failed to update review. Please try again.')
+          setIsSaving(false)
+          return
+        }
+      } else {
+        // Insert new review
+        const { data, error } = await supabase
+          .from('review')
+          .insert({
+            order_id: feedbackId,
+            review_type: reviewType,
+            rating: rating,
+            comment: comment,
+            is_hidden: sendAnonymously
+          })
+          .select()
+
+        if (error) {
+          console.error('Error inserting review:', error)
+          alert('Failed to submit review. Please try again.')
+          setIsSaving(false)
+          return
+        }
+
+        // Update local state with new review ID
+        if (data && data.length > 0) {
+          setFeedbackData(prev => ({
+            ...prev,
+            [`${activeTab}ReviewId`]: data[0].review_id
+          }))
+        }
+      }
+
+      alert('Review submitted successfully!')
+      setIsEditing(false)
+    } catch (err) {
+      console.error('Unexpected error submitting review:', err)
+      alert('An unexpected error occurred. Please try again.')
+    } finally {
+      setIsSaving(false)
+    }
   }
 
   const renderStars = (rating: number) => {
@@ -186,14 +372,23 @@ function RouteComponent() {
     ))
   }
 
+  const LoadingSpinner = () => (
+    <div className="fixed inset-0 bg-black/50 flex justify-center items-center z-[60]">
+      <div className="bg-white rounded-xl shadow-lg p-6 flex flex-col items-center gap-4">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#964B00]"></div>
+        <p className="text-gray-700 font-medium">Processing...</p>
+      </div>
+    </div>
+  );
+
   const logoStyle: React.CSSProperties = {
-    width: '140px', // equivalent to w-35 (35 * 4px = 140px)
-    height: '140px', // equivalent to h-35 (35 * 4px = 140px)
+    width: '140px',
+    height: '140px',
     backgroundImage: "url('/angierens-logo.png')",
     backgroundSize: 'cover',
     backgroundPosition: 'center',
     position: 'absolute' as const,
-    top: '8px', // equivalent to top-2
+    top: '8px',
     left: '16px'
   };
 
@@ -415,25 +610,38 @@ function RouteComponent() {
               <ArrowLeft className="w-5 h-5 sm:w-6 sm:h-6" />
             </Link>
             <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-800 break-words">
-              ORDER ID: {feedbackData.orderId}
+              ORDER ID: #{feedbackData.orderNumber || ''}
             </h1>
           </div>
 
-          {/* Category Tabs */}
-          <div className="flex gap-2 sm:gap-3 lg:gap-4 mb-6 sm:mb-8 flex-wrap">
-            {tabs.map(tab => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`px-3 py-2 sm:px-4 sm:py-2.5 lg:px-6 lg:py-3 rounded-full font-semibold text-white transition-colors text-sm sm:text-base ${activeTab === tab.id
-                  ? 'bg-[#B8860B]'
-                  : 'bg-[#8B4513] hover:bg-[#A0522D]'
-                  }`}
-              >
-                {tab.label}
-              </button>
-            ))}
+          {/* Tabs + Edit Button in one row */}
+          <div className="flex flex-wrap items-center justify-between mb-6 sm:mb-8 gap-3">
+            {/* Category Tabs */}
+            <div className="flex gap-2 sm:gap-3 lg:gap-4 flex-wrap">
+              {tabs.map(tab => (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`px-3 py-2 sm:px-4 sm:py-2.5 lg:px-6 lg:py-3 rounded-full font-semibold text-white transition-colors text-sm sm:text-base ${activeTab === tab.id
+                    ? 'bg-[#B8860B]'
+                    : 'bg-[#8B4513] hover:bg-[#A0522D]'
+                    }`}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Edit Button */}
+            <button
+              onClick={() => setIsEditing(!isEditing)}
+              className="flex items-center gap-2 px-4 py-2 bg-[#964B00] text-yellow-400 rounded-lg hover:bg-[#7a3d00] transition-colors font-semibold"
+            >
+              <Edit className="w-4 h-4" />
+              {isEditing ? 'Cancel Edit' : 'Edit Review'}
+            </button>
           </div>
+
 
           {/* Feedback Form */}
           <div className="bg-white rounded-2xl sm:rounded-3xl p-4 sm:p-6 lg:p-8 shadow-lg border-2 sm:border-4 border-yellow-300">
@@ -461,33 +669,16 @@ function RouteComponent() {
                 />
               </div>
 
-              {/* Options */}
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 sm:gap-0 mb-6 sm:mb-8">
-                <div className="flex items-center gap-3">
-                  <input
-                    type="checkbox"
-                    id="anonymous"
-                    checked={sendAnonymously}
-                    onChange={(e) => setSendAnonymously(e.target.checked)}
-                    disabled={!isEditing}
-                    className="w-4 h-4 sm:w-5 sm:h-5 text-yellow-400 rounded focus:ring-yellow-400 disabled:opacity-50"
-                  />
-                  <label htmlFor="anonymous" className="text-gray-700 font-medium text-sm sm:text-base">
-                    Send Anonymously
-                  </label>
-                </div>
-              </div>
-
               {/* Submit Button */}
               <button
                 onClick={handleSubmit}
-                disabled={!isEditing}
-                className={`w-full py-3 sm:py-4 rounded-lg font-bold text-base sm:text-lg transition-colors ${isEditing
+                disabled={!isEditing || isSaving}
+                className={`w-full py-3 sm:py-4 rounded-lg font-bold text-base sm:text-lg transition-colors ${isEditing && !isSaving
                   ? 'bg-yellow-400 text-black hover:bg-yellow-500'
                   : 'bg-gray-300 text-gray-500 cursor-not-allowed'
                   }`}
               >
-                {isEditing ? 'Submit Feedback' : 'Submit Feedback'}
+                {isSaving ? 'Submitting...' : 'Submit Feedback'}
               </button>
             </div>
           </div>
@@ -539,6 +730,8 @@ function RouteComponent() {
           </div>
         </footer>
       </div>
+      {isLoading && <LoadingSpinner />}
+
     </ProtectedRoute>
   )
 }

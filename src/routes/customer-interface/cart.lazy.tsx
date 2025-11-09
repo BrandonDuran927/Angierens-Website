@@ -4,15 +4,17 @@ import { ProtectedRoute } from '@/components/ProtectedRoute'
 import { useState, useEffect } from 'react'
 import { useUser } from '@/context/UserContext'
 import { useNavigate } from '@tanstack/react-router'
+import { supabase } from '@/lib/supabaseClient'
 
 export const Route = createLazyFileRoute('/customer-interface/cart')({
     component: RouteComponent,
 })
 
 interface CartItem {
-    id: string
+    cart_item_id: string
+    menu_id: string
     name: string
-    addOns: string
+    addOns: Array<{ id: string; name: string; quantity: number; price: number }>
     price: number
     quantity: number
     image: string
@@ -21,7 +23,7 @@ interface CartItem {
 }
 
 interface AddOnOption {
-    id: string
+    add_on: string
     name: string
     price: number
 }
@@ -40,7 +42,7 @@ function RouteComponent() {
     const navigate = useNavigate();
 
     useEffect(() => {
-        console.log("Navigated to /customer-interface")
+        console.log("Navigated to /customer-interface/cart")
         console.log("Current logged-in user:", user)
     }, [user])
 
@@ -48,28 +50,22 @@ function RouteComponent() {
         await signOut();
         navigate({ to: "/login" });
     }
-
+    const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
     const [isNotificationOpen, setIsNotificationOpen] = useState(false)
     const [isOrderDropdownOpen, setIsOrderDropdownOpen] = useState(false);
-    const [cartCount, setCartCount] = useState(2); // Set based on cart items
+    const [cartCount, setCartCount] = useState(0);
     const [notificationCount, setNotificationCount] = useState(3);
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [selectedItem, setSelectedItem] = useState<CartItem | null>(null);
     const [orderQuantity, setOrderQuantity] = useState(1);
     const [addOns, setAddOns] = useState<Record<string, number>>({});
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
+    const [cartItems, setCartItems] = useState<CartItem[]>([])
+    const [addOnOptions, setAddOnOptions] = useState<AddOnOption[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [cartId, setCartId] = useState<string | null>(null);
 
-
-    // Add-on options
-    const addOnOptions: AddOnOption[] = [
-        { id: '1', name: 'Puto (10 pcs)', price: 150 },
-        { id: '2', name: 'Puto (20 pcs)', price: 300 },
-        { id: '3', name: 'Extra Rice', price: 50 },
-        { id: '4', name: 'Iced Tea', price: 25 },
-        { id: '5', name: 'Soda', price: 35 },
-    ];
-
-    // Navigation items with their corresponding routes - ORDER is now a direct link
+    // Navigation items with their corresponding routes
     const navigationItems = [
         { name: 'HOME', route: '/customer-interface/home', active: false },
         { name: 'MENU', route: '/customer-interface/', active: false },
@@ -121,6 +117,156 @@ function RouteComponent() {
         }
     ])
 
+    // Fetch add-on options from Supabase
+    useEffect(() => {
+        async function fetchAddOnOptions() {
+            try {
+                const { data, error } = await supabase
+                    .from('add_on')
+                    .select('*')
+
+                if (error) throw error;
+
+                if (data) {
+                    setAddOnOptions(data);
+                }
+            } catch (error) {
+                console.error('Error fetching add-on options:', error);
+            }
+        }
+
+        fetchAddOnOptions();
+    }, []);
+
+    // Fetch cart items from Supabase
+    useEffect(() => {
+        async function fetchCartItems() {
+            if (!user?.id) {
+                setLoading(false);
+                return;
+            }
+
+            try {
+                setLoading(true);
+
+                // First, get or create cart for the user
+                let { data: cartData, error: cartError } = await supabase
+                    .from('cart')
+                    .select('cart_id')
+                    .eq('customer_uid', user.id)
+                    .single();
+
+                if (cartError && cartError.code !== 'PGRST116') {
+                    throw cartError;
+                }
+
+                // If no cart exists, create one
+                if (!cartData) {
+                    const { data: newCart, error: createError } = await supabase
+                        .from('cart')
+                        .insert([
+                            {
+                                customer_uid: user.id,
+                                created_at: new Date().toISOString()
+                            }
+                        ])
+                        .select('cart_id')
+                        .single();
+
+                    if (createError) throw createError;
+                    cartData = newCart;
+                }
+
+                setCartId(cartData.cart_id);
+
+                // Fetch cart items with menu details
+                const { data: cartItemsData, error: itemsError } = await supabase
+                    .from('cart_item')
+                    .select(`
+                        cart_item_id,
+                        quantity,
+                        price,
+                        menu_id,
+                        menu:menu_id (
+                            name,
+                            description,
+                            image_url,
+                            inclusion,
+                            price
+                        )
+                    `)
+                    .eq('cart_id', cartData.cart_id);
+
+                if (itemsError) throw itemsError;
+
+                if (cartItemsData) {
+                    // For each cart item, fetch its add-ons
+                    const itemsWithAddOns = await Promise.all(
+                        cartItemsData.map(async (item: any) => {
+                            const { data: addOnsData, error: addOnsError } = await supabase
+                                .from('cart_item_add_on')
+                                .select(`
+                                    quantity,
+                                    price,
+                                    add_on_id,
+                                    add_on:add_on_id (
+                                        add_on,
+                                        name,
+                                        price
+                                    )
+                                `)
+                                .eq('cart_item_id', item.cart_item_id);
+
+                            if (addOnsError) {
+                                console.error('Error fetching add-ons:', addOnsError);
+                            }
+
+                            const addOnsFormatted = addOnsData?.map((ao: any) => ({
+                                id: ao.add_on.add_on,
+                                name: ao.add_on.name,
+                                quantity: ao.quantity,
+                                price: ao.add_on.price
+                            })) || [];
+
+                            // Parse inclusions if it's a string
+                            let inclusions: string[] = [];
+                            if (item.menu.inclusion) {
+                                try {
+                                    inclusions = typeof item.menu.inclusion === 'string'
+                                        ? JSON.parse(item.menu.inclusion)
+                                        : item.menu.inclusion;
+                                } catch (e) {
+                                    inclusions = [item.menu.inclusion];
+                                }
+                            }
+
+                            return {
+                                cart_item_id: item.cart_item_id,
+                                menu_id: item.menu_id,
+                                name: item.menu.name,
+                                addOns: addOnsFormatted,
+                                price: Number(item.menu.price),
+                                quantity: Number(item.quantity),
+                                image: item.menu.image_url || '/public/menu-page img/pancit malabonbon.png',
+                                description: item.menu.description,
+                                inclusions: inclusions
+                            };
+                        })
+                    );
+
+                    setCartItems(itemsWithAddOns);
+                    setCartCount(itemsWithAddOns.length);
+                }
+            } catch (error) {
+                console.error('Error fetching cart items:', error);
+            } finally {
+                setLoading(false);
+            }
+        }
+
+        fetchCartItems();
+    }, [user]);
+
     const markAllAsRead = () => {
         setNotifications(prev => prev.map(notif => ({ ...notif, read: true })))
     }
@@ -138,57 +284,104 @@ function RouteComponent() {
         }
     }
 
-    // Sample cart data - replace with your actual state management
-    const [cartItems, setCartItems] = useState<CartItem[]>([
-        {
-            id: '1',
-            name: '5 in 1 Mix in Bilao (PALABOK)',
-            addOns: '20 pcs. Puto',
-            price: 1850,
-            quantity: 2,
-            image: '/public/menu-page img/pancit malabonbon.png',
-            description: 'A hearty and flavorful blend of authentic Filipino dishes, perfectly portioned for sharing and celebrating with family and friends.',
-            inclusions: [
-                'Palabok (Filipino rice noodles)',
-                'Pansit Canton (stir-fried noodles)',
-                'Biko (sticky rice cake)',
-                'Suman (rice cake)',
-                'Turon (banana spring roll)',
-                'Lechon Kawali (crispy pork belly)',
-                'Adobo (Filipino braised meat)',
-                'Steamed Rice',
-                'Banana Leaves for presentation'
-            ]
-        },
-        // Add more items as needed
-    ])
-
-    const updateQuantity = (id: string, newQuantity: number) => {
+    const updateQuantity = async (cart_item_id: string, newQuantity: number) => {
         if (newQuantity === 0) {
-            setCartItems(cartItems.filter(item => item.id !== id))
-        } else {
+            await removeItem(cart_item_id);
+            return;
+        }
+
+        try {
+            const { error } = await supabase
+                .from('cart_item')
+                .update({ quantity: newQuantity })
+                .eq('cart_item_id', cart_item_id);
+
+            if (error) throw error;
+
             setCartItems(cartItems.map(item =>
-                item.id === id ? { ...item, quantity: newQuantity } : item
-            ))
+                item.cart_item_id === cart_item_id ? { ...item, quantity: newQuantity } : item
+            ));
+        } catch (error) {
+            console.error('Error updating quantity:', error);
         }
     }
 
-    const removeItem = (id: string) => {
-        setCartItems(cartItems.filter(item => item.id !== id))
+    const removeItem = async (cart_item_id: string) => {
+        try {
+            // First delete associated add-ons
+            await supabase
+                .from('cart_item_add_on')
+                .delete()
+                .eq('cart_item_id', cart_item_id);
+
+            // Then delete the cart item
+            const { error } = await supabase
+                .from('cart_item')
+                .delete()
+                .eq('cart_item_id', cart_item_id);
+
+            if (error) throw error;
+
+            const updatedItems = cartItems.filter(item => item.cart_item_id !== cart_item_id);
+            setCartItems(updatedItems);
+            setCartCount(updatedItems.length);
+        } catch (error) {
+            console.error('Error removing item:', error);
+        }
     }
 
     const calculateTotal = () => {
-        return cartItems.reduce((total, item) => total + (item.price * item.quantity), 0)
+        return cartItems.reduce((total, item) => {
+            const itemTotal = item.price * item.quantity;
+            const addOnsTotal = item.addOns.reduce((sum, addOn) => sum + (addOn.price * addOn.quantity), 0);
+            return total + itemTotal + addOnsTotal;
+        }, 0);
     }
 
     const formatPrice = (price: number) => {
         return `₱ ${price.toLocaleString()}`
     }
 
+    const toggleItemSelection = (cart_item_id: string) => {
+        setSelectedItems(prev => {
+            const newSet = new Set(prev);
+            if (newSet.has(cart_item_id)) {
+                newSet.delete(cart_item_id);
+            } else {
+                newSet.add(cart_item_id);
+            }
+            return newSet;
+        });
+    };
+
+    const toggleSelectAll = () => {
+        if (selectedItems.size === cartItems.length) {
+            setSelectedItems(new Set());
+        } else {
+            setSelectedItems(new Set(cartItems.map(item => item.cart_item_id)));
+        }
+    };
+
+    const calculateSelectedTotal = () => {
+        return cartItems
+            .filter(item => selectedItems.has(item.cart_item_id))
+            .reduce((total, item) => {
+                const itemTotal = item.price * item.quantity;
+                const addOnsTotal = item.addOns.reduce((sum, addOn) => sum + (addOn.price * addOn.quantity), 0);
+                return total + itemTotal + addOnsTotal;
+            }, 0);
+    };
+
     const openEditModal = (item: CartItem) => {
         setSelectedItem(item);
         setOrderQuantity(item.quantity);
-        setAddOns({}); // Reset add-ons for fresh selection
+
+        // Pre-populate existing add-ons
+        const existingAddOns: Record<string, number> = {};
+        item.addOns.forEach(addOn => {
+            existingAddOns[addOn.id] = addOn.quantity;
+        });
+        setAddOns(existingAddOns);
         setIsEditModalOpen(true);
     };
 
@@ -214,47 +407,91 @@ function RouteComponent() {
 
         const baseTotal = selectedItem.price * orderQuantity;
         const addOnTotal = Object.entries(addOns).reduce((total, [addOnId, quantity]) => {
-            const addOn = addOnOptions.find(option => option.id === addOnId);
-            return total + (addOn ? addOn.price * quantity : 0);
+            const addOn = addOnOptions.find(option => option.add_on === addOnId);
+            return total + (addOn ? Number(addOn.price) * quantity : 0);
         }, 0);
 
         return baseTotal + addOnTotal;
     };
 
-    const updateCartItem = () => {
+    const updateCartItem = async () => {
         if (!selectedItem) return;
 
-        // Create add-ons string
-        const addOnsList = Object.entries(addOns)
-            .filter(([_, quantity]) => quantity > 0)
-            .map(([addOnId, quantity]) => {
-                const addOn = addOnOptions.find(option => option.id === addOnId);
-                return addOn ? `${addOn.name} (${quantity})` : '';
-            })
-            .filter(Boolean)
-            .join(', ');
+        try {
+            // Update cart item quantity
+            const { error: updateError } = await supabase
+                .from('cart_item')
+                .update({ quantity: orderQuantity })
+                .eq('cart_item_id', selectedItem.cart_item_id);
 
-        setCartItems(cartItems.map(item =>
-            item.id === selectedItem.id
-                ? {
-                    ...item,
-                    quantity: orderQuantity,
-                    addOns: addOnsList || item.addOns
+            if (updateError) throw updateError;
+
+            // Delete existing add-ons
+            await supabase
+                .from('cart_item_add_on')
+                .delete()
+                .eq('cart_item_id', selectedItem.cart_item_id);
+
+            // Insert new add-ons
+            if (Object.keys(addOns).length > 0) {
+                const addOnsToInsert = Object.entries(addOns)
+                    .filter(([_, quantity]) => quantity > 0)
+                    .map(([addOnId, quantity]) => {
+                        const addOn = addOnOptions.find(option => option.add_on === addOnId);
+                        return {
+                            cart_item_id: selectedItem.cart_item_id,
+                            add_on_id: addOnId,
+                            quantity: quantity,
+                            price: addOn ? Number(addOn.price) : 0
+                        };
+                    });
+
+                if (addOnsToInsert.length > 0) {
+                    const { error: addOnError } = await supabase
+                        .from('cart_item_add_on')
+                        .insert(addOnsToInsert);
+
+                    if (addOnError) throw addOnError;
                 }
-                : item
-        ));
+            }
 
-        closeEditModal();
+            // Update local state
+            const addOnsFormatted = Object.entries(addOns)
+                .filter(([_, quantity]) => quantity > 0)
+                .map(([addOnId, quantity]) => {
+                    const addOn = addOnOptions.find(option => option.add_on === addOnId);
+                    return {
+                        id: addOnId,
+                        name: addOn?.name || '',
+                        quantity: quantity,
+                        price: addOn ? Number(addOn.price) : 0
+                    };
+                });
+
+            setCartItems(cartItems.map(item =>
+                item.cart_item_id === selectedItem.cart_item_id
+                    ? {
+                        ...item,
+                        quantity: orderQuantity,
+                        addOns: addOnsFormatted
+                    }
+                    : item
+            ));
+
+            closeEditModal();
+        } catch (error) {
+            console.error('Error updating cart item:', error);
+        }
     };
 
     const logoStyle: React.CSSProperties = {
-        width: '140px', // equivalent to w-35 (35 * 4px = 140px)
-        height: '140px', // equivalent to h-35 (35 * 4px = 140px)
+        width: '140px',
+        height: '140px',
         backgroundImage: "url('/angierens-logo.png')",
         backgroundSize: 'cover',
         backgroundPosition: 'center',
         position: 'absolute' as const,
-        top: '8px', // equivalent to top-2
+        top: '8px',
         left: '16px'
     };
 
@@ -284,6 +521,25 @@ function RouteComponent() {
       }
     }
   `;
+
+    const formatAddOnsDisplay = (addOns: Array<{ name: string; quantity: number }>) => {
+        if (addOns.length === 0) return 'No add-ons';
+        return addOns.map(addOn => `${addOn.name} (${addOn.quantity})`).join(', ');
+    };
+
+    const getImageUrl = (imageUrl: string | null): string => {
+        if (!imageUrl) return '/api/placeholder/300/200'
+
+        // If it's already a full URL, return it
+        if (imageUrl.startsWith('http://') || imageUrl.startsWith('https://')) {
+            return imageUrl
+        }
+
+        // Construct the Supabase storage URL
+        // Encode the filename to handle spaces and special characters
+        const encodedFileName = encodeURIComponent(imageUrl)
+        return `https://tvuawpgcpmqhsmwbwypy.supabase.co/storage/v1/object/public/menu-images/${encodedFileName}`
+    }
 
     return (
         <ProtectedRoute>
@@ -317,7 +573,7 @@ function RouteComponent() {
                                 ))}
                             </nav>
 
-                            {/* Hamburger Menu Button - Show on tablet and mobile */}
+                            {/* Hamburger Menu Button */}
                             <button
                                 onClick={() => setIsMobileMenuOpen(true)}
                                 className="lg:hidden p-2 text-[#964B00] hover:bg-amber-100 rounded-lg bg-yellow-400"
@@ -473,179 +729,213 @@ function RouteComponent() {
                         <h1 className="text-2xl sm:text-3xl font-bold text-gray-800">Your Cart</h1>
                     </div>
 
-                    {/* Cart Items */}
-                    <div className="space-y-3 sm:space-y-4 mb-6 sm:mb-8">
-                        {cartItems.length === 0 ? (
-                            <div className="text-center py-12 sm:py-16">
-                                <ShoppingCart className="w-12 h-12 sm:w-16 sm:h-16 text-gray-400 mx-auto mb-4" />
-                                <p className="text-gray-500 text-base sm:text-lg">Your cart is empty</p>
-                            </div>
-                        ) : (
-                            cartItems.map((item) => (
-                                <div key={item.id} className="bg-white rounded-xl sm:rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
-                                    <div className="p-4 sm:p-6">
-                                        {/* Desktop Layout */}
-                                        <div className="hidden lg:flex items-center gap-6">
-                                            {/* Selection Checkbox */}
-                                            <div className="flex-shrink-0">
-                                                <div className="w-5 h-5 rounded-full bg-yellow-400 border-2 border-yellow-400 flex items-center justify-center">
-                                                    <div className="w-2 h-2 bg-white rounded-full"></div>
-                                                </div>
-                                            </div>
-
-                                            {/* Product Image */}
-                                            <div className="flex-shrink-0">
-                                                <div className="relative">
-                                                    <img
-                                                        src={item.image}
-                                                        alt={item.name}
-                                                        className="w-24 h-24 object-cover rounded-full border-4 border-green-600"
-                                                    />
-                                                </div>
-                                            </div>
-
-                                            {/* Product Details */}
-                                            <div className="flex-1">
-                                                <h3 className="text-lg font-semibold text-gray-800 mb-1">
-                                                    {item.name}
-                                                </h3>
-                                                <p className="text-gray-600 text-sm mb-3">
-                                                    add-ons: {item.addOns}
-                                                </p>
-                                                <div className="text-xl font-bold text-gray-800">
-                                                    {formatPrice(item.price)}
-                                                </div>
-                                            </div>
-
-                                            {/* Quantity Controls */}
-                                            <div className="flex items-center gap-3">
-                                                <button
-                                                    onClick={() => updateQuantity(item.id, item.quantity - 1)}
-                                                    className="w-10 h-10 bg-yellow-400 hover:bg-yellow-500 rounded-full flex items-center justify-center transition-colors"
-                                                >
-                                                    <Minus className="w-5 h-5 text-gray-800" />
-                                                </button>
-                                                <span className="w-8 text-center font-semibold text-lg">
-                                                    {item.quantity}
-                                                </span>
-                                                <button
-                                                    onClick={() => updateQuantity(item.id, item.quantity + 1)}
-                                                    className="w-10 h-10 bg-yellow-400 hover:bg-yellow-500 rounded-full flex items-center justify-center transition-colors"
-                                                >
-                                                    <Plus className="w-5 h-5 text-gray-800" />
-                                                </button>
-                                            </div>
-
-                                            {/* Action Buttons */}
-                                            <div className="flex flex-col gap-2">
-                                                <button
-                                                    onClick={() => openEditModal(item)}
-                                                    className="p-2 text-orange-600 hover:text-orange-700 transition-colors"
-                                                >
-                                                    <Edit2 className="w-5 h-5" />
-                                                </button>
-                                                <button
-                                                    onClick={() => removeItem(item.id)}
-                                                    className="p-2 text-red-600 hover:text-red-700 transition-colors"
-                                                >
-                                                    <Trash2 className="w-5 h-5" />
-                                                </button>
-                                            </div>
-                                        </div>
-
-                                        {/* Mobile/Tablet Layout */}
-                                        <div className="lg:hidden">
-                                            {/* Top Row - Image, Details, and Actions */}
-                                            <div className="flex items-start gap-4 mb-4">
-                                                {/* Selection Checkbox - Mobile */}
-                                                <div className="flex-shrink-0 mt-2">
-                                                    <div className="w-4 h-4 sm:w-5 sm:h-5 rounded-full bg-yellow-400 border-2 border-yellow-400 flex items-center justify-center">
-                                                        <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 bg-white rounded-full"></div>
-                                                    </div>
-                                                </div>
-
-                                                {/* Product Image - Mobile */}
-                                                <div className="flex-shrink-0">
-                                                    <img
-                                                        src={item.image}
-                                                        alt={item.name}
-                                                        className="w-16 h-16 sm:w-20 sm:h-20 object-cover rounded-full border-2 sm:border-4 border-green-600"
-                                                    />
-                                                </div>
-
-                                                {/* Product Details - Mobile */}
-                                                <div className="flex-1 min-w-0">
-                                                    <h3 className="text-base sm:text-lg font-semibold text-gray-800 mb-1 truncate">
-                                                        {item.name}
-                                                    </h3>
-                                                    <p className="text-gray-600 text-xs sm:text-sm mb-2 truncate">
-                                                        add-ons: {item.addOns}
-                                                    </p>
-                                                    <div className="text-lg sm:text-xl font-bold text-gray-800">
-                                                        {formatPrice(item.price)}
-                                                    </div>
-                                                </div>
-
-                                                {/* Action Buttons - Mobile */}
-                                                <div className="flex sm:flex-col gap-1 sm:gap-2 flex-shrink-0">
-                                                    <button
-                                                        onClick={() => openEditModal(item)}
-                                                        className="p-1.5 sm:p-2 text-orange-600 hover:text-orange-700 transition-colors"
-                                                    >
-                                                        <Edit2 className="w-4 h-4 sm:w-5 sm:h-5" />
-                                                    </button>
-                                                    <button
-                                                        onClick={() => removeItem(item.id)}
-                                                        className="p-1.5 sm:p-2 text-red-600 hover:text-red-700 transition-colors"
-                                                    >
-                                                        <Trash2 className="w-4 h-4 sm:w-5 sm:h-5" />
-                                                    </button>
-                                                </div>
-                                            </div>
-
-                                            {/* Bottom Row - Quantity Controls (Mobile) */}
-                                            <div className="flex items-center justify-center gap-3 pt-3 border-t border-gray-100">
-                                                <span className="text-sm font-medium text-gray-600 mr-2">Qty:</span>
-                                                <button
-                                                    onClick={() => updateQuantity(item.id, item.quantity - 1)}
-                                                    className="w-8 h-8 sm:w-10 sm:h-10 bg-yellow-400 hover:bg-yellow-500 rounded-full flex items-center justify-center transition-colors"
-                                                >
-                                                    <Minus className="w-4 h-4 sm:w-5 sm:h-5 text-gray-800" />
-                                                </button>
-                                                <span className="w-6 sm:w-8 text-center font-semibold text-base sm:text-lg">
-                                                    {item.quantity}
-                                                </span>
-                                                <button
-                                                    onClick={() => updateQuantity(item.id, item.quantity + 1)}
-                                                    className="w-8 h-8 sm:w-10 sm:h-10 bg-yellow-400 hover:bg-yellow-500 rounded-full flex items-center justify-center transition-colors"
-                                                >
-                                                    <Plus className="w-4 h-4 sm:w-5 sm:h-5 text-gray-800" />
-                                                </button>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            ))
-                        )}
-                    </div>
-
-                    {/* Cart Summary */}
-                    {cartItems.length > 0 && (
-                        <div className="border-t border-gray-300 pt-4 sm:pt-6">
-                            <div className="flex flex-col sm:flex-row items-center gap-4 sm:justify-between">
-                                <div className="bg-gray-100 px-4 py-2 sm:px-6 sm:py-3 rounded-full order-2 sm:order-1">
-                                    <span className="text-base sm:text-lg font-semibold text-gray-800">
-                                        Cart Total: {formatPrice(calculateTotal())}
-                                    </span>
-                                </div>
-                                <Link
-                                    to='/customer-interface/payment'
-                                    className='bg-yellow-400 hover:bg-yellow-500 text-gray-800 font-semibold px-6 py-2.5 sm:px-8 sm:py-3 rounded-full transition-colors flex items-center gap-2 order-1 sm:order-2 w-full sm:w-auto justify-center text-sm sm:text-base'
-                                >
-                                    Proceed to Checkout →
-                                </Link>
+                    {/* Loading State */}
+                    {loading ? (
+                        <div className="fixed inset-0 bg-black/50 flex justify-center items-center z-[60]">
+                            <div className="bg-white rounded-xl shadow-lg p-6 flex flex-col items-center gap-4">
+                                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#964B00]"></div>
+                                <p className="text-gray-700 font-medium">Processing...</p>
                             </div>
                         </div>
+                    ) : (
+                        <>
+                            {/* Cart Items */}
+                            <div className="space-y-3 sm:space-y-4 mb-6 sm:mb-8">
+                                {cartItems.length === 0 ? (
+                                    <div className="text-center py-12 sm:py-16">
+                                        <ShoppingCart className="w-12 h-12 sm:w-16 sm:h-16 text-gray-400 mx-auto mb-4" />
+                                        <p className="text-gray-500 text-base sm:text-lg">Your cart is empty</p>
+                                    </div>
+                                ) : (
+                                    cartItems.map((item) => (
+                                        <div key={item.cart_item_id} className="bg-white rounded-xl sm:rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
+                                            <div className="p-4 sm:p-6">
+                                                {/* Desktop Layout */}
+                                                <div className="hidden lg:flex items-center gap-6">
+                                                    {/* Selection Checkbox */}
+                                                    <div className="flex-shrink-0">
+                                                        <button
+                                                            onClick={() => toggleItemSelection(item.cart_item_id)}
+                                                            className="w-5 h-5 rounded-full border-2 border-yellow-400 flex items-center justify-center hover:bg-yellow-50 transition-colors"
+                                                        >
+                                                            {selectedItems.has(item.cart_item_id) && (
+                                                                <div className="w-3 h-3 bg-yellow-400 rounded-full"></div>
+                                                            )}
+                                                        </button>
+                                                    </div>
+
+                                                    {/* Product Image */}
+                                                    <div className="flex-shrink-0">
+                                                        <div className="relative">
+                                                            <img
+                                                                src={getImageUrl(item.image)}
+                                                                alt={item.name}
+                                                                className="w-24 h-24 object-cover rounded-full border-4 border-green-600"
+                                                            />
+                                                        </div>
+                                                    </div>
+
+                                                    {/* Product Details */}
+                                                    <div className="flex-1">
+                                                        <h3 className="text-lg font-semibold text-gray-800 mb-1">
+                                                            {item.name}
+                                                        </h3>
+                                                        <p className="text-gray-600 text-sm mb-3">
+                                                            add-ons: {formatAddOnsDisplay(item.addOns)}
+                                                        </p>
+                                                        <div className="text-xl font-bold text-gray-800">
+                                                            {formatPrice(item.price)}
+                                                        </div>
+                                                    </div>
+
+                                                    {/* Quantity Controls */}
+                                                    <div className="flex items-center gap-3">
+                                                        <button
+                                                            onClick={() => updateQuantity(item.cart_item_id, item.quantity - 1)}
+                                                            className="w-10 h-10 bg-yellow-400 hover:bg-yellow-500 rounded-full flex items-center justify-center transition-colors"
+                                                        >
+                                                            <Minus className="w-5 h-5 text-gray-800" />
+                                                        </button>
+                                                        <span className="w-8 text-center font-semibold text-lg">
+                                                            {item.quantity}
+                                                        </span>
+                                                        <button
+                                                            onClick={() => updateQuantity(item.cart_item_id, item.quantity + 1)}
+                                                            className="w-10 h-10 bg-yellow-400 hover:bg-yellow-500 rounded-full flex items-center justify-center transition-colors"
+                                                        >
+                                                            <Plus className="w-5 h-5 text-gray-800" />
+                                                        </button>
+                                                    </div>
+
+                                                    {/* Action Buttons */}
+                                                    <div className="flex flex-col gap-2">
+                                                        <button
+                                                            onClick={() => openEditModal(item)}
+                                                            className="p-2 text-orange-600 hover:text-orange-700 transition-colors"
+                                                        >
+                                                            <Edit2 className="w-5 h-5" />
+                                                        </button>
+                                                        <button
+                                                            onClick={() => removeItem(item.cart_item_id)}
+                                                            className="p-2 text-red-600 hover:text-red-700 transition-colors"
+                                                        >
+                                                            <Trash2 className="w-5 h-5" />
+                                                        </button>
+                                                    </div>
+                                                </div>
+
+                                                {/* Mobile/Tablet Layout */}
+                                                <div className="lg:hidden">
+                                                    {/* Top Row - Image, Details, and Actions */}
+                                                    <div className="flex items-start gap-4 mb-4">
+                                                        {/* Selection Checkbox - Mobile */}
+                                                        <div className="flex-shrink-0 mt-2">
+                                                            <button
+                                                                onClick={() => toggleItemSelection(item.cart_item_id)}
+                                                                className="w-4 h-4 sm:w-5 sm:h-5 rounded-full border-2 border-yellow-400 flex items-center justify-center hover:bg-yellow-50 transition-colors"
+                                                            >
+                                                                {selectedItems.has(item.cart_item_id) && (
+                                                                    <div className="w-2 h-2 sm:w-3 sm:h-3 bg-yellow-400 rounded-full"></div>
+                                                                )}
+                                                            </button>
+                                                        </div>
+
+                                                        {/* Product Image - Mobile */}
+                                                        <div className="flex-shrink-0">
+                                                            <img
+                                                                src={item.image}
+                                                                alt={item.name}
+                                                                className="w-16 h-16 sm:w-20 sm:h-20 object-cover rounded-full border-2 sm:border-4 border-green-600"
+                                                            />
+                                                        </div>
+
+                                                        {/* Product Details - Mobile */}
+                                                        <div className="flex-1 min-w-0">
+                                                            <h3 className="text-base sm:text-lg font-semibold text-gray-800 mb-1 truncate">
+                                                                {item.name}
+                                                            </h3>
+                                                            <p className="text-gray-600 text-xs sm:text-sm mb-2 truncate">
+                                                                add-ons: {formatAddOnsDisplay(item.addOns)}
+                                                            </p>
+                                                            <div className="text-lg sm:text-xl font-bold text-gray-800">
+                                                                {formatPrice(item.price)}
+                                                            </div>
+                                                        </div>
+
+                                                        {/* Action Buttons - Mobile */}
+                                                        <div className="flex sm:flex-col gap-1 sm:gap-2 flex-shrink-0">
+                                                            <button
+                                                                onClick={() => openEditModal(item)}
+                                                                className="p-1.5 sm:p-2 text-orange-600 hover:text-orange-700 transition-colors"
+                                                            >
+                                                                <Edit2 className="w-4 h-4 sm:w-5 sm:h-5" />
+                                                            </button>
+                                                            <button
+                                                                onClick={() => removeItem(item.cart_item_id)}
+                                                                className="p-1.5 sm:p-2 text-red-600 hover:text-red-700 transition-colors"
+                                                            >
+                                                                <Trash2 className="w-4 h-4 sm:w-5 sm:h-5" />
+                                                            </button>
+                                                        </div>
+                                                    </div>
+
+                                                    {/* Bottom Row - Quantity Controls (Mobile) */}
+                                                    <div className="flex items-center justify-center gap-3 pt-3 border-t border-gray-100">
+                                                        <span className="text-sm font-medium text-gray-600 mr-2">Qty:</span>
+                                                        <button
+                                                            onClick={() => updateQuantity(item.cart_item_id, item.quantity - 1)}
+                                                            className="w-8 h-8 sm:w-10 sm:h-10 bg-yellow-400 hover:bg-yellow-500 rounded-full flex items-center justify-center transition-colors"
+                                                        >
+                                                            <Minus className="w-4 h-4 sm:w-5 sm:h-5 text-gray-800" />
+                                                        </button>
+                                                        <span className="w-6 sm:w-8 text-center font-semibold text-base sm:text-lg">
+                                                            {item.quantity}
+                                                        </span>
+                                                        <button
+                                                            onClick={() => updateQuantity(item.cart_item_id, item.quantity + 1)}
+                                                            className="w-8 h-8 sm:w-10 sm:h-10 bg-yellow-400 hover:bg-yellow-500 rounded-full flex items-center justify-center transition-colors"
+                                                        >
+                                                            <Plus className="w-4 h-4 sm:w-5 sm:h-5 text-gray-800" />
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))
+                                )}
+                            </div>
+
+                            {/* Cart Summary */}
+                            {cartItems.length > 0 && (
+                                <div className="border-t border-gray-300 pt-4 sm:pt-6">
+                                    <div className="flex flex-col sm:flex-row items-center gap-4 sm:justify-between">
+                                        <div className="bg-gray-100 px-4 py-2 sm:px-6 sm:py-3 rounded-full order-2 sm:order-1">
+                                            <span className="text-base sm:text-lg font-semibold text-gray-800">
+                                                Selected Total ({selectedItems.size} {selectedItems.size === 1 ? 'item' : 'items'}): {formatPrice(calculateSelectedTotal())}
+                                            </span>
+                                        </div>
+                                        <button
+                                            disabled={selectedItems.size === 0}
+                                            onClick={() => {
+                                                if (selectedItems.size > 0) {
+                                                    const selectedIds = Array.from(selectedItems).join(',');
+                                                    navigate({
+                                                        to: '/customer-interface/payment',
+                                                        search: { items: selectedIds }
+                                                    });
+                                                }
+                                            }}
+                                            className={`font-semibold px-6 py-2.5 sm:px-8 sm:py-3 rounded-full transition-colors flex items-center gap-2 order-1 sm:order-2 w-full sm:w-auto justify-center text-sm sm:text-base ${selectedItems.size === 0
+                                                    ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                                                    : 'bg-yellow-400 hover:bg-yellow-500 text-gray-800'
+                                                }`}
+                                        >
+                                            Proceed to Checkout ({selectedItems.size}) →
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+                        </>
                     )}
                 </div>
 
@@ -653,7 +943,7 @@ function RouteComponent() {
                 {isEditModalOpen && selectedItem && (
                     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
                         <div className="bg-white rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
-                            <div className="flex">
+                            <div className="flex flex-col lg:flex-row">
                                 {/* Left side - Item details */}
                                 <div className="flex-1 p-6">
                                     <div className="flex justify-between items-start mb-4">
@@ -669,14 +959,16 @@ function RouteComponent() {
                                         </button>
                                     </div>
 
-                                    <div className="mb-6">
-                                        <h3 className="text-lg font-semibold text-gray-800 mb-3">Inclusion:</h3>
-                                        <div className="grid grid-cols-2 gap-2">
-                                            {selectedItem.inclusions?.map((inclusion: string, index: number) => (
-                                                <p key={index} className="text-gray-600 text-sm">{inclusion}</p>
-                                            ))}
+                                    {selectedItem.inclusions && selectedItem.inclusions.length > 0 && (
+                                        <div className="mb-6">
+                                            <h3 className="text-lg font-semibold text-gray-800 mb-3">Inclusion:</h3>
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                                {selectedItem.inclusions.map((inclusion: string, index: number) => (
+                                                    <p key={index} className="text-gray-600 text-sm">{inclusion}</p>
+                                                ))}
+                                            </div>
                                         </div>
-                                    </div>
+                                    )}
 
                                     {/* Quantity selector */}
                                     <div className="flex items-center gap-4 mb-6">
@@ -713,26 +1005,27 @@ function RouteComponent() {
                                 </div>
 
                                 {/* Right side - Add-ons */}
-                                <div className="w-80 bg-gray-50 p-6 border-l">
+                                <div className="w-full lg:w-80 bg-gray-50 p-6 border-t lg:border-t-0 lg:border-l">
                                     <h3 className="text-lg font-semibold text-gray-800 mb-4">Add-ons:</h3>
                                     <div className="space-y-3">
                                         {addOnOptions.map((addOn) => (
-                                            <div key={addOn.id} className="flex items-center justify-between">
+                                            <div key={addOn.add_on} className="flex items-center justify-between">
                                                 <div className="flex-1">
                                                     <button className="bg-yellow-400 text-black px-3 py-1 rounded-full text-sm font-medium">
                                                         {addOn.name}
                                                     </button>
+                                                    <p className="text-xs text-gray-600 mt-1">₱{Number(addOn.price).toLocaleString()}</p>
                                                 </div>
                                                 <div className="flex items-center gap-2">
                                                     <button
-                                                        onClick={() => updateAddOnQuantity(addOn.id, (addOns[addOn.id] || 0) - 1)}
+                                                        onClick={() => updateAddOnQuantity(addOn.add_on, (addOns[addOn.add_on] || 0) - 1)}
                                                         className="w-8 h-8 rounded-full border-2 border-gray-300 flex items-center justify-center hover:bg-gray-100"
                                                     >
                                                         <Minus className="h-3 w-3" />
                                                     </button>
-                                                    <span className="w-8 text-center text-sm">{addOns[addOn.id] || 0}</span>
+                                                    <span className="w-8 text-center text-sm">{addOns[addOn.add_on] || 0}</span>
                                                     <button
-                                                        onClick={() => updateAddOnQuantity(addOn.id, (addOns[addOn.id] || 0) + 1)}
+                                                        onClick={() => updateAddOnQuantity(addOn.add_on, (addOns[addOn.add_on] || 0) + 1)}
                                                         className="w-8 h-8 rounded-full border-2 border-gray-300 flex items-center justify-center hover:bg-gray-100"
                                                     >
                                                         <Plus className="h-3 w-3" />

@@ -1,54 +1,19 @@
-// src/routes/customer-interface/specific-order/$orderId.tsx
 import { createLazyFileRoute, Link } from '@tanstack/react-router'
 import { ArrowLeft, Package, CreditCard, Clock, ShoppingBag, Star, X, Menu, ShoppingCart, Bell, MessageSquare, Heart } from 'lucide-react'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { supabase } from '@/lib/supabaseClient'
+import { useUser } from '@/context/UserContext'
 
-// Create the route definition using the dynamic param $orderId
 export const Route = createLazyFileRoute('/customer-interface/specific-order/$orderId')({
   component: SpecificOrder,
 })
-
-// Type-safe component access to route params using Route.useParams
-const mockOrderData = {
-  orderId: '06',
-  status: 'queuing',
-  orderPlacedDate: '05/16/25 10:30 AM',
-  paymentConfirmedDate: '05/16/25 10:40 AM',
-  queuingDate: '05/16/25 10:40 AM',
-  deliveryOption: 'Delivery',
-  fulfillmentType: 'Current Day',
-  paymentMethod: 'Online - GCash 100%',
-  pickDate: 'May 17, 2025',
-  pickTime: '2:00 PM',
-  customer: {
-    name: 'Brandon Duran',
-    phone: '(+63) 982 248 2982',
-    address: 'Blk 20, Lot 15, Queensville, Caloocan City'
-  },
-  items: [
-    {
-      id: 1,
-      name: '5 in 1 Mix in Bilao (PALABOK) 2x',
-      image: '/api/placeholder/100/100',
-      inclusion: '40 pcs. Pork Shanghai, 12 pcs. Pork BBQ',
-      details: '30 pcs. Pork Shanghai, 30 slices Cordon Bleu',
-      addOns: 'Puto (20)',
-      specialInstructions: 'Wag po paramihan yung bawang..'
-    }
-  ],
-  pricing: {
-    subtotal: 3950,
-    deliveryFee: 75,
-    total: 4025
-  }
-}
 
 // Navigation items for header
 const navigationItems = [
   { name: 'HOME', route: '/customer-interface/home', active: false },
   { name: 'MENU', route: '/customer-interface/', active: false },
   { name: 'ORDER', route: '/customer-interface/order', active: false },
-  { name: 'FEEDBACK', route: '/customer-interface/feedback', active: false },
+  { name: 'REVIEW', route: '/customer-interface/feedback', active: false },
   { name: 'MY INFO', route: '/customer-interface/my-info', active: false },
 ]
 
@@ -61,20 +26,62 @@ interface Notification {
   read: boolean
 }
 
+interface OrderItem {
+  id: string
+  name: string
+  image: string
+  quantity: number
+  price: number
+  inclusions: string[]
+  addOns: string
+}
+
+interface OrderData {
+  orderId: string
+  orderNumber: string
+  status: string
+  orderPlacedDate: string
+  paymentConfirmedDate: string
+  // queuingDate: string
+  // preparingDate: string
+  // readyDate: string
+  status_updated_at: string
+  completedDate: string
+  deliveryOption: string
+  fulfillmentType: string
+  paymentMethod: string
+  pickDate: string
+  pickTime: string
+  customer: {
+    name: string
+    phone: string
+    address: string
+  }
+  items: OrderItem[]
+  pricing: {
+    subtotal: number
+    deliveryFee: number
+    total: number
+  }
+  specialInstructions: string
+  proofOfPaymentUrl: string | null
+}
+
 function SpecificOrder() {
+  const { user } = useUser()
   const [isNotificationOpen, setIsNotificationOpen] = useState(false)
-  const [showFilterModal, setShowFilterModal] = useState(false)
   const [showRefundModal, setShowRefundModal] = useState(false)
-  const [refundStep, setRefundStep] = useState(1) // 1: reason, 2: confirm, 3: gcash, 4: processing
+  const [refundStep, setRefundStep] = useState(1)
   const [selectedReason, setSelectedReason] = useState('')
   const [gcashNumber, setGcashNumber] = useState('')
   const [confirmGcashNumber, setConfirmGcashNumber] = useState('')
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
+  const [orderData, setOrderData] = useState<OrderData | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
+  const [showViewReceiptModal, setShowViewReceiptModal] = useState(false)
 
   const { orderId } = Route.useParams()
-  const order = mockOrderData // In real app, fetch based on orderId
 
-  // Mock counts
   const cartCount = 3
   const notificationCount = 1
 
@@ -121,6 +128,129 @@ function SpecificOrder() {
     }
   ])
 
+  // Fetch order data
+  useEffect(() => {
+    if (orderId && user) {
+      fetchOrderData()
+    }
+  }, [orderId, user])
+
+  const fetchOrderData = async () => {
+    setIsLoading(true)
+    try {
+      const { data: orderDataRaw, error: orderError } = await supabase
+        .from('order')
+        .select(`
+          *,
+          payment (*),
+          schedule (*),
+          order_item (
+            *,
+            menu (*),
+            order_item_add_on (
+              *,
+              add_on (*)
+            )
+          )
+        `)
+        .eq('order_id', orderId)
+        .single()
+
+      if (orderError) throw orderError
+
+      // Get customer info
+      const { data: userData, error: userError } = await supabase
+        .from('users')
+        .select('*')
+        .eq('user_uid', orderDataRaw.customer_uid)
+        .single()
+
+      if (userError) throw userError
+
+      // Transform the data
+      const items: OrderItem[] = orderDataRaw.order_item.map((item: any) => {
+        const inclusions = item.menu?.inclusion
+          ? item.menu.inclusion.split(',').map((i: string) => i.trim())
+          : []
+
+        const addOns: string[] = []
+        item.order_item_add_on?.forEach((addOn: any) => {
+          if (addOn.add_on?.name) {
+            addOns.push(`${addOn.add_on.name} (${addOn.quantity})`)
+          }
+        })
+
+        return {
+          id: item.order_item_id,
+          name: item.menu?.name || 'Unknown Item',
+          image: item.menu?.image_url || '/placeholder.png',
+          quantity: Number(item.quantity),
+          price: Number(item.menu?.price || 0),
+          inclusions: inclusions,
+          addOns: addOns.length > 0 ? addOns.join(', ') : 'None'
+        }
+      })
+
+      // Format dates
+      const formatDate = (dateString: string | null) => {
+        if (!dateString) return ''
+        const date = new Date(dateString)
+        return date.toLocaleString('en-US', {
+          month: '2-digit',
+          day: '2-digit',
+          year: '2-digit',
+          hour: '2-digit',
+          minute: '2-digit',
+          hour12: true
+        })
+      }
+
+      // Calculate delivery fee (you can adjust this logic)
+      const deliveryFee = orderDataRaw.delivery_option === 'Delivery' ? 75 : 0
+      const subtotal = Number(orderDataRaw.total_price) - deliveryFee
+
+      const transformed: OrderData = {
+        orderId: orderDataRaw.order_id,
+        orderNumber: `#${String(orderDataRaw.order_number).padStart(2, '0')}`,
+        status: orderDataRaw.order_status,
+        orderPlacedDate: formatDate(orderDataRaw.created_at),
+        paymentConfirmedDate: orderDataRaw.payment?.is_paid && orderDataRaw.payment?.payment_date ? formatDate(orderDataRaw.payment.payment_date) : '',
+        // queuingDate: ['Queueing'].includes(orderDataRaw.order_status) ? formatDate(orderDataRaw.created_at) : '',
+        // preparingDate: ['Preparing', 'Cooking', 'Ready', 'On Delivery'].includes(orderDataRaw.order_status) ? formatDate(orderDataRaw.status_updated_at) : '',
+        // readyDate: ['Ready', 'On Delivery', 'Claim Order'].includes(orderDataRaw.order_status) ? formatDate(orderDataRaw.status_updated_at) : '',
+        status_updated_at: formatDate(orderDataRaw.status_updated_at),
+        completedDate: orderDataRaw.order_status === 'Completed' ? formatDate(orderDataRaw.completed_date) : '',
+        deliveryOption: orderDataRaw.order_type || 'Delivery',
+        fulfillmentType: orderDataRaw.fulfillment_type || 'Current Day',
+        paymentMethod: orderDataRaw.payment?.payment_method || 'GCash',
+        pickDate: orderDataRaw.schedule?.schedule_date
+          ? new Date(orderDataRaw.schedule.schedule_date).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
+          : 'Not scheduled',
+        pickTime: orderDataRaw.schedule?.schedule_time || 'Not scheduled',
+        customer: {
+          name: `${userData.first_name} ${userData.middle_name ? userData.middle_name + ' ' : ''}${userData.last_name}`,
+          phone: userData.phone_number || 'N/A',
+          address: orderDataRaw.delivery_address || 'N/A'
+        },
+        items: items,
+        pricing: {
+          subtotal: subtotal,
+          deliveryFee: deliveryFee,
+          total: Number(orderDataRaw.total_price)
+        },
+        specialInstructions: orderDataRaw.special_instructions || 'None',
+        proofOfPaymentUrl: orderDataRaw.payment?.proof_of_payment_url || null
+      }
+
+      console.log('Transformed Order Data:', transformed)
+      setOrderData(transformed)
+    } catch (error) {
+      console.error('Error fetching order data:', error)
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
   const markAllAsRead = () => {
     setNotifications(prev => prev.map(notif => ({ ...notif, read: true })))
   }
@@ -139,18 +269,90 @@ function SpecificOrder() {
   }
 
   const getProgressSteps = () => {
+    if (!orderData) return []
+
     const steps = [
-      { key: 'placed', label: 'Order Placed', date: order.orderPlacedDate, icon: Package, completed: true },
-      { key: 'payment', label: 'Payment Confirmed', date: order.paymentConfirmedDate, icon: CreditCard, completed: true },
-      { key: 'queuing', label: 'Queuing', date: order.queuingDate, icon: Clock, completed: order.status !== 'placed' },
-      { key: 'preparing', label: 'Preparing', date: '', icon: ShoppingBag, completed: order.status === 'preparing' || order.status === 'ready' || order.status === 'delivered' },
-      { key: 'ready', label: 'Ready', date: '', icon: Star, completed: order.status === 'ready' || order.status === 'delivered' }
+      {
+        key: 'placed',
+        label: 'Order Placed',
+        date: orderData.orderPlacedDate,
+        icon: Package,
+        completed: true
+      },
+      {
+        key: 'payment',
+        label: orderData.paymentConfirmedDate ? 'Payment Confirmed' : 'For Payment',
+        date: orderData.paymentConfirmedDate,
+        icon: CreditCard,
+        completed: orderData.status !== 'Pending'
+      }
     ]
+
+    // Third step - Dynamic based on order status
+    if (orderData.status === 'Queueing') {
+      steps.push({
+        key: 'queuing',
+        label: 'Queueing',
+        date: orderData.status_updated_at,
+        icon: Clock,
+        completed: true
+      })
+    } else if (orderData.status === 'Preparing') {
+      steps.push({
+        key: 'preparing',
+        label: 'Preparing',
+        date: orderData.status_updated_at,
+        icon: ShoppingBag,
+        completed: true
+      })
+    } else if (orderData.status === 'Cooking') {
+      steps.push({
+        key: 'cooking',
+        label: 'Cooking',
+        date: orderData.status_updated_at,
+        icon: ShoppingBag,
+        completed: true
+      })
+    } else if (orderData.status === 'Ready') {
+      steps.push({
+        key: 'ready',
+        label: 'Ready',
+        date: orderData.status_updated_at,
+        icon: Star,
+        completed: true
+      })
+    }
+
+    if (orderData.deliveryOption === 'Delivery') {
+      steps.push({
+        key: 'on-delivery',
+        label: orderData.status === 'Claim Order' || orderData.status === 'Completed' ? 'On Delivered' : 'On Delivery',
+        date: orderData.status_updated_at,
+        icon: ShoppingBag,
+        completed: true
+      })
+    }
+
+    steps.push({
+      key: 'order-completed',
+      label: 'Order Complete',
+      date: orderData.completedDate,
+      icon: Package,
+      completed: orderData.completedDate ? true : false
+    })
+
+    steps.push({
+      key: 'rate',
+      label: 'Rate Order',
+      date: '',
+      icon: Star,
+      completed: orderData.status === 'Completed' ? true : false
+    })
+
     return steps
   }
 
   const formatPrice = (price: number) => `₱${price.toLocaleString()}`
-  const steps = getProgressSteps()
 
   const handleRefundClick = () => {
     setShowRefundModal(true)
@@ -175,24 +377,103 @@ function SpecificOrder() {
     setRefundStep(3)
   }
 
-  const handleGcashSubmit = () => {
+  const handleGcashSubmit = async () => {
     if (gcashNumber && confirmGcashNumber && gcashNumber === confirmGcashNumber) {
-      setRefundStep(4)
+      try {
+        // Create refund request
+        const { error: refundError } = await supabase
+          .from('refund')
+          .insert({
+            order_id: orderId,
+            reason: selectedReason,
+            status: 'Pending',
+            request_date: new Date().toISOString(),
+            gcash_number: gcashNumber
+          })
+
+        if (refundError) throw refundError
+
+        // Update order status to Refunding
+        const { error: orderError } = await supabase
+          .from('order')
+          .update({
+            order_status: 'Refunding',
+            status_updated_at: new Date().toISOString()
+          })
+          .eq('order_id', orderId)
+
+        if (orderError) throw orderError
+
+        setRefundStep(4)
+      } catch (error) {
+        console.error('Error submitting refund:', error)
+        alert('Failed to submit refund request')
+      }
     }
   }
 
   const handleGoBackToOrder = () => {
     handleCloseRefundModal()
+    // Optionally refresh order data
+    fetchOrderData()
   }
 
+  const getImageUrl = (imageUrl: string | null): string => {
+    if (!imageUrl) return '/api/placeholder/300/200'
+
+    if (imageUrl.startsWith('http://') || imageUrl.startsWith('https://')) {
+      return imageUrl
+    }
+
+    const encodedFileName = encodeURIComponent(imageUrl)
+    return `https://tvuawpgcpmqhsmwbwypy.supabase.co/storage/v1/object/public/menu-images/${encodedFileName}`
+  }
+
+  const handleOpenViewReceipt = () => {
+    setShowViewReceiptModal(true)
+  }
+
+  const handleCloseViewReceipt = () => {
+    setShowViewReceiptModal(false)
+  }
+
+  const handleConfirmPickup = async () => {
+    try {
+      const { error } = await supabase
+        .from('order')
+        .update({
+          order_status: 'Completed',
+          completed_date: new Date().toISOString()
+        })
+        .eq('order_id', orderId)
+
+      if (error) throw error
+
+      alert('Order confirmed as completed!')
+      await fetchOrderData() // Refresh the order data
+    } catch (error) {
+      console.error('Error confirming pickup:', error)
+      alert('Failed to confirm pickup. Please try again.')
+    }
+  }
+
+  const LoadingSpinner = () => (
+    <div className="fixed inset-0 bg-black/50 flex justify-center items-center z-[60]">
+      <div className="bg-white rounded-xl shadow-lg p-6 flex flex-col items-center gap-4">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#964B00]"></div>
+        <p className="text-gray-700 font-medium">Processing...</p>
+      </div>
+    </div>
+  );
+
   const logoStyle: React.CSSProperties = {
-    width: '140px', // equivalent to w-35 (35 * 4px = 140px)
-    height: '140px', // equivalent to h-35 (35 * 4px = 140px)
+    width: '140px',
+    height: '140px',
     backgroundImage: "url('/angierens-logo.png')",
     backgroundSize: 'cover',
     backgroundPosition: 'center',
     position: 'absolute' as const,
-    top: '8px', // equivalent to top-2
+    top: '8px',
     left: '16px'
   };
 
@@ -222,6 +503,8 @@ function SpecificOrder() {
       }
     }
   `;
+
+  const steps = orderData ? getProgressSteps() : []
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-amber-50 to-orange-100">
@@ -394,179 +677,267 @@ function SpecificOrder() {
       )}
 
       <main className="w-full max-w-screen-xl mx-auto px-3 sm:px-4">
-        <div className="flex items-center justify-between ">
+        <div className="flex items-center justify-between">
           <h1 className="text-2xl sm:text-4xl font-bold text-black mt-3">My order</h1>
         </div>
 
-        {/* Main Content Card */}
-        <div className="bg-white rounded-2xl sm:rounded-3xl shadow-lg overflow-hidden border-2 border-orange-200 my-[20px] sm:my-[30px]">
-          {/* Order Header */}
-          <div className="px-4 sm:px-8 py-4 sm:py-6 border-b border-b-gray-200">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-0">
-              <div className="flex items-center space-x-3 sm:space-x-4">
-                <Link to='/customer-interface/order'>
-                  <ArrowLeft className="w-5 h-5 sm:w-6 sm:h-6 text-black" />
-                </Link>
-                <h2 className="text-lg sm:text-2xl font-bold text-black">Order ID: #{orderId}</h2>
-              </div>
-              {/* <div className="text-amber-600 px-3 sm:px-6 py-1 sm:py-2 rounded-full text-sm sm:text-xl font-medium text-center">
-                Your order is for payment
-              </div> */}
-
-              <button className="bg-amber-600 hover:bg-amber-700 text-white px-4 py-2 rounded-lg text-sm sm:text-base font-medium transition-colors">
-                View Proof of Payment
-              </button>
-            </div>
+        {!orderData ? (
+          <div className="bg-white rounded-2xl sm:rounded-3xl shadow-lg overflow-hidden border-2 border-orange-200 my-[20px] sm:my-[30px] p-8 text-center">
+            <div className="text-2xl font-bold text-gray-600">Order not found</div>
           </div>
-
-          {/* Progress Tracker */}
-          <div className="px-4 sm:px-8 py-4 sm:py-6">
-            <div className="flex items-center justify-between relative overflow-x-auto">
-              {steps.map((step, index) => {
-                const IconComponent = step.icon
-                const isCompleted = step.completed
-                const isActive = step.key === 'queuing'
-                const isLast = index === steps.length - 1
-
-                return (
-                  <div key={step.key} className="flex items-center flex-shrink-0">
-                    <div className="flex flex-col items-center relative z-10">
-                      <div className={`w-12 h-12 sm:w-16 sm:h-16 rounded-full flex items-center justify-center border-2 sm:border-4 ${isCompleted
-                        ? 'bg-amber-700 border-amber-700 text-white'
-                        : isActive
-                          ? 'bg-white border-amber-700 text-amber-700'
-                          : 'bg-white border-gray-300 text-gray-400'
-                        }`}>
-                        <IconComponent className="w-5 h-5 sm:w-7 sm:h-7" />
-                      </div>
-                      <div className="text-center mt-2 sm:mt-3">
-                        <div className={`font-semibold text-xs sm:text-sm ${isCompleted || isActive ? 'text-black' : 'text-gray-500'
-                          }`}>
-                          {step.label}
-                        </div>
-                        {step.date && (
-                          <div className="text-xs text-gray-500 mt-1">
-                            {step.date}
-                          </div>
-                        )}
-
-                        {/* Refund Button under "Queuing" */}
-                        {step.key === 'queuing' && (
-                          <div className="mt-3 sm:mt-4">
-                            <button
-                              onClick={handleRefundClick}
-                              className="bg-red-500 hover:bg-red-600 text-white px-3 sm:px-4 py-1 text-xs sm:text-sm rounded-md font-medium transition-colors"
-                            >
-                              Refund Order
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Connector line */}
-                    {!isLast && (
-                      <div className={`w-16 sm:w-24 h-1 mx-2 sm:mx-4 ${isCompleted ? 'bg-amber-700' : 'bg-gray-300'}`} />
-                    )}
-                  </div>
-                )
-              })}
-            </div>
-          </div>
-
-          {/* Order Content */}
-          <div className="px-4 sm:px-8 pb-6 sm:pb-8">
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 sm:gap-8">
-              {/* Delivery Address */}
-              <div className="lg:col-span-1">
-                <h3 className="text-lg sm:text-xl font-bold text-black mb-3 sm:mb-4">Delivery Address</h3>
-                <div className="space-y-2 text-gray-600">
-                  <div className="font-semibold text-black text-base sm:text-lg">
-                    {order.customer.name}
-                  </div>
-                  <div className="text-gray-500 text-sm sm:text-base">{order.customer.phone}</div>
-                  <div className="text-gray-500 text-sm sm:text-base">{order.customer.address}</div>
+        ) : (
+          /* Main Content Card */
+          <div className="bg-white rounded-2xl sm:rounded-3xl shadow-lg overflow-hidden border-2 border-orange-200 my-[20px] sm:my-[30px]">
+            {/* Order Header */}
+            <div className="px-4 sm:px-8 py-4 sm:py-6 border-b border-b-gray-200">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-0">
+                <div className="flex items-center space-x-3 sm:space-x-4">
+                  <Link to="/customer-interface/order">
+                    <ArrowLeft className="w-5 h-5 sm:w-6 sm:h-6 text-black" />
+                  </Link>
+                  <h2 className="text-lg sm:text-2xl font-bold text-black">
+                    Order ID: {orderData.orderNumber}
+                  </h2>
                 </div>
-              </div>
 
-              {/* Order Items */}
-              <div className="lg:col-span-2">
-                <div className="space-y-4 sm:space-y-6">
-                  {order.items.map((item) => (
-                    <div key={item.id} className="flex flex-col sm:flex-row sm:items-start space-y-4 sm:space-y-0 sm:space-x-6">
-                      <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full overflow-hidden flex-shrink-0 mx-auto sm:mx-0">
-                        <img
-                          src={item.image}
-                          alt={item.name}
-                          className="w-full h-full object-cover"
-                        />
+                {orderData.proofOfPaymentUrl && (
+                  <button
+                    onClick={handleOpenViewReceipt}
+                    className="bg-amber-600 hover:bg-amber-700 text-white px-4 py-2 rounded-lg text-sm sm:text-base font-medium transition-colors"
+                  >
+                    View Proof of Payment
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Progress Tracker */}
+            <div className="px-4 sm:px-8 py-4 sm:py-6">
+              <div className="flex items-center justify-between relative overflow-x-auto">
+                {steps.map((step, index) => {
+                  const IconComponent = step.icon
+                  const isCompleted = step.completed
+                  const isActive = step.key === orderData.status.toLowerCase()
+                  const isLast = index === steps.length - 1
+
+                  return (
+                    <div key={step.key} className="flex items-center flex-shrink-0">
+                      <div className="flex flex-col items-center relative z-10">
+                        <div className={`w-12 h-12 sm:w-16 sm:h-16 rounded-full flex items-center justify-center border-2 sm:border-4 ${isCompleted
+                          ? 'bg-amber-700 border-amber-700 text-white'
+                          : isActive
+                            ? 'bg-white border-amber-700 text-amber-700'
+                            : 'bg-white border-gray-300 text-gray-400'
+                          }`}>
+                          <IconComponent className="w-5 h-5 sm:w-7 sm:h-7" />
+                        </div>
+                        <div className="text-center mt-2 sm:mt-3">
+                          <div className={`font-semibold text-xs sm:text-sm ${isCompleted || isActive ? 'text-black' : 'text-gray-500'
+                            }`}>
+                            {step.label}
+                          </div>
+                          {step.date && (
+                            <div className="text-xs text-gray-500 mt-1">
+                              {step.date}
+                            </div>
+                          )}
+
+                          {/* Refund Button under "Queuing" */}
+                          {step.key === 'queuing' && orderData.status === 'Queueing' && (
+                            <div className="mt-3 sm:mt-4">
+                              <button
+                                onClick={handleRefundClick}
+                                className="bg-red-500 hover:bg-red-600 text-white px-3 sm:px-4 py-1 text-xs sm:text-sm rounded-md font-medium transition-colors"
+                              >
+                                Refund Order
+                              </button>
+                            </div>
+                          )}
+
+                          {/* Track Rider Button under "On Delivery" */}
+                          {step.key === 'on-delivery' && orderData.status === 'On Delivery' && (
+                            <div className="mt-3 sm:mt-4">
+                              <button
+                                onClick={() => alert('Track Rider feature - to be implemented')}
+                                className="bg-amber-500 hover:bg-amber-600 text-white px-3 sm:px-4 py-1 text-xs sm:text-sm rounded-md font-medium transition-colors"
+                              >
+                                Track Rider
+                              </button>
+                            </div>
+                          )}
+
+                          {/* Confirm Pick-up and Report buttons under "Order Completed" */}
+                          {step.key === 'order-completed' && orderData.status === 'Claim Order' && (
+                            <div className="mt-3 sm:mt-4 flex flex-col gap-2">
+                              <button
+                                onClick={handleConfirmPickup}
+                                className="bg-amber-500 hover:bg-amber-600 text-white px-3 sm:px-4 py-1 text-xs sm:text-sm rounded-md font-medium transition-colors whitespace-nowrap"
+                              >
+                                Confirm Pick-up
+                              </button>
+                              <button
+                                onClick={() => alert('Report feature - to be implemented')}
+                                className="bg-gray-200 hover:bg-gray-300 text-black px-3 sm:px-4 py-1 text-xs sm:text-sm rounded-md font-medium transition-colors"
+                              >
+                                Report
+                              </button>
+                            </div>
+                          )}
+
+                          {/* Rate button under last step when Completed */}
+                          {step.key === 'rate' && orderData.status === 'Completed' && (
+                            <div className="mt-3 sm:mt-4">
+                              <Link
+                                to="/customer-interface/feedback"
+                                className="inline-block bg-yellow-400 hover:bg-yellow-500 text-black px-3 sm:px-4 py-1 text-xs sm:text-sm rounded-md font-medium transition-colors"
+                              >
+                                Rate Order
+                              </Link>
+                            </div>
+                          )}
+                        </div>
                       </div>
-                      <div className="flex-1">
-                        <h4 className="font-bold text-black text-lg sm:text-xl mb-2 sm:mb-3 text-center sm:text-left">
-                          {item.name}
-                        </h4>
-                        <div className="text-gray-600 space-y-2">
-                          <div>
-                            <span className="font-semibold text-black">Inclusion:</span>
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-4 mt-1">
-                              <div className="text-sm">40 pcs. Pork Shanghai</div>
-                              <div className="text-sm">30 pcs. Pork Shanghai</div>
-                              <div className="text-sm">12 pcs. Pork BBQ</div>
-                              <div className="text-sm">30 slices Cordon Bleu</div>
+
+                      {/* Connector line */}
+                      {!isLast && (
+                        <div className={`w-16 sm:w-24 h-1 mx-2 sm:mx-4 ${isCompleted ? 'bg-amber-700' : 'bg-gray-300'}`} />
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+
+            {/* Order Content */}
+            <div className="px-4 sm:px-8 pb-6 sm:pb-8">
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 sm:gap-8">
+                {/* Delivery Address */}
+                <div className="lg:col-span-1">
+                  <h3 className="text-lg sm:text-xl font-bold text-black mb-3 sm:mb-4">
+                    Delivery Address
+                  </h3>
+                  <div className="space-y-2 text-gray-600">
+                    <div className="font-semibold text-black text-base sm:text-lg">
+                      {orderData.customer.name}
+                    </div>
+                    <div className="text-gray-500 text-sm sm:text-base">
+                      {orderData.customer.phone}
+                    </div>
+                    <div className="text-gray-500 text-sm sm:text-base">
+                      {orderData.customer.address}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Order Items */}
+                <div className="lg:col-span-2">
+                  <div className="space-y-4 sm:space-y-6">
+                    {orderData.items.map((item) => (
+                      <div
+                        key={item.id}
+                        className="flex flex-col sm:flex-row sm:items-start space-y-4 sm:space-y-0 sm:space-x-6"
+                      >
+                        <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full overflow-hidden flex-shrink-0 mx-auto sm:mx-0">
+                          <img
+                            src={getImageUrl(item.image)}
+                            alt={item.name}
+                            className="w-full h-full object-cover"
+                          />
+                        </div>
+                        <div className="flex-1">
+                          <h4 className="font-bold text-black text-lg sm:text-xl mb-2 sm:mb-3 text-center sm:text-left">
+                            {item.name} {item.quantity > 1 && `${item.quantity}x`}
+                          </h4>
+                          <div className="text-gray-600 space-y-2">
+                            {item.inclusions.length > 0 && (
+                              <div>
+                                <span className="font-semibold text-black">Inclusion:</span>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-4 mt-1">
+                                  {item.inclusions.map((inclusion, idx) => (
+                                    <div key={idx} className="text-sm">
+                                      {inclusion}
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                            <div className="text-sm">
+                              <span className="font-semibold text-black">Add-ons:</span>{' '}
+                              {item.addOns}
                             </div>
                           </div>
-                          <div className="text-sm">
-                            <span className="font-semibold text-black">Add-ons:</span> {item.addOns}
+                        </div>
+                        <div className="text-center sm:text-right text-sm text-gray-600 flex-shrink-0 border-t sm:border-t-0 pt-4 sm:pt-0">
+                          <div className="space-y-1">
+                            <div>
+                              <span className="font-semibold text-black">Delivery Option:</span>{' '}
+                              {orderData.deliveryOption}
+                            </div>
+                            <div>
+                              <span className="font-semibold text-black">Payment Method:</span>{' '}
+                              {orderData.paymentMethod}
+                            </div>
+                            <div>
+                              <span className="font-semibold text-black">Schedule Date:</span>{' '}
+                              {orderData.pickDate}
+                            </div>
+                            <div>
+                              <span className="font-semibold text-black">Schedule Time:</span>{' '}
+                              {orderData.pickTime}
+                            </div>
                           </div>
                         </div>
                       </div>
-                      <div className="text-center sm:text-right text-sm text-gray-600 flex-shrink-0 border-t sm:border-t-0 pt-4 sm:pt-0">
-                        <div className="space-y-1">
-                          <div><span className="font-semibold text-black">Delivery Option:</span> {order.deliveryOption}</div>
-                          <div><span className="font-semibold text-black">Fulfillment Type:</span> {order.fulfillmentType}</div>
-                          <div><span className="font-semibold text-black">Payment Method:</span> {order.paymentMethod}</div>
-                          <div><span className="font-semibold text-black">Pick Date:</span> {order.pickDate}</div>
-                          <div><span className="font-semibold text-black">Pick Time:</span> {order.pickTime}</div>
+                    ))}
+
+                    {/* Special Instructions */}
+                    <div className="mt-4 sm:mt-6">
+                      <div className="text-sm">
+                        <span className="font-semibold text-black">
+                          Special Instructions:
+                        </span>
+                        <div className="text-gray-600 mt-1">
+                          {orderData.specialInstructions}
                         </div>
                       </div>
                     </div>
-                  ))}
 
-                  {/* Special Instructions */}
-                  <div className="mt-4 sm:mt-6">
-                    <div className="text-sm">
-                      <span className="font-semibold text-black">Special Instructions:</span>
-                      <div className="text-gray-600 mt-1">Wag po paramihan yung bawang..</div>
-                    </div>
-                  </div>
-
-                  {/* Pricing Summary */}
-                  <div className="mt-6 sm:mt-8 pt-4 sm:pt-6 border-t border-gray-200">
-                    <div className="space-y-3 sm:space-y-4">
-                      <div className="flex justify-between text-base sm:text-lg">
-                        <span className="text-black">Subtotal</span>
-                        <span className="font-bold text-black">{formatPrice(order.pricing.subtotal)}</span>
-                      </div>
-                      <div className="flex justify-between text-base sm:text-lg">
-                        <span className="text-black">Delivery Fee</span>
-                        <span className="font-bold text-black">{formatPrice(order.pricing.deliveryFee)}</span>
-                      </div>
-                      <hr className="border-gray-300" />
-                      <div className="flex justify-between text-lg sm:text-xl">
-                        <span className="font-bold text-black">Order Total</span>
-                        <span className="font-bold text-orange-600">{formatPrice(order.pricing.total)}</span>
+                    {/* Pricing Summary */}
+                    <div className="mt-6 sm:mt-8 pt-4 sm:pt-6 border-t border-gray-200">
+                      <div className="space-y-3 sm:space-y-4">
+                        <div className="flex justify-between text-base sm:text-lg">
+                          <span className="text-black">Subtotal</span>
+                          <span className="font-bold text-black">
+                            {formatPrice(orderData.pricing.subtotal)}
+                          </span>
+                        </div>
+                        <div className="flex justify-between text-base sm:text-lg">
+                          <span className="text-black">Delivery Fee</span>
+                          <span className="font-bold text-black">
+                            {formatPrice(orderData.pricing.deliveryFee)}
+                          </span>
+                        </div>
+                        <hr className="border-gray-300" />
+                        <div className="flex justify-between text-lg sm:text-xl">
+                          <span className="font-bold text-black">Order Total</span>
+                          <span className="font-bold text-orange-600">
+                            {formatPrice(orderData.pricing.total)}
+                          </span>
+                        </div>
                       </div>
                     </div>
                   </div>
                 </div>
               </div>
             </div>
+            {/* End of Main Content Card */}
           </div>
-        </div>
+        )}
       </main>
 
+
       {/* REFUND MODAL */}
-      {showRefundModal && (
+      {showRefundModal && orderData && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto">
             {/* Step 1: Select Cancellation Reason */}
@@ -649,7 +1020,7 @@ function SpecificOrder() {
 
                 <div className="mb-6">
                   <p className="text-lg text-gray-700 mb-2">
-                    Are you sure you want to cancel Order #{orderId}?
+                    Are you sure you want to cancel Order {orderData.orderNumber}?
                   </p>
                   <p className="text-lg text-gray-700 mb-6">
                     Once you Place Order, your request will begin the refund process.
@@ -777,6 +1148,40 @@ function SpecificOrder() {
         </div>
       )}
 
+      {/* View Receipt Modal */}
+      {showViewReceiptModal && orderData && orderData.proofOfPaymentUrl && (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-hidden">
+            <div className="p-4 border-b border-gray-200 flex items-center justify-between">
+              <h2 className="text-xl font-bold text-black">Payment Receipt</h2>
+              <button
+                onClick={handleCloseViewReceipt}
+                className="text-gray-500 hover:text-gray-700 text-2xl font-bold"
+              >
+                ×
+              </button>
+            </div>
+
+            <div className="p-4 overflow-auto max-h-[calc(90vh-120px)]">
+              <img
+                src={orderData.proofOfPaymentUrl}
+                alt="Payment Receipt"
+                className="w-full h-auto rounded-lg"
+              />
+            </div>
+
+            <div className="p-4 border-t border-gray-200 flex justify-end">
+              <button
+                onClick={handleCloseViewReceipt}
+                className="bg-gray-300 hover:bg-gray-400 text-gray-800 font-medium py-2 px-6 rounded-lg transition-colors"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* FOOTER */}
       <footer id="contact" className="py-8 bottom-0 w-full z-10" style={{ backgroundColor: "#F9ECD9" }}>
         <div className="max-w-5xl mx-auto px-4">
@@ -822,6 +1227,9 @@ function SpecificOrder() {
           </div>
         </div>
       </footer>
+
+      {/* Loading Spinner */}
+      {isLoading && <LoadingSpinner />}
     </div>
   )
 }
