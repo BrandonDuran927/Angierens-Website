@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { useUser } from '@/context/UserContext'
 import { useNavigate } from '@tanstack/react-router'
 import { ProtectedRoute } from '@/components/ProtectedRoute'
+import { supabase } from '@/lib/supabaseClient'
 
 export const Route = createLazyFileRoute('/customer-interface/my-info')({
   component: RouteComponent,
@@ -18,12 +19,36 @@ interface Notification {
   read: boolean
 }
 
+interface UserData {
+  user_uid: string
+  first_name: string
+  middle_name: string | null
+  last_name: string
+  email: string
+  phone_number: string
+  birth_date: string | null
+  gender: string
+  other_contact: string | null
+}
+
+interface AddressData {
+  address_id: string
+  address_type: string
+  address_line: string
+  region: string
+  city: string
+  barangay: string
+  postal_code: string
+}
+
 function RouteComponent() {
   const { user, signOut } = useUser()
   const navigate = useNavigate();
+  const [loading, setLoading] = useState(true)
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null)
 
   useEffect(() => {
-    console.log("Navigated to /customer-interface")
+    console.log("Navigated to /customer-interface/my-info")
     console.log("Current logged-in user:", user)
   }, [user])
 
@@ -36,7 +61,6 @@ function RouteComponent() {
   const [cartCount] = useState(2)
   const [notificationCount] = useState(3)
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
-
 
   const [notifications, setNotifications] = useState<Notification[]>([
     {
@@ -100,15 +124,15 @@ function RouteComponent() {
 
   // Only editable fields are in state
   const [editableData, setEditableData] = useState({
-    mobileNumber: '0934 344 9343',
-    email: 'abahakarwelastik@students.nu-fairview.edu.ph',
+    phoneNumber: '',
+    email: '',
     newPassword: '',
     retypePassword: ''
   })
 
   // Track which fields are currently being edited
   const [editingFields, setEditingFields] = useState({
-    mobileNumber: false,
+    phoneNumber: false,
     email: false,
     password: false
   })
@@ -119,27 +143,137 @@ function RouteComponent() {
   const [currentPassword, setCurrentPassword] = useState('')
   const [otpCode, setOtpCode] = useState('')
   const [pendingEdit, setPendingEdit] = useState('')
+  const [sentCode, setSentCode] = useState('')
 
   // Store original values for cancel functionality
   const [originalValues, setOriginalValues] = useState({
-    mobileNumber: '0934 344 9343',
-    email: 'abahakarwelastik@students.nu-fairview.edu.ph'
+    phoneNumber: '',
+    email: ''
   })
 
   // Static user data (non-editable)
-  const staticData = {
-    firstName: 'Brandon',
+  const [staticData, setStaticData] = useState({
+    firstName: '',
     middleName: '',
-    lastName: 'Duran',
-    birthMonth: 'February',
-    birthDay: '02',
-    birthYear: '2004',
-    gender: 'MALE',
+    lastName: '',
+    birthMonth: '',
+    birthDay: '',
+    birthYear: '',
+    gender: '',
+    otherContact: ''
+  })
+
+  // Address data
+  const [addressData, setAddressData] = useState({
     country: 'Philippines',
-    postalCode: '1431',
-    province: 'Metro Manila',
-    city: 'Caloocan',
-    address: 'Area subdivision/barangay/district'
+    postalCode: '',
+    region: '',
+    city: '',
+    barangay: '',
+    addressLine: ''
+  })
+
+  useEffect(() => {
+    fetchCurrentUser()
+  }, [])
+
+  const fetchCurrentUser = async () => {
+    try {
+      setLoading(true)
+
+      // Get current authenticated user
+      const { data: { user }, error: authError } = await supabase.auth.getUser()
+
+      if (authError || !user) {
+        console.error('Error getting authenticated user:', authError)
+        alert('Please log in to view your information')
+        navigate({ to: '/login' })
+        return
+      }
+
+      setCurrentUserId(user.id)
+
+      // Fetch user data from users table
+      const { data: userData, error: userError } = await supabase
+        .from('users')
+        .select('user_uid, first_name, middle_name, last_name, email, phone_number, birth_date, gender, other_contact')
+        .eq('user_uid', user.id)
+        .single()
+
+      if (userError) {
+        console.error('Error fetching user data:', userError)
+        alert('Failed to load user information')
+        return
+      }
+
+      if (userData) {
+        // Parse birth_date
+        let birthMonth = ''
+        let birthDay = ''
+        let birthYear = ''
+
+        if (userData.birth_date) {
+          const date = new Date(userData.birth_date)
+          birthMonth = date.toLocaleString('en-US', { month: 'long' })
+          birthDay = String(date.getDate()).padStart(2, '0')
+          birthYear = String(date.getFullYear())
+        }
+
+        // Set static (non-editable) data
+        setStaticData({
+          firstName: userData.first_name || '',
+          middleName: userData.middle_name || '',
+          lastName: userData.last_name || '',
+          birthMonth,
+          birthDay,
+          birthYear,
+          gender: userData.gender || '',
+          otherContact: userData.other_contact || ''
+        })
+
+        // Set editable data
+        setEditableData(prev => ({
+          ...prev,
+          phoneNumber: userData.phone_number || '',
+          email: userData.email || ''
+        }))
+
+        // Set original values
+        setOriginalValues({
+          phoneNumber: userData.phone_number || '',
+          email: userData.email || ''
+        })
+      }
+
+      // Fetch address data
+      const { data: addressDataResult, error: addressError } = await supabase
+        .from('address')
+        .select('address_id, address_type, address_line, region, city, barangay, postal_code')
+        .eq('customer_id', user.id)
+        .eq('address_type', 'Primary')
+        .maybeSingle()
+
+      if (addressError) {
+        console.log('No address found or error:', addressError)
+        // Don't show error - address might not exist yet
+      } else if (addressDataResult) {
+        console.log('Fetched address data:', addressDataResult)
+
+        setAddressData({
+          country: 'Philippines',
+          postalCode: addressDataResult.postal_code || '',
+          region: addressDataResult.region || '',
+          city: addressDataResult.city || '',
+          barangay: addressDataResult.barangay || '',
+          addressLine: addressDataResult.address_line || ''
+        })
+      }
+    } catch (error) {
+      console.error('Error in fetchCurrentUser:', error)
+      alert('An error occurred while loading your information')
+    } finally {
+      setLoading(false)
+    }
   }
 
   const navigationItems = [
@@ -159,7 +293,7 @@ function RouteComponent() {
 
   const startEditing = (field: string) => {
     // Show password verification modal for sensitive fields
-    if (field === 'mobileNumber' || field === 'email' || field === 'password') {
+    if (field === 'phoneNumber' || field === 'email' || field === 'password') {
       setPendingEdit(field)
       setShowPasswordModal(true)
     } else {
@@ -177,10 +311,10 @@ function RouteComponent() {
     }))
 
     // Restore original values
-    if (field === 'mobileNumber' || field === 'email') {
+    if (field === 'phoneNumber' || field === 'email') {
       setEditableData(prev => ({
         ...prev,
-        [field]: originalValues[field]
+        [field]: originalValues[field as keyof typeof originalValues]
       }))
     } else if (field === 'password') {
       setEditableData(prev => ({
@@ -191,55 +325,49 @@ function RouteComponent() {
     }
   }
 
-  const verifyPassword = () => {
-    // Simulate password verification (replace with actual API call)
+  const verifyPassword = async () => {
+    console.log("Triggered")
+
     if (currentPassword.trim() === '') {
       alert('Please enter your current password!')
       return
     }
 
-    // Mock password verification - in reality, verify against backend
-    if (currentPassword !== 'password123') {
-      alert('Incorrect password!')
-      return
+    try {
+      const { data: { user }, error: authError } = await supabase.auth.getUser()
+
+      if (authError || !user) {
+        alert('Session expired. Please log in again.')
+        return
+      }
+
+      const { error } = await supabase.auth.signInWithPassword({
+        email: originalValues.email,
+        password: currentPassword
+      })
+
+      if (error) {
+        alert('Incorrect password!')
+        return
+      }
+
+      if (pendingEdit === 'phoneNumber') {
+        setShowPasswordModal(false)
+        setShowOtpModal(true)
+        handleSubmit(new Event('submit') as unknown as React.FormEvent)
+      } else {
+        setShowPasswordModal(false)
+        setEditingFields(prev => ({
+          ...prev,
+          [pendingEdit]: true
+        }))
+      }
+
+      setCurrentPassword('')
+    } catch (error) {
+      console.error('Error verifying password:', error)
+      alert('An error occurred while verifying your password')
     }
-
-    // Password verified, proceed based on the field being edited
-    if (pendingEdit === 'mobileNumber') {
-      // For mobile number, show OTP modal
-      setShowPasswordModal(false)
-      setShowOtpModal(true)
-    } else {
-      // For email or password change, directly allow editing
-      setShowPasswordModal(false)
-      setEditingFields(prev => ({
-        ...prev,
-        [pendingEdit]: true
-      }))
-    }
-
-    setCurrentPassword('')
-  }
-
-  const verifyOtp = () => {
-    if (otpCode.trim() === '') {
-      alert('Please enter the OTP code!')
-      return
-    }
-
-    // Mock OTP verification - in reality, verify against backend
-    if (otpCode !== '123456') {
-      alert('Invalid OTP code!')
-      return
-    }
-
-    // OTP verified, allow mobile number editing
-    setShowOtpModal(false)
-    setEditingFields(prev => ({
-      ...prev,
-      mobileNumber: true
-    }))
-    setOtpCode('')
   }
 
   const closePasswordModal = () => {
@@ -250,39 +378,81 @@ function RouteComponent() {
 
   const closeOtpModal = () => {
     setShowOtpModal(false)
+    setSentCode('')
     setOtpCode('')
-    setPendingEdit('')
   }
 
-  const saveField = (field: string) => {
-    if (field === 'mobileNumber' || field === 'email') {
+  const saveField = async (field: string) => {
+    if (!currentUserId) {
+      alert('User not authenticated')
+      return
+    }
+
+    if (field === 'phoneNumber' || field === 'email') {
       // Basic validation
       if (field === 'email' && !editableData.email.includes('@')) {
         alert('Please enter a valid email address!')
         return
       }
 
-      if (field === 'mobileNumber' && editableData.mobileNumber.trim().length === 0) {
-        alert('Please enter a mobile number!')
+      if (field === 'phoneNumber' && editableData.phoneNumber.trim().length === 0) {
+        alert('Please enter a phone number!')
         return
       }
 
-      // Update original value
-      setOriginalValues(prev => ({
-        ...prev,
-        [field]: editableData[field]
-      }))
+      try {
+        setLoading(true)
 
-      setEditingFields(prev => ({
-        ...prev,
-        [field]: false
-      }))
+        // Update in users table
+        const updateData = field === 'phoneNumber'
+          ? { phone_number: editableData.phoneNumber }
+          : { email: editableData.email }
 
-      alert(`${field === 'mobileNumber' ? 'Mobile number' : 'Email address'} updated successfully!`)
+        const { error: updateError } = await supabase
+          .from('users')
+          .update(updateData)
+          .eq('user_uid', currentUserId)
+
+        if (updateError) {
+          console.error('Error updating user data:', updateError)
+          alert('Failed to update. Please try again.')
+          return
+        }
+
+        // If updating email, also update auth email
+        if (field === 'email') {
+          const { error: authError } = await supabase.auth.updateUser({
+            email: editableData.email
+          })
+
+          if (authError) {
+            console.error('Error updating auth email:', authError)
+            alert('Profile updated but email verification may be required. Please check your inbox.')
+          }
+        }
+
+        // Update original value
+        setOriginalValues(prev => ({
+          ...prev,
+          [field]: editableData[field as keyof typeof editableData] as string
+        }))
+
+        setEditingFields(prev => ({
+          ...prev,
+          [field]: false
+        }))
+
+        alert(`${field === 'phoneNumber' ? 'Phone number' : 'Email address'} updated successfully!`)
+      } catch (error) {
+        console.error('Error saving field:', error)
+        alert('An error occurred while saving your changes')
+      } finally {
+        setLoading(false)
+      }
     }
   }
 
-  const handleChangePassword = () => {
+  const handleChangePassword = async () => {
     if (editableData.newPassword !== editableData.retypePassword) {
       alert('Passwords do not match!')
       return
@@ -296,37 +466,113 @@ function RouteComponent() {
       return
     }
 
-    // Handle password change logic here
-    console.log('Password changed successfully')
-    setEditableData(prev => ({
-      ...prev,
-      newPassword: '',
-      retypePassword: ''
-    }))
-    setEditingFields(prev => ({
-      ...prev,
-      password: false
-    }))
-    alert('Password changed successfully!')
+    try {
+      setLoading(true)
+
+      const { error } = await supabase.auth.updateUser({
+        password: editableData.newPassword
+      })
+
+      if (error) {
+        console.error('Error updating password:', error)
+        alert('Failed to update password. Please try again.')
+        return
+      }
+
+      setEditableData(prev => ({
+        ...prev,
+        newPassword: '',
+        retypePassword: ''
+      }))
+      setEditingFields(prev => ({
+        ...prev,
+        password: false
+      }))
+      alert('Password changed successfully!')
+    } catch (error) {
+      console.error('Error changing password:', error)
+      alert('An error occurred while changing your password')
+    } finally {
+      setLoading(false)
+    }
   }
 
-  const handleSaveInfo = () => {
-    // Handle saving mobile number and email
-    console.log('Information updated:', {
-      mobileNumber: editableData.mobileNumber,
-      email: editableData.email
-    })
-    alert('Information updated successfully!')
+  const formatPhoneNumber = (number: string): string => {
+    const cleaned = number.replace(/\s+/g, '')
+
+    if (cleaned.startsWith('0')) {
+      return '+63' + cleaned.substring(1)
+    }
+
+    return cleaned
   }
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    console.log("Submitting OTP request")
+
+    try {
+      // const formattedNumber = formatPhoneNumber(editableData.phoneNumber)
+
+      // const { data, error } = await supabase.functions.invoke('send-otp', {
+      //   body: { phoneNumber: formattedNumber }
+      // })
+
+      // if (error) throw error
+      // console.log("Data sent:", data)
+      // setSentCode(data)
+
+      setShowOtpModal(true)
+    } catch (error) {
+      console.error('Error sending OTP:', error)
+    }
+  }
+
+  const verifyOtp = async () => {
+    try {
+      const formattedNumber = formatPhoneNumber(originalValues.phoneNumber)
+
+      const { data, error } = await supabase.functions.invoke('verify-otp', {
+        body: { phoneNumber: formattedNumber, otpCode },
+      })
+
+      if (error) throw error
+
+      if (data.status === 'approved') {
+        alert('OTP verified successfully! You can now edit your phone number.')
+        closeOtpModal()
+
+        // Now enable editing mode (don't save yet)
+        setEditingFields(prev => ({
+          ...prev,
+          phoneNumber: true
+        }))
+      } else {
+        alert('Invalid or expired OTP.')
+      }
+    } catch (error) {
+      console.error('Error verifying OTP:', error)
+      alert('Failed to verify OTP. Please try again.')
+    }
+  }
+
+  const LoadingSpinner = () => (
+    <div className="fixed inset-0 bg-black/50 flex justify-center items-center z-[60]">
+      <div className="bg-white rounded-xl shadow-lg p-6 flex flex-col items-center gap-4">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#964B00]"></div>
+        <p className="text-gray-700 font-medium">Loading...</p>
+      </div>
+    </div>
+  )
 
   const logoStyle: React.CSSProperties = {
-    width: '140px', // equivalent to w-35 (35 * 4px = 140px)
-    height: '140px', // equivalent to h-35 (35 * 4px = 140px)
+    width: '140px',
+    height: '140px',
     backgroundImage: "url('/angierens-logo.png')",
     backgroundSize: 'cover',
     backgroundPosition: 'center',
     position: 'absolute' as const,
-    top: '8px', // equivalent to top-2
+    top: '8px',
     left: '16px'
   };
 
@@ -418,7 +664,10 @@ function RouteComponent() {
                 />
               </div>
               <div className="text-center mb-4">
-                <button className="text-[#964B00] text-sm hover:underline">
+                <button
+                  onClick={handleSubmit}
+                  className="text-[#964B00] text-sm hover:underline"
+                >
                   Resend OTP
                 </button>
               </div>
@@ -659,19 +908,19 @@ function RouteComponent() {
                     <div>
                       <label className="block text-xs text-gray-500 mb-1">MONTH</label>
                       <div className="w-full px-3 py-2 border border-gray-200 rounded-md bg-gray-100 text-gray-500 cursor-not-allowed">
-                        {staticData.birthMonth}
+                        {staticData.birthMonth || '-'}
                       </div>
                     </div>
                     <div>
                       <label className="block text-xs text-gray-500 mb-1">DAY</label>
                       <div className="w-full px-3 py-2 border border-gray-200 rounded-md bg-gray-100 text-gray-500 cursor-not-allowed">
-                        {staticData.birthDay}
+                        {staticData.birthDay || '-'}
                       </div>
                     </div>
                     <div>
                       <label className="block text-xs text-gray-500 mb-1">YEAR</label>
                       <div className="w-full px-3 py-2 border border-gray-200 rounded-md bg-gray-100 text-gray-500 cursor-not-allowed">
-                        {staticData.birthYear}
+                        {staticData.birthYear || '-'}
                       </div>
                     </div>
                   </div>
@@ -681,17 +930,23 @@ function RouteComponent() {
                 <div className="mb-6">
                   <label className="block text-sm font-medium text-gray-600 mb-2">GENDER</label>
                   <div className="flex gap-4">
-                    <div className={`px-4 py-2 rounded-full border cursor-not-allowed ${staticData.gender === 'MALE'
+                    <div className={`px-4 py-2 rounded-full border cursor-not-allowed ${staticData.gender === 'Male'
                       ? 'bg-gray-400 text-white border-gray-400'
                       : 'bg-gray-100 text-gray-400 border-gray-200'
                       }`}>
                       MALE
                     </div>
-                    <div className={`px-4 py-2 rounded-full border cursor-not-allowed ${staticData.gender === 'FEMALE'
+                    <div className={`px-4 py-2 rounded-full border cursor-not-allowed ${staticData.gender === 'Female'
                       ? 'bg-gray-400 text-white border-gray-400'
                       : 'bg-gray-100 text-gray-400 border-gray-200'
                       }`}>
                       FEMALE
+                    </div>
+                    <div className={`px-4 py-2 rounded-full border cursor-not-allowed ${staticData.gender === 'Other'
+                      ? 'bg-gray-400 text-white border-gray-400'
+                      : 'bg-gray-100 text-gray-400 border-gray-200'
+                      }`}>
+                      OTHER
                     </div>
                   </div>
                 </div>
@@ -706,30 +961,38 @@ function RouteComponent() {
                   <div>
                     <label className="block text-sm font-medium text-gray-600 mb-1">COUNTRY</label>
                     <div className="w-full px-3 py-2 border border-gray-200 rounded-md bg-gray-100 text-gray-500 cursor-not-allowed">
-                      {staticData.country}
+                      {addressData.country}
                     </div>
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-600 mb-1">POSTAL CODE</label>
                     <div className="w-full px-3 py-2 border border-gray-200 rounded-md bg-gray-100 text-gray-500 cursor-not-allowed">
-                      {staticData.postalCode}
+                      {addressData.postalCode || '-'}
                     </div>
                   </div>
                 </div>
 
-                {/* Province and City - Read Only */}
+                {/* Region and City - Read Only */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-600 mb-1">PROVINCE</label>
+                    <label className="block text-sm font-medium text-gray-600 mb-1">REGION</label>
                     <div className="w-full px-3 py-2 border border-gray-200 rounded-md bg-gray-100 text-gray-500 cursor-not-allowed">
-                      {staticData.province}
+                      {addressData.region || '-'}
                     </div>
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-600 mb-1">CITY</label>
                     <div className="w-full px-3 py-2 border border-gray-200 rounded-md bg-gray-100 text-gray-500 cursor-not-allowed">
-                      {staticData.city}
+                      {addressData.city || '-'}
                     </div>
+                  </div>
+                </div>
+
+                {/* Barangay - Read Only */}
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-gray-600 mb-1">BARANGAY</label>
+                  <div className="w-full px-3 py-2 border border-gray-200 rounded-md bg-gray-100 text-gray-500 cursor-not-allowed">
+                    {addressData.barangay || '-'}
                   </div>
                 </div>
 
@@ -737,7 +1000,7 @@ function RouteComponent() {
                 <div className="mb-4">
                   <label className="block text-sm font-medium text-gray-600 mb-1">ADDRESS</label>
                   <div className="w-full px-3 py-2 border border-gray-200 rounded-md bg-gray-100 text-gray-500 cursor-not-allowed">
-                    {staticData.address}
+                    {addressData.addressLine || '-'}
                   </div>
                 </div>
 
@@ -746,25 +1009,25 @@ function RouteComponent() {
                   <label className="block text-sm font-medium text-gray-600 mb-1">
                     MOBILE NUMBER
                   </label>
-                  {editingFields.mobileNumber ? (
+                  {editingFields.phoneNumber ? (
                     <div className="space-y-3">
                       <input
                         type="text"
-                        value={editableData.mobileNumber}
-                        onChange={(e) => handleInputChange('mobileNumber', e.target.value)}
+                        value={editableData.phoneNumber}
+                        onChange={(e) => handleInputChange('phoneNumber', e.target.value)}
                         className="w-full max-w-xs px-3 py-2 border border-gray-300 rounded-md bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent"
                         placeholder="Enter mobile number"
                       />
                       <div className="flex gap-2">
                         <button
-                          onClick={() => saveField('mobileNumber')}
+                          onClick={handleSubmit}
                           className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md transition-colors flex items-center gap-2"
                         >
                           <Save className="h-4 w-4" />
                           Save
                         </button>
                         <button
-                          onClick={() => cancelEditing('mobileNumber')}
+                          onClick={() => cancelEditing('phoneNumber')}
                           className="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-md transition-colors flex items-center gap-2"
                         >
                           <X className="h-4 w-4" />
@@ -775,10 +1038,10 @@ function RouteComponent() {
                   ) : (
                     <div className="flex items-center gap-2">
                       <div className="flex-1 px-3 py-2 border border-gray-200 rounded-md bg-gray-100 text-gray-500 cursor-not-allowed max-w-xs">
-                        {editableData.mobileNumber}
+                        {editableData.phoneNumber || '-'}
                       </div>
                       <button
-                        onClick={() => startEditing('mobileNumber')}
+                        onClick={() => startEditing('phoneNumber')}
                         className="bg-[#964B00] hover:bg-[#7a3d00] text-yellow-400 p-2 rounded-md transition-colors"
                         title="Edit Mobile Number"
                       >
@@ -822,7 +1085,7 @@ function RouteComponent() {
                   ) : (
                     <div className="flex items-center gap-2">
                       <div className="flex-1 px-3 py-2 border border-gray-200 rounded-md bg-gray-100 text-gray-500 cursor-not-allowed">
-                        {editableData.email}
+                        {editableData.email || '-'}
                       </div>
                       <button
                         onClick={() => startEditing('email')}
@@ -907,6 +1170,7 @@ function RouteComponent() {
             </div>
           </div>
         </div>
+
         {/* FOOTER */}
         <footer id="contact" className="py-8" style={{ backgroundColor: "#F9ECD9" }}>
           <div className="max-w-5xl mx-auto px-4">
@@ -952,6 +1216,8 @@ function RouteComponent() {
             </div>
           </div>
         </footer>
+
+        {loading && <LoadingSpinner />}
       </div>
     </ProtectedRoute>
   )

@@ -187,7 +187,6 @@ function RouteComponent() {
     }
 
     try {
-      // Verify password by attempting to sign in
       const { data: { user }, error: authError } = await supabase.auth.getUser()
 
       if (authError || !user) {
@@ -195,7 +194,6 @@ function RouteComponent() {
         return
       }
 
-      // Attempt to re-authenticate with current password
       const { error } = await supabase.auth.signInWithPassword({
         email: originalValues.email,
         password: currentPassword
@@ -206,13 +204,10 @@ function RouteComponent() {
         return
       }
 
-      // Password verified, proceed based on the field being edited
       if (pendingEdit === 'phoneNumber') {
-        // For phone number, show OTP modal
         setShowPasswordModal(false)
         setShowOtpModal(true)
       } else {
-        // For email or password change, directly allow editing
         setShowPasswordModal(false)
         setEditingFields(prev => ({
           ...prev,
