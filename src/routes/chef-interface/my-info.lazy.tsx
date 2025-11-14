@@ -393,8 +393,8 @@ function RouteComponent() {
                     <div className="bg-amber-800 text-white px-6 py-4 relative">
                         <div className="flex items-center justify-between">
                             <div className="flex items-center gap-3">
-                                <div className="w-12 h-12 bg-yellow-400 rounded-full flex items-center justify-center">
-                                    <img src="/api/placeholder/40/40" alt="Logo" className="w-8 h-8 rounded-full" />
+                                <div className="w-12 h-12 rounded-full flex items-center justify-center">
+                                    <img src="/public/angierens-logo.png" alt="Logo" className="w-12 h-12 rounded-full" />
                                 </div>
                                 <div>
                                     <h2 className="text-lg font-bold">Angieren's</h2>

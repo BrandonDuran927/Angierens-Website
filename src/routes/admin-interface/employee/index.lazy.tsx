@@ -23,6 +23,7 @@ import {
 } from 'lucide-react'
 import { supabase } from '@/lib/supabaseClient'
 import { ProtectedRoute } from '@/components/ProtectedRoute'
+import { useUser } from '@/context/UserContext'
 
 export const Route = createLazyFileRoute('/admin-interface/employee/')({
     component: RouteComponent,
@@ -75,6 +76,8 @@ interface FormData {
 
 function RouteComponent() {
     const navigate = useNavigate()
+    const { user, signOut } = useUser()
+
     const [searchTerm, setSearchTerm] = useState('')
     const [filterType, setFilterType] = useState('All')
     const location = useLocation()
@@ -99,6 +102,11 @@ function RouteComponent() {
     const [selectedEmployeeForAssign, setSelectedEmployeeForAssign] = useState<Employee | null>(null)
     const [isTrackModalOpen, setIsTrackModalOpen] = useState(false)
     const [selectedEmployeeForTrack, setSelectedEmployeeForTrack] = useState<Employee | null>(null)
+
+    async function handleLogout() {
+        await signOut();
+        navigate({ to: "/login" });
+    }
 
     // Fetch employees from Supabase
     useEffect(() => {
@@ -600,7 +608,10 @@ function RouteComponent() {
                     {/* Logout */}
                     <div className='border-t border-amber-600'>
                         <div className='w-auto mx-4'>
-                            <button className="w-full flex items-center gap-3 px-4 py-3 mt-5 bg-gray-200 opacity-75 text-gray-950 rounded-lg hover:bg-amber-700 hover:text-white transition-colors">
+                            <button
+                                className="w-full flex items-center gap-3 px-4 py-3 mt-5 bg-gray-200 opacity-75 text-gray-950 rounded-lg hover:bg-amber-700 hover:text-white transition-colors cursor-pointer"
+                                onClick={handleLogout}
+                            >
                                 <LogOut className="h-5 w-5" />
                                 <span className="font-medium">Logout</span>
                             </button>

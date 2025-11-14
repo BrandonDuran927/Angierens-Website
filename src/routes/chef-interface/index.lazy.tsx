@@ -20,6 +20,8 @@ import {
 } from 'lucide-react'
 import { supabase } from '@/lib/supabaseClient'
 import { ProtectedRoute } from '@/components/ProtectedRoute'
+import { useUser } from '@/context/UserContext'
+import { useNavigate } from '@tanstack/react-router'
 
 interface Notification {
     id: string
@@ -78,6 +80,16 @@ function RouteComponent() {
     const [orders, setOrders] = useState<Order[]>([])
     const [loading, setLoading] = useState(true)
     const [notifications, setNotifications] = useState<Notification[]>([])
+    const navigate = useNavigate()
+
+    const { user, signOut } = useUser()
+
+    async function handleLogout() {
+        await signOut();
+        navigate({ to: "/login" });
+    }
+
+
 
     // Fetch orders from Supabase
     const fetchOrders = async () => {
@@ -375,20 +387,17 @@ function RouteComponent() {
 
     const activeOrders = getActiveOrders()
 
-    if (loading) {
-        return (
-            <div className="min-h-screen bg-gradient-to-br from-amber-50 to-orange-100 flex items-center justify-center">
-                <div className="text-center">
-                    <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-amber-800 mx-auto"></div>
-                    <p className="mt-4 text-amber-800 font-semibold">Loading orders...</p>
-                </div>
+    const LoadingSpinner = () => (
+        <div className="fixed inset-0 bg-black/50 flex justify-center items-center z-[60]">
+            <div className="bg-white rounded-xl shadow-lg p-6 flex flex-col items-center gap-4">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#964B00]"></div>
+                <p className="text-gray-700 font-medium">Processing...</p>
             </div>
-        )
-    }
+        </div>
+    );
 
     return (
         <ProtectedRoute>
-
             <div className="min-h-screen bg-gradient-to-br from-amber-50 to-orange-100 flex overflow-x-hidden">
                 {/* Sidebar */}
                 <div
@@ -401,8 +410,8 @@ function RouteComponent() {
                     <div className="bg-amber-800 text-white px-6 py-4 relative">
                         <div className="flex items-center justify-between">
                             <div className="flex items-center gap-3">
-                                <div className="w-12 h-12 bg-yellow-400 rounded-full flex items-center justify-center">
-                                    <img src="/api/placeholder/40/40" alt="Logo" className="w-8 h-8 rounded-full" />
+                                <div className="w-12 h-12 rounded-full flex items-center justify-center">
+                                    <img src="/public/angierens-logo.png" alt="Logo" className="w-12 h-12 rounded-full" />
                                 </div>
                                 <div>
                                     <h2 className="text-lg font-bold">Angieren's</h2>
@@ -445,12 +454,17 @@ function RouteComponent() {
                         ))}
                     </nav>
 
-                    {/* Logout Button */}
-                    <div className="px-4 pb-6">
-                        <button className="flex items-center gap-3 px-4 py-3 text-amber-900 hover:bg-red-100 hover:text-red-600 rounded-lg w-full transition-colors">
-                            <LogOut className="h-5 w-5" />
-                            Logout
-                        </button>
+                    {/* Logout */}
+                    <div className='border-t border-amber-600'>
+                        <div className='w-auto mx-4'>
+                            <button
+                                className="w-full flex items-center gap-3 px-4 py-3 mt-5 bg-gray-200 opacity-75 text-gray-950 rounded-lg hover:bg-amber-700 hover:text-white transition-colors cursor-pointer"
+                                onClick={handleLogout}
+                            >
+                                <LogOut className="h-5 w-5" />
+                                <span className="font-medium">Logout</span>
+                            </button>
+                        </div>
                     </div>
                 </div>
 
@@ -824,6 +838,8 @@ function RouteComponent() {
                         )}
                     </main>
                 </div>
+                {loading && <LoadingSpinner />}
+
             </div>
         </ProtectedRoute>
     )
