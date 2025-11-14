@@ -15,6 +15,7 @@ import { Route as PostsIndexRouteImport } from './routes/posts/index'
 import { Route as PostsPostIdRouteImport } from './routes/posts/$postId'
 import { Route as CustomerInterfacePaymentRouteImport } from './routes/customer-interface/payment'
 
+const UnauthorizedLazyRouteImport = createFileRoute('/unauthorized')()
 const SignupLazyRouteImport = createFileRoute('/signup')()
 const LoginLazyRouteImport = createFileRoute('/login')()
 const AboutLazyRouteImport = createFileRoute('/about')()
@@ -81,6 +82,11 @@ const CustomerInterfaceFeedbackFeedbackIdLazyRouteImport = createFileRoute(
   '/customer-interface/feedback/$feedbackId',
 )()
 
+const UnauthorizedLazyRoute = UnauthorizedLazyRouteImport.update({
+  id: '/unauthorized',
+  path: '/unauthorized',
+  getParentRoute: () => rootRouteImport,
+} as any).lazy(() => import('./routes/unauthorized.lazy').then((d) => d.Route))
 const SignupLazyRoute = SignupLazyRouteImport.update({
   id: '/signup',
   path: '/signup',
@@ -317,6 +323,7 @@ export interface FileRoutesByFullPath {
   '/about': typeof AboutLazyRoute
   '/login': typeof LoginLazyRoute
   '/signup': typeof SignupLazyRoute
+  '/unauthorized': typeof UnauthorizedLazyRoute
   '/customer-interface/payment': typeof CustomerInterfacePaymentRoute
   '/posts/$postId': typeof PostsPostIdRoute
   '/admin-interface/menu': typeof AdminInterfaceMenuLazyRoute
@@ -352,6 +359,7 @@ export interface FileRoutesByTo {
   '/about': typeof AboutLazyRoute
   '/login': typeof LoginLazyRoute
   '/signup': typeof SignupLazyRoute
+  '/unauthorized': typeof UnauthorizedLazyRoute
   '/customer-interface/payment': typeof CustomerInterfacePaymentRoute
   '/posts/$postId': typeof PostsPostIdRoute
   '/admin-interface/menu': typeof AdminInterfaceMenuLazyRoute
@@ -388,6 +396,7 @@ export interface FileRoutesById {
   '/about': typeof AboutLazyRoute
   '/login': typeof LoginLazyRoute
   '/signup': typeof SignupLazyRoute
+  '/unauthorized': typeof UnauthorizedLazyRoute
   '/customer-interface/payment': typeof CustomerInterfacePaymentRoute
   '/posts/$postId': typeof PostsPostIdRoute
   '/admin-interface/menu': typeof AdminInterfaceMenuLazyRoute
@@ -425,6 +434,7 @@ export interface FileRouteTypes {
     | '/about'
     | '/login'
     | '/signup'
+    | '/unauthorized'
     | '/customer-interface/payment'
     | '/posts/$postId'
     | '/admin-interface/menu'
@@ -460,6 +470,7 @@ export interface FileRouteTypes {
     | '/about'
     | '/login'
     | '/signup'
+    | '/unauthorized'
     | '/customer-interface/payment'
     | '/posts/$postId'
     | '/admin-interface/menu'
@@ -495,6 +506,7 @@ export interface FileRouteTypes {
     | '/about'
     | '/login'
     | '/signup'
+    | '/unauthorized'
     | '/customer-interface/payment'
     | '/posts/$postId'
     | '/admin-interface/menu'
@@ -531,6 +543,7 @@ export interface RootRouteChildren {
   AboutLazyRoute: typeof AboutLazyRoute
   LoginLazyRoute: typeof LoginLazyRoute
   SignupLazyRoute: typeof SignupLazyRoute
+  UnauthorizedLazyRoute: typeof UnauthorizedLazyRoute
   CustomerInterfacePaymentRoute: typeof CustomerInterfacePaymentRoute
   PostsPostIdRoute: typeof PostsPostIdRoute
   AdminInterfaceMenuLazyRoute: typeof AdminInterfaceMenuLazyRoute
@@ -564,6 +577,13 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/unauthorized': {
+      id: '/unauthorized'
+      path: '/unauthorized'
+      fullPath: '/unauthorized'
+      preLoaderRoute: typeof UnauthorizedLazyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/signup': {
       id: '/signup'
       path: '/signup'
@@ -803,6 +823,7 @@ const rootRouteChildren: RootRouteChildren = {
   AboutLazyRoute: AboutLazyRoute,
   LoginLazyRoute: LoginLazyRoute,
   SignupLazyRoute: SignupLazyRoute,
+  UnauthorizedLazyRoute: UnauthorizedLazyRoute,
   CustomerInterfacePaymentRoute: CustomerInterfacePaymentRoute,
   PostsPostIdRoute: PostsPostIdRoute,
   AdminInterfaceMenuLazyRoute: AdminInterfaceMenuLazyRoute,

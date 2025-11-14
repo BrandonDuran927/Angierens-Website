@@ -11,6 +11,7 @@ import {
     LogOut,
     Star
 } from 'lucide-react'
+import { ProtectedRoute } from '@/components/ProtectedRoute'
 
 export const Route = createLazyFileRoute('/chef-interface/my-info')({
     component: RouteComponent,
@@ -290,456 +291,459 @@ function RouteComponent() {
     ]
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-amber-50 to-orange-100 flex overflow-x-hidden">
-            {/* Password Verification Modal */}
-            {showPasswordModal && (
-                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 px-4">
-                    <div className="bg-white rounded-lg p-4 sm:p-6 max-w-md w-full shadow-xl">
-                        <h2 className="text-lg sm:text-xl font-semibold text-gray-800 mb-3 sm:mb-4">
-                            Verify Your Password
-                        </h2>
-                        <p className="text-gray-600 mb-3 sm:mb-4 text-sm sm:text-base">
-                            Please enter your current password to continue editing this sensitive information.
-                        </p>
-                        <div className="mb-4">
-                            <label className="block text-sm font-medium text-gray-600 mb-2">
-                                Current Password
-                            </label>
-                            <input
-                                type="password"
-                                value={currentPassword}
-                                onChange={(e) => setCurrentPassword(e.target.value)}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent text-sm sm:text-base"
-                                placeholder="Enter your current password"
-                                onKeyDown={(e) => e.key === 'Enter' && verifyPassword()}
-                            />
-                        </div>
-                        <div className="flex gap-2 sm:gap-3 justify-end">
-                            <button
-                                onClick={closePasswordModal}
-                                className="px-3 sm:px-4 py-2 text-gray-600 bg-gray-200 rounded-md hover:bg-gray-300 text-sm sm:text-base"
-                            >
-                                Cancel
-                            </button>
-                            <button
-                                onClick={verifyPassword}
-                                className="px-3 sm:px-4 py-2 bg-[#964B00] text-yellow-400 rounded-md hover:bg-[#7a3d00] text-sm sm:text-base"
-                            >
-                                Verify
-                            </button>
+        <ProtectedRoute allowedRoles={['chef']}>
+
+            <div className="min-h-screen bg-gradient-to-br from-amber-50 to-orange-100 flex overflow-x-hidden">
+                {/* Password Verification Modal */}
+                {showPasswordModal && (
+                    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 px-4">
+                        <div className="bg-white rounded-lg p-4 sm:p-6 max-w-md w-full shadow-xl">
+                            <h2 className="text-lg sm:text-xl font-semibold text-gray-800 mb-3 sm:mb-4">
+                                Verify Your Password
+                            </h2>
+                            <p className="text-gray-600 mb-3 sm:mb-4 text-sm sm:text-base">
+                                Please enter your current password to continue editing this sensitive information.
+                            </p>
+                            <div className="mb-4">
+                                <label className="block text-sm font-medium text-gray-600 mb-2">
+                                    Current Password
+                                </label>
+                                <input
+                                    type="password"
+                                    value={currentPassword}
+                                    onChange={(e) => setCurrentPassword(e.target.value)}
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent text-sm sm:text-base"
+                                    placeholder="Enter your current password"
+                                    onKeyDown={(e) => e.key === 'Enter' && verifyPassword()}
+                                />
+                            </div>
+                            <div className="flex gap-2 sm:gap-3 justify-end">
+                                <button
+                                    onClick={closePasswordModal}
+                                    className="px-3 sm:px-4 py-2 text-gray-600 bg-gray-200 rounded-md hover:bg-gray-300 text-sm sm:text-base"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    onClick={verifyPassword}
+                                    className="px-3 sm:px-4 py-2 bg-[#964B00] text-yellow-400 rounded-md hover:bg-[#7a3d00] text-sm sm:text-base"
+                                >
+                                    Verify
+                                </button>
+                            </div>
                         </div>
                     </div>
-                </div>
-            )}
+                )}
 
-            {/* OTP Verification Modal */}
-            {showOtpModal && (
-                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 px-4">
-                    <div className="bg-white rounded-lg p-4 sm:p-6 max-w-md w-full shadow-xl">
-                        <h2 className="text-lg sm:text-xl font-semibold text-gray-800 mb-3 sm:mb-4">
-                            Enter OTP Code
-                        </h2>
-                        <p className="text-gray-600 mb-3 sm:mb-4 text-sm sm:text-base">
-                            We've sent a verification code to your current phone number. Please enter it below to continue.
-                        </p>
-                        <div className="mb-4">
-                            <label className="block text-sm font-medium text-gray-600 mb-2">
-                                OTP Code
-                            </label>
-                            <input
-                                type="text"
-                                value={otpCode}
-                                onChange={(e) => setOtpCode(e.target.value)}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-amber-500 text-center text-lg tracking-widest"
-                                placeholder="123456"
-                                maxLength={6}
-                                onKeyDown={(e) => e.key === 'Enter' && verifyOtp()}
-                            />
-                        </div>
-                        <div className="text-center mb-4">
-                            <button className="text-[#964B00] text-sm hover:underline">
-                                Resend OTP
-                            </button>
-                        </div>
-                        <div className="flex gap-2 sm:gap-3 justify-end">
-                            <button
-                                onClick={closeOtpModal}
-                                className="px-3 sm:px-4 py-2 text-gray-600 bg-gray-200 rounded-md hover:bg-gray-300 text-sm sm:text-base"
-                            >
-                                Cancel
-                            </button>
-                            <button
-                                onClick={verifyOtp}
-                                className="px-3 sm:px-4 py-2 bg-[#964B00] text-yellow-400 rounded-md hover:bg-[#7a3d00] text-sm sm:text-base"
-                            >
-                                Verify OTP
-                            </button>
+                {/* OTP Verification Modal */}
+                {showOtpModal && (
+                    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 px-4">
+                        <div className="bg-white rounded-lg p-4 sm:p-6 max-w-md w-full shadow-xl">
+                            <h2 className="text-lg sm:text-xl font-semibold text-gray-800 mb-3 sm:mb-4">
+                                Enter OTP Code
+                            </h2>
+                            <p className="text-gray-600 mb-3 sm:mb-4 text-sm sm:text-base">
+                                We've sent a verification code to your current phone number. Please enter it below to continue.
+                            </p>
+                            <div className="mb-4">
+                                <label className="block text-sm font-medium text-gray-600 mb-2">
+                                    OTP Code
+                                </label>
+                                <input
+                                    type="text"
+                                    value={otpCode}
+                                    onChange={(e) => setOtpCode(e.target.value)}
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-amber-500 text-center text-lg tracking-widest"
+                                    placeholder="123456"
+                                    maxLength={6}
+                                    onKeyDown={(e) => e.key === 'Enter' && verifyOtp()}
+                                />
+                            </div>
+                            <div className="text-center mb-4">
+                                <button className="text-[#964B00] text-sm hover:underline">
+                                    Resend OTP
+                                </button>
+                            </div>
+                            <div className="flex gap-2 sm:gap-3 justify-end">
+                                <button
+                                    onClick={closeOtpModal}
+                                    className="px-3 sm:px-4 py-2 text-gray-600 bg-gray-200 rounded-md hover:bg-gray-300 text-sm sm:text-base"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    onClick={verifyOtp}
+                                    className="px-3 sm:px-4 py-2 bg-[#964B00] text-yellow-400 rounded-md hover:bg-[#7a3d00] text-sm sm:text-base"
+                                >
+                                    Verify OTP
+                                </button>
+                            </div>
                         </div>
                     </div>
-                </div>
-            )}
+                )}
 
-            {/* Sidebar */}
-            <div
-                className={`
+                {/* Sidebar */}
+                <div
+                    className={`
         fixed inset-y-0 left-0 z-50 w-64 bg-yellow-400 transform transition-transform duration-300 ease-in-out
         ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}
       `}
-            >
-                {/* Header */}
-                <div className="bg-amber-800 text-white px-6 py-4 relative">
-                    <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                            <div className="w-12 h-12 bg-yellow-400 rounded-full flex items-center justify-center">
-                                <img src="/api/placeholder/40/40" alt="Logo" className="w-8 h-8 rounded-full" />
+                >
+                    {/* Header */}
+                    <div className="bg-amber-800 text-white px-6 py-4 relative">
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                                <div className="w-12 h-12 bg-yellow-400 rounded-full flex items-center justify-center">
+                                    <img src="/api/placeholder/40/40" alt="Logo" className="w-8 h-8 rounded-full" />
+                                </div>
+                                <div>
+                                    <h2 className="text-lg font-bold">Angieren's</h2>
+                                    <p className="text-lg font-bold">Lutong Bahay</p>
+                                </div>
                             </div>
-                            <div>
-                                <h2 className="text-lg font-bold">Angieren's</h2>
-                                <p className="text-lg font-bold">Lutong Bahay</p>
-                            </div>
+                            <button
+                                onClick={() => setIsSidebarOpen(false)}
+                                className="lg:hidden p-2 hover:bg-amber-700 rounded-lg"
+                            >
+                                <X className="h-6 w-6" />
+                            </button>
                         </div>
-                        <button
-                            onClick={() => setIsSidebarOpen(false)}
-                            className="lg:hidden p-2 hover:bg-amber-700 rounded-lg"
-                        >
-                            <X className="h-6 w-6" />
+                    </div>
+
+                    {/* User Info */}
+                    <div className="px-6 py-4 border-b-2 border-amber-600">
+                        <h3 className="font-bold text-lg text-amber-900">Jenny Frenzzy</h3>
+                        <p className="text-sm text-amber-800">+63 912 212 1209</p>
+                        <p className="text-sm text-amber-800">jennyfrenzzy@gmail.com</p>
+                    </div>
+
+                    {/* Navigation Menu */}
+                    <nav className="flex-1 px-4 py-6 space-y-2">
+                        {navigationItems.map((item) => (
+                            <Link
+                                key={item.name}
+                                to={item.route}
+                                className={`
+              flex items-center gap-3 px-4 py-3 rounded-lg text-left font-semibold transition-colors w-full
+              ${item.active
+                                        ? 'bg-amber-700 text-white shadow-lg'
+                                        : 'text-amber-900 hover:bg-amber-300'}
+            `}
+                            >
+                                {item.icon}
+                                {item.name}
+                            </Link>
+                        ))}
+                    </nav>
+
+                    {/* Logout Button */}
+                    <div className="px-4 pb-6">
+                        <button className="flex items-center gap-3 px-4 py-3 text-amber-900 hover:bg-red-100 hover:text-red-600 rounded-lg w-full transition-colors">
+                            <LogOut className="h-5 w-5" />
+                            Logout
                         </button>
                     </div>
                 </div>
 
-                {/* User Info */}
-                <div className="px-6 py-4 border-b-2 border-amber-600">
-                    <h3 className="font-bold text-lg text-amber-900">Jenny Frenzzy</h3>
-                    <p className="text-sm text-amber-800">+63 912 212 1209</p>
-                    <p className="text-sm text-amber-800">jennyfrenzzy@gmail.com</p>
-                </div>
+                {/* Overlay for mobile */}
+                {isSidebarOpen && (
+                    <div
+                        className="fixed inset-0 bg-black/50 z-40"
+                        onClick={() => setIsSidebarOpen(false)}
+                    />
+                )}
 
-                {/* Navigation Menu */}
-                <nav className="flex-1 px-4 py-6 space-y-2">
-                    {navigationItems.map((item) => (
-                        <Link
-                            key={item.name}
-                            to={item.route}
-                            className={`
-              flex items-center gap-3 px-4 py-3 rounded-lg text-left font-semibold transition-colors w-full
-              ${item.active
-                                    ? 'bg-amber-700 text-white shadow-lg'
-                                    : 'text-amber-900 hover:bg-amber-300'}
-            `}
-                        >
-                            {item.icon}
-                            {item.name}
-                        </Link>
-                    ))}
-                </nav>
-
-                {/* Logout Button */}
-                <div className="px-4 pb-6">
-                    <button className="flex items-center gap-3 px-4 py-3 text-amber-900 hover:bg-red-100 hover:text-red-600 rounded-lg w-full transition-colors">
-                        <LogOut className="h-5 w-5" />
-                        Logout
-                    </button>
-                </div>
-            </div>
-
-            {/* Overlay for mobile */}
-            {isSidebarOpen && (
-                <div
-                    className="fixed inset-0 bg-black/50 z-40"
-                    onClick={() => setIsSidebarOpen(false)}
-                />
-            )}
-
-            {/* Main Area */}
-            <div className="flex-1 flex flex-col min-w-0">
-                {/* Top Bar */}
-                <header className="bg-amber-800 text-white p-3 sm:p-4 shadow-md">
-                    <div className="flex justify-between items-center">
-                        <div className="flex items-center gap-3">
-                            {/* Mobile Menu Button */}
-                            <button
-                                onClick={() => setIsSidebarOpen(true)}
-                                className="p-2 text-white hover:bg-amber-700 rounded-lg"
-                            >
-                                <Menu className="h-6 w-6" />
-                            </button>
-                            <h1 className="text-lg sm:text-xl lg:text-3xl font-bold">MY INFO</h1>
-                        </div>
-                        <div className="flex items-center gap-2 lg:gap-6">
-                            <span className="text-amber-200 text-xs sm:text-sm lg:text-lg font-semibold hidden sm:inline">
-                                Date: {getCurrentDate()}
-                            </span>
-                            <span className="text-amber-200 text-xs sm:text-sm lg:text-lg font-semibold hidden sm:inline">
-                                Time: {getCurrentTime()}
-                            </span>
-                            <div className="w-9 h-9 sm:w-10 sm:h-10 bg-yellow-400 rounded-full flex items-center justify-center">
-                                <div className="relative">
-                                    <button
-                                        onClick={() => setIsNotificationOpen(!isNotificationOpen)}
-                                        className="relative p-2 text-[#7a3d00] hover:bg-yellow-400 rounded-full"
-                                    >
-                                        <Bell className="h-5 w-5 sm:h-6 sm:w-6" />
-                                        {notificationCount > 0 && (
-                                            <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-4 w-4 sm:h-5 sm:w-5 flex items-center justify-center">
-                                                {notificationCount}
-                                            </span>
-                                        )}
-                                    </button>
-                                    {/* Notification Dropdown */}
-                                    {isNotificationOpen && (
-                                        <div className="absolute right-0 mt-2 w-72 sm:w-96 bg-white rounded-lg shadow-lg border border-gray-200 z-50">
-                                            <div className="p-4 border-b border-gray-200">
-                                                <h3 className="text-base sm:text-lg font-semibold text-gray-800">
-                                                    Notifications
-                                                </h3>
-                                            </div>
-                                            <div className="max-h-64 sm:max-h-80 overflow-y-auto">
-                                                {notifications.map((notification, index) => (
-                                                    <div
-                                                        key={notification.id}
-                                                        className={`p-3 sm:p-4 border-b border-gray-100 hover:bg-gray-50 cursor-pointer ${index === notifications.length - 1 ? 'border-b-0' : ''
-                                                            }`}
-                                                    >
-                                                        <div className="flex items-start gap-3">
-                                                            <div className="flex-shrink-0 w-9 h-9 sm:w-10 sm:h-10 bg-yellow-400 rounded-full flex items-center justify-center text-black">
-                                                                {getNotificationIcon(notification.icon)}
-                                                            </div>
-                                                            <div className="flex-1 min-w-0">
-                                                                <p className="text-sm text-gray-800 leading-relaxed">
-                                                                    {notification.title}
-                                                                </p>
-                                                                <p className="text-xs text-gray-500 mt-1">
-                                                                    {notification.time}
-                                                                </p>
+                {/* Main Area */}
+                <div className="flex-1 flex flex-col min-w-0">
+                    {/* Top Bar */}
+                    <header className="bg-amber-800 text-white p-3 sm:p-4 shadow-md">
+                        <div className="flex justify-between items-center">
+                            <div className="flex items-center gap-3">
+                                {/* Mobile Menu Button */}
+                                <button
+                                    onClick={() => setIsSidebarOpen(true)}
+                                    className="p-2 text-white hover:bg-amber-700 rounded-lg"
+                                >
+                                    <Menu className="h-6 w-6" />
+                                </button>
+                                <h1 className="text-lg sm:text-xl lg:text-3xl font-bold">MY INFO</h1>
+                            </div>
+                            <div className="flex items-center gap-2 lg:gap-6">
+                                <span className="text-amber-200 text-xs sm:text-sm lg:text-lg font-semibold hidden sm:inline">
+                                    Date: {getCurrentDate()}
+                                </span>
+                                <span className="text-amber-200 text-xs sm:text-sm lg:text-lg font-semibold hidden sm:inline">
+                                    Time: {getCurrentTime()}
+                                </span>
+                                <div className="w-9 h-9 sm:w-10 sm:h-10 bg-yellow-400 rounded-full flex items-center justify-center">
+                                    <div className="relative">
+                                        <button
+                                            onClick={() => setIsNotificationOpen(!isNotificationOpen)}
+                                            className="relative p-2 text-[#7a3d00] hover:bg-yellow-400 rounded-full"
+                                        >
+                                            <Bell className="h-5 w-5 sm:h-6 sm:w-6" />
+                                            {notificationCount > 0 && (
+                                                <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-4 w-4 sm:h-5 sm:w-5 flex items-center justify-center">
+                                                    {notificationCount}
+                                                </span>
+                                            )}
+                                        </button>
+                                        {/* Notification Dropdown */}
+                                        {isNotificationOpen && (
+                                            <div className="absolute right-0 mt-2 w-72 sm:w-96 bg-white rounded-lg shadow-lg border border-gray-200 z-50">
+                                                <div className="p-4 border-b border-gray-200">
+                                                    <h3 className="text-base sm:text-lg font-semibold text-gray-800">
+                                                        Notifications
+                                                    </h3>
+                                                </div>
+                                                <div className="max-h-64 sm:max-h-80 overflow-y-auto">
+                                                    {notifications.map((notification, index) => (
+                                                        <div
+                                                            key={notification.id}
+                                                            className={`p-3 sm:p-4 border-b border-gray-100 hover:bg-gray-50 cursor-pointer ${index === notifications.length - 1 ? 'border-b-0' : ''
+                                                                }`}
+                                                        >
+                                                            <div className="flex items-start gap-3">
+                                                                <div className="flex-shrink-0 w-9 h-9 sm:w-10 sm:h-10 bg-yellow-400 rounded-full flex items-center justify-center text-black">
+                                                                    {getNotificationIcon(notification.icon)}
+                                                                </div>
+                                                                <div className="flex-1 min-w-0">
+                                                                    <p className="text-sm text-gray-800 leading-relaxed">
+                                                                        {notification.title}
+                                                                    </p>
+                                                                    <p className="text-xs text-gray-500 mt-1">
+                                                                        {notification.time}
+                                                                    </p>
+                                                                </div>
                                                             </div>
                                                         </div>
-                                                    </div>
-                                                ))}
+                                                    ))}
+                                                </div>
+                                                <div className="p-3 sm:p-4 border-t border-gray-200">
+                                                    <button
+                                                        onClick={markAllAsRead}
+                                                        className="w-full bg-yellow-400 text-black py-2 px-3 sm:px-4 rounded-lg font-medium hover:bg-yellow-500 transition-colors flex items-center justify-center gap-2 text-sm sm:text-base"
+                                                    >
+                                                        <Bell className="h-4 w-4" />
+                                                        Mark all as read
+                                                    </button>
+                                                </div>
                                             </div>
-                                            <div className="p-3 sm:p-4 border-t border-gray-200">
-                                                <button
-                                                    onClick={markAllAsRead}
-                                                    className="w-full bg-yellow-400 text-black py-2 px-3 sm:px-4 rounded-lg font-medium hover:bg-yellow-500 transition-colors flex items-center justify-center gap-2 text-sm sm:text-base"
-                                                >
-                                                    <Bell className="h-4 w-4" />
-                                                    Mark all as read
-                                                </button>
-                                            </div>
-                                        </div>
-                                    )}
+                                        )}
+                                    </div>
                                 </div>
                             </div>
                         </div>
-                    </div>
-                </header>
+                    </header>
 
-                {/* Main Content */}
-                <div className="flex-1 flex items-center justify-center p-4 sm:p-6 lg:p-8">
-                    <div className="bg-white rounded-lg shadow-2xl p-4 sm:p-6 lg:p-8 w-full max-w-2xl">
-                        <div className="space-y-6">
-                            {/* First Name */}
-                            <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
-                                <label className="text-sm sm:text-base lg:text-lg font-medium text-gray-700 sm:w-48 sm:text-right">
-                                    First Name:
-                                </label>
-                                <div className="flex-1">
-                                    <input
-                                        type="text"
-                                        value={staticData.firstName}
-                                        className="w-full px-3 py-2 sm:px-4 sm:py-3 border-2 border-gray-300 rounded-lg bg-gray-100 text-gray-500 cursor-not-allowed text-sm sm:text-base"
-                                        disabled
-                                    />
+                    {/* Main Content */}
+                    <div className="flex-1 flex items-center justify-center p-4 sm:p-6 lg:p-8">
+                        <div className="bg-white rounded-lg shadow-2xl p-4 sm:p-6 lg:p-8 w-full max-w-2xl">
+                            <div className="space-y-6">
+                                {/* First Name */}
+                                <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
+                                    <label className="text-sm sm:text-base lg:text-lg font-medium text-gray-700 sm:w-48 sm:text-right">
+                                        First Name:
+                                    </label>
+                                    <div className="flex-1">
+                                        <input
+                                            type="text"
+                                            value={staticData.firstName}
+                                            className="w-full px-3 py-2 sm:px-4 sm:py-3 border-2 border-gray-300 rounded-lg bg-gray-100 text-gray-500 cursor-not-allowed text-sm sm:text-base"
+                                            disabled
+                                        />
+                                    </div>
                                 </div>
-                            </div>
 
-                            {/* Middle Name */}
-                            <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
-                                <label className="text-sm sm:text-base lg:text-lg font-medium text-gray-700 sm:w-48 sm:text-right">
-                                    Middle Name:
-                                </label>
-                                <div className="flex-1">
-                                    <input
-                                        type="text"
-                                        value={staticData.middleName}
-                                        className="w-full px-3 py-2 sm:px-4 sm:py-3 border-2 border-gray-300 rounded-lg bg-gray-100 text-gray-500 cursor-not-allowed text-sm sm:text-base"
-                                        disabled
-                                    />
+                                {/* Middle Name */}
+                                <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
+                                    <label className="text-sm sm:text-base lg:text-lg font-medium text-gray-700 sm:w-48 sm:text-right">
+                                        Middle Name:
+                                    </label>
+                                    <div className="flex-1">
+                                        <input
+                                            type="text"
+                                            value={staticData.middleName}
+                                            className="w-full px-3 py-2 sm:px-4 sm:py-3 border-2 border-gray-300 rounded-lg bg-gray-100 text-gray-500 cursor-not-allowed text-sm sm:text-base"
+                                            disabled
+                                        />
+                                    </div>
                                 </div>
-                            </div>
 
-                            {/* Last Name */}
-                            <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
-                                <label className="text-sm sm:text-base lg:text-lg font-medium text-gray-700 sm:w-48 sm:text-right">
-                                    Last Name:
-                                </label>
-                                <div className="flex-1">
-                                    <input
-                                        type="text"
-                                        value={staticData.lastName}
-                                        className="w-full px-3 py-2 sm:px-4 sm:py-3 border-2 border-gray-300 rounded-lg bg-gray-100 text-gray-500 cursor-not-allowed text-sm sm:text-base"
-                                        disabled
-                                    />
+                                {/* Last Name */}
+                                <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
+                                    <label className="text-sm sm:text-base lg:text-lg font-medium text-gray-700 sm:w-48 sm:text-right">
+                                        Last Name:
+                                    </label>
+                                    <div className="flex-1">
+                                        <input
+                                            type="text"
+                                            value={staticData.lastName}
+                                            className="w-full px-3 py-2 sm:px-4 sm:py-3 border-2 border-gray-300 rounded-lg bg-gray-100 text-gray-500 cursor-not-allowed text-sm sm:text-base"
+                                            disabled
+                                        />
+                                    </div>
                                 </div>
-                            </div>
 
-                            {/* Phone Number */}
-                            <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
-                                <label className="text-sm sm:text-base lg:text-lg font-medium text-gray-700 sm:w-48 sm:text-right">
-                                    Phone Number:
-                                </label>
-                                <div className="flex-1 flex flex-col sm:flex-row sm:items-center gap-2">
-                                    {editingFields.phoneNumber ? (
-                                        <>
-                                            <input
-                                                type="text"
-                                                value={editableData.phoneNumber}
-                                                onChange={(e) => handleInputChange('phoneNumber', e.target.value)}
-                                                className="flex-1 px-3 py-2 sm:px-4 sm:py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 text-sm sm:text-base"
-                                            />
-                                            <div className="flex gap-2">
+                                {/* Phone Number */}
+                                <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
+                                    <label className="text-sm sm:text-base lg:text-lg font-medium text-gray-700 sm:w-48 sm:text-right">
+                                        Phone Number:
+                                    </label>
+                                    <div className="flex-1 flex flex-col sm:flex-row sm:items-center gap-2">
+                                        {editingFields.phoneNumber ? (
+                                            <>
+                                                <input
+                                                    type="text"
+                                                    value={editableData.phoneNumber}
+                                                    onChange={(e) => handleInputChange('phoneNumber', e.target.value)}
+                                                    className="flex-1 px-3 py-2 sm:px-4 sm:py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 text-sm sm:text-base"
+                                                />
+                                                <div className="flex gap-2">
+                                                    <button
+                                                        onClick={() => saveField('phoneNumber')}
+                                                        className="p-2 bg-green-600 hover:bg-green-700 text-white rounded-lg"
+                                                    >
+                                                        <Save className="h-5 w-5" />
+                                                    </button>
+                                                    <button
+                                                        onClick={() => cancelEditing('phoneNumber')}
+                                                        className="p-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg"
+                                                    >
+                                                        <X className="h-5 w-5" />
+                                                    </button>
+                                                </div>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <input
+                                                    type="text"
+                                                    value={editableData.phoneNumber}
+                                                    className="flex-1 px-3 py-2 sm:px-4 sm:py-3 border-2 border-gray-300 rounded-lg bg-gray-100 text-gray-600 cursor-not-allowed text-sm sm:text-base"
+                                                    disabled
+                                                />
                                                 <button
-                                                    onClick={() => saveField('phoneNumber')}
-                                                    className="p-2 bg-green-600 hover:bg-green-700 text-white rounded-lg"
+                                                    onClick={() => startEditing('phoneNumber')}
+                                                    className="p-2 bg-gray-400 hover:bg-gray-500 text-white rounded-lg"
                                                 >
-                                                    <Save className="h-5 w-5" />
+                                                    <Edit className="h-5 w-5" />
                                                 </button>
+                                            </>
+                                        )}
+                                    </div>
+                                </div>
+
+                                {/* Email */}
+                                <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
+                                    <label className="text-sm sm:text-base lg:text-lg font-medium text-gray-700 sm:w-48 sm:text-right">
+                                        Email Address:
+                                    </label>
+                                    <div className="flex-1 flex flex-col sm:flex-row sm:items-center gap-2">
+                                        {editingFields.email ? (
+                                            <>
+                                                <input
+                                                    type="email"
+                                                    value={editableData.email}
+                                                    onChange={(e) => handleInputChange('email', e.target.value)}
+                                                    className="flex-1 px-3 py-2 sm:px-4 sm:py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 text-sm sm:text-base"
+                                                />
+                                                <div className="flex gap-2">
+                                                    <button
+                                                        onClick={() => saveField('email')}
+                                                        className="p-2 bg-green-600 hover:bg-green-700 text-white rounded-lg"
+                                                    >
+                                                        <Save className="h-5 w-5" />
+                                                    </button>
+                                                    <button
+                                                        onClick={() => cancelEditing('email')}
+                                                        className="p-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg"
+                                                    >
+                                                        <X className="h-5 w-5" />
+                                                    </button>
+                                                </div>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <input
+                                                    type="email"
+                                                    value={editableData.email}
+                                                    className="flex-1 px-3 py-2 sm:px-4 sm:py-3 border-2 border-gray-300 rounded-lg bg-gray-100 text-gray-600 cursor-not-allowed text-sm sm:text-base"
+                                                    disabled
+                                                />
                                                 <button
-                                                    onClick={() => cancelEditing('phoneNumber')}
-                                                    className="p-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg"
+                                                    onClick={() => startEditing('email')}
+                                                    className="p-2 bg-gray-400 hover:bg-gray-500 text-white rounded-lg"
                                                 >
-                                                    <X className="h-5 w-5" />
+                                                    <Edit className="h-5 w-5" />
                                                 </button>
+                                            </>
+                                        )}
+                                    </div>
+                                </div>
+
+                                {/* Password */}
+                                <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
+                                    <label className="text-sm sm:text-base lg:text-lg font-medium text-gray-700 sm:w-48 sm:text-right">
+                                        Password:
+                                    </label>
+                                    <div className="flex-1 flex flex-col sm:flex-row sm:items-center gap-2">
+                                        {editingFields.password ? (
+                                            <div className="flex-1 space-y-3">
+                                                <input
+                                                    type="password"
+                                                    value={editableData.newPassword}
+                                                    onChange={(e) => handleInputChange('newPassword', e.target.value)}
+                                                    className="w-full px-3 py-2 sm:px-4 sm:py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 text-sm sm:text-base"
+                                                    placeholder="New password"
+                                                />
+                                                <input
+                                                    type="password"
+                                                    value={editableData.retypePassword}
+                                                    onChange={(e) => handleInputChange('retypePassword', e.target.value)}
+                                                    className="w-full px-3 py-2 sm:px-4 sm:py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 text-sm sm:text-base"
+                                                    placeholder="Retype password"
+                                                />
+                                                <div className="flex flex-col sm:flex-row gap-2">
+                                                    <button
+                                                        onClick={handleChangePassword}
+                                                        className="px-3 sm:px-4 py-2 bg-[#964B00] hover:bg-[#7a3d00] text-yellow-400 rounded-lg flex items-center justify-center gap-2 text-sm sm:text-base"
+                                                    >
+                                                        <Save className="h-4 w-4" />
+                                                        Save Password
+                                                    </button>
+                                                    <button
+                                                        onClick={() => cancelEditing('password')}
+                                                        className="px-3 sm:px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg flex items-center justify-center gap-2 text-sm sm:text-base"
+                                                    >
+                                                        <X className="h-4 w-4" />
+                                                        Cancel
+                                                    </button>
+                                                </div>
                                             </div>
-                                        </>
-                                    ) : (
-                                        <>
-                                            <input
-                                                type="text"
-                                                value={editableData.phoneNumber}
-                                                className="flex-1 px-3 py-2 sm:px-4 sm:py-3 border-2 border-gray-300 rounded-lg bg-gray-100 text-gray-600 cursor-not-allowed text-sm sm:text-base"
-                                                disabled
-                                            />
-                                            <button
-                                                onClick={() => startEditing('phoneNumber')}
-                                                className="p-2 bg-gray-400 hover:bg-gray-500 text-white rounded-lg"
-                                            >
-                                                <Edit className="h-5 w-5" />
-                                            </button>
-                                        </>
-                                    )}
-                                </div>
-                            </div>
-
-                            {/* Email */}
-                            <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
-                                <label className="text-sm sm:text-base lg:text-lg font-medium text-gray-700 sm:w-48 sm:text-right">
-                                    Email Address:
-                                </label>
-                                <div className="flex-1 flex flex-col sm:flex-row sm:items-center gap-2">
-                                    {editingFields.email ? (
-                                        <>
-                                            <input
-                                                type="email"
-                                                value={editableData.email}
-                                                onChange={(e) => handleInputChange('email', e.target.value)}
-                                                className="flex-1 px-3 py-2 sm:px-4 sm:py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 text-sm sm:text-base"
-                                            />
-                                            <div className="flex gap-2">
+                                        ) : (
+                                            <>
+                                                <input
+                                                    type="password"
+                                                    value="************"
+                                                    className="flex-1 px-3 py-2 sm:px-4 sm:py-3 border-2 border-gray-300 rounded-lg bg-gray-100 text-gray-600 cursor-not-allowed text-sm sm:text-base"
+                                                    disabled
+                                                />
                                                 <button
-                                                    onClick={() => saveField('email')}
-                                                    className="p-2 bg-green-600 hover:bg-green-700 text-white rounded-lg"
+                                                    onClick={() => startEditing('password')}
+                                                    className="p-2 bg-gray-400 hover:bg-gray-500 text-white rounded-lg"
                                                 >
-                                                    <Save className="h-5 w-5" />
+                                                    <Edit className="h-5 w-5" />
                                                 </button>
-                                                <button
-                                                    onClick={() => cancelEditing('email')}
-                                                    className="p-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg"
-                                                >
-                                                    <X className="h-5 w-5" />
-                                                </button>
-                                            </div>
-                                        </>
-                                    ) : (
-                                        <>
-                                            <input
-                                                type="email"
-                                                value={editableData.email}
-                                                className="flex-1 px-3 py-2 sm:px-4 sm:py-3 border-2 border-gray-300 rounded-lg bg-gray-100 text-gray-600 cursor-not-allowed text-sm sm:text-base"
-                                                disabled
-                                            />
-                                            <button
-                                                onClick={() => startEditing('email')}
-                                                className="p-2 bg-gray-400 hover:bg-gray-500 text-white rounded-lg"
-                                            >
-                                                <Edit className="h-5 w-5" />
-                                            </button>
-                                        </>
-                                    )}
-                                </div>
-                            </div>
-
-                            {/* Password */}
-                            <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
-                                <label className="text-sm sm:text-base lg:text-lg font-medium text-gray-700 sm:w-48 sm:text-right">
-                                    Password:
-                                </label>
-                                <div className="flex-1 flex flex-col sm:flex-row sm:items-center gap-2">
-                                    {editingFields.password ? (
-                                        <div className="flex-1 space-y-3">
-                                            <input
-                                                type="password"
-                                                value={editableData.newPassword}
-                                                onChange={(e) => handleInputChange('newPassword', e.target.value)}
-                                                className="w-full px-3 py-2 sm:px-4 sm:py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 text-sm sm:text-base"
-                                                placeholder="New password"
-                                            />
-                                            <input
-                                                type="password"
-                                                value={editableData.retypePassword}
-                                                onChange={(e) => handleInputChange('retypePassword', e.target.value)}
-                                                className="w-full px-3 py-2 sm:px-4 sm:py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 text-sm sm:text-base"
-                                                placeholder="Retype password"
-                                            />
-                                            <div className="flex flex-col sm:flex-row gap-2">
-                                                <button
-                                                    onClick={handleChangePassword}
-                                                    className="px-3 sm:px-4 py-2 bg-[#964B00] hover:bg-[#7a3d00] text-yellow-400 rounded-lg flex items-center justify-center gap-2 text-sm sm:text-base"
-                                                >
-                                                    <Save className="h-4 w-4" />
-                                                    Save Password
-                                                </button>
-                                                <button
-                                                    onClick={() => cancelEditing('password')}
-                                                    className="px-3 sm:px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg flex items-center justify-center gap-2 text-sm sm:text-base"
-                                                >
-                                                    <X className="h-4 w-4" />
-                                                    Cancel
-                                                </button>
-                                            </div>
-                                        </div>
-                                    ) : (
-                                        <>
-                                            <input
-                                                type="password"
-                                                value="************"
-                                                className="flex-1 px-3 py-2 sm:px-4 sm:py-3 border-2 border-gray-300 rounded-lg bg-gray-100 text-gray-600 cursor-not-allowed text-sm sm:text-base"
-                                                disabled
-                                            />
-                                            <button
-                                                onClick={() => startEditing('password')}
-                                                className="p-2 bg-gray-400 hover:bg-gray-500 text-white rounded-lg"
-                                            >
-                                                <Edit className="h-5 w-5" />
-                                            </button>
-                                        </>
-                                    )}
+                                            </>
+                                        )}
+                                    </div>
                                 </div>
                             </div>
                         </div>
                     </div>
                 </div>
             </div>
-        </div>
+        </ProtectedRoute>
     )
 
 }

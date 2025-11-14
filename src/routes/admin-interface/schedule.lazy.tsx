@@ -6,6 +6,7 @@ import {
 import { supabase } from '@/lib/supabaseClient'
 import { useUser } from '@/context/UserContext'
 import { useNavigate } from '@tanstack/react-router'
+import { ProtectedRoute } from '@/components/ProtectedRoute'
 
 export const Route = createLazyFileRoute('/admin-interface/schedule')({
     component: RouteComponent,
@@ -452,317 +453,320 @@ function RouteComponent() {
     const [isNotificationOpen, setIsNotificationOpen] = useState(false)
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-amber-50 to-orange-100 flex overflow-x-hidden">
-            {/* Sidebar - Mobile Overlay */}
-            {isSidebarOpen && (
-                <div
-                    className="fixed inset-0 bg-black/50 z-40 lg:hidden"
-                    onClick={() => setIsSidebarOpen(false)}
-                />
-            )}
-            {/* Sidebar */}
-            <div className={`
+        <ProtectedRoute allowedRoles={['owner']}>
+
+            <div className="min-h-screen bg-gradient-to-br from-amber-50 to-orange-100 flex overflow-x-hidden">
+                {/* Sidebar - Mobile Overlay */}
+                {isSidebarOpen && (
+                    <div
+                        className="fixed inset-0 bg-black/50 z-40 lg:hidden"
+                        onClick={() => setIsSidebarOpen(false)}
+                    />
+                )}
+                {/* Sidebar */}
+                <div className={`
                 fixed lg:static inset-y-0 left-0 z-50 w-64 bg-gradient-to-b from-yellow-400 to-amber-500 shadow-lg transform transition-transform duration-300 ease-in-out
                 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
             `}>
-                {/* Logo */}
-                <div className="p-6 border-b border-amber-600">
-                    <div className="flex justify-center items-center gap-3">
-                        <img src="/angierens-logo.png" alt="Logo" className="w-50 h-50 object-contain" />
-                    </div>
-                </div>
-
-                {/* Navigation */}
-                <nav className="p-4 space-y-2">
-                    {sidebarItems.map((item, index) => {
-                        const Icon = item.icon
-                        const isActive = location.pathname === item.route ||
-                            (location.pathname === '/admin-interface' && item.route === '/admin-interface/') ||
-                            (location.pathname === '/admin-interface/' && item.route === '/admin-interface/')
-
-                        return (
-                            <Link
-                                key={index}
-                                to={item.route}
-                                onClick={() => setIsSidebarOpen(false)} // Close sidebar on mobile when link is clicked
-                                className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left transition-all ${isActive
-                                    ? 'bg-amber-800 text-yellow-300 shadow-md'
-                                    : 'text-amber-900 hover:bg-amber-400 hover:text-amber-800'
-                                    }`}
-                            >
-                                <Icon className="h-5 w-5" />
-                                <span className="font-medium text-xl">{item.label}</span>
-                            </Link>
-                        )
-                    })}
-                </nav>
-
-                {/* Logout */}
-                <div className='border-t border-amber-600'>
-                    <div className='w-auto mx-4'>
-                        <button
-                            className="w-full flex items-center gap-3 px-4 py-3 mt-5 bg-gray-200 opacity-75 text-gray-950 rounded-lg hover:bg-amber-700 hover:text-white transition-colors cursor-pointer"
-                            onClick={handleLogout}
-                        >
-                            <LogOut className="h-5 w-5" />
-                            <span className="font-medium">Logout</span>
-                        </button>
-                    </div>
-                </div>
-            </div>
-
-            {/* Main Content */}
-            <div className="flex-1 flex flex-col min-w-0">
-                {/* Top Bar */}
-                <header className="bg-amber-800 text-white p-4 shadow-md">
-                    <div className="flex justify-between items-center">
-                        <div className="flex items-center gap-4">
-                            {/* Mobile Menu Button */}
-                            <button
-                                onClick={() => setIsSidebarOpen(true)}
-                                className="lg:hidden p-2 text-white hover:bg-amber-700 rounded-lg"
-                            >
-                                <MenuIcon className="h-6 w-6" />
-                            </button>
-                            <div>
-                                <h2 className="text-xl lg:text-2xl font-bold">SCHEDULE</h2>
-                            </div>
+                    {/* Logo */}
+                    <div className="p-6 border-b border-amber-600">
+                        <div className="flex justify-center items-center gap-3">
+                            <img src="/angierens-logo.png" alt="Logo" className="w-50 h-50 object-contain" />
                         </div>
-                        <div className="flex items-center gap-2 lg:gap-4">
-                            <span className="text-amber-200 text-xs lg:text-sm hidden sm:inline">Date: {getCurrentDate()}</span>
-                            <span className="text-amber-200 text-xs lg:text-sm hidden sm:inline">Time: {getCurrentTime()}</span>
-                            <div className="w-10 h-10 bg-yellow-400 rounded-full flex items-center justify-center">
-                                <div className='relative'>
-                                    <button
-                                        onClick={() => setIsNotificationOpen(!isNotificationOpen)}
-                                        className="relative p-2 text-[#7a3d00] hover:bg-yellow-400 rounded-full"
-                                    >
-                                        <Bell className="h-6 w-6" />
-                                        {notificationCount > 0 && <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">{notificationCount}</span>}
-                                    </button>
-                                    {/* Notification Dropdown */}
-                                    {isNotificationOpen && (
-                                        <div className="absolute right-0 mt-2 w-80 md:w-96 bg-white rounded-lg shadow-lg border border-gray-200 z-50">
-                                            <div className="p-4 border-b border-gray-200">
-                                                <h3 className="text-lg font-semibold text-gray-800">Notifications</h3>
-                                            </div>
+                    </div>
 
-                                            <div className="max-h-80 overflow-y-auto">
-                                                {notifications.map((notification, index) => (
-                                                    <div
-                                                        key={notification.id}
-                                                        className={`p-4 border-b border-gray-100 hover:bg-gray-50 cursor-pointer ${index === notifications.length - 1 ? 'border-b-0' : ''
-                                                            }`}
-                                                    >
-                                                        <div className="flex items-start gap-3">
-                                                            <div className="flex-shrink-0 w-10 h-10 bg-yellow-400 rounded-full flex items-center justify-center text-black">
-                                                                {getNotificationIcon(notification.icon)}
-                                                            </div>
-                                                            <div className="flex-1 min-w-0">
-                                                                <p className="text-sm text-gray-800 leading-relaxed">
-                                                                    {notification.title}
-                                                                </p>
-                                                                <p className="text-xs text-gray-500 mt-1">
-                                                                    {notification.time}
-                                                                </p>
+                    {/* Navigation */}
+                    <nav className="p-4 space-y-2">
+                        {sidebarItems.map((item, index) => {
+                            const Icon = item.icon
+                            const isActive = location.pathname === item.route ||
+                                (location.pathname === '/admin-interface' && item.route === '/admin-interface/') ||
+                                (location.pathname === '/admin-interface/' && item.route === '/admin-interface/')
+
+                            return (
+                                <Link
+                                    key={index}
+                                    to={item.route}
+                                    onClick={() => setIsSidebarOpen(false)} // Close sidebar on mobile when link is clicked
+                                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left transition-all ${isActive
+                                        ? 'bg-amber-800 text-yellow-300 shadow-md'
+                                        : 'text-amber-900 hover:bg-amber-400 hover:text-amber-800'
+                                        }`}
+                                >
+                                    <Icon className="h-5 w-5" />
+                                    <span className="font-medium text-xl">{item.label}</span>
+                                </Link>
+                            )
+                        })}
+                    </nav>
+
+                    {/* Logout */}
+                    <div className='border-t border-amber-600'>
+                        <div className='w-auto mx-4'>
+                            <button
+                                className="w-full flex items-center gap-3 px-4 py-3 mt-5 bg-gray-200 opacity-75 text-gray-950 rounded-lg hover:bg-amber-700 hover:text-white transition-colors cursor-pointer"
+                                onClick={handleLogout}
+                            >
+                                <LogOut className="h-5 w-5" />
+                                <span className="font-medium">Logout</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Main Content */}
+                <div className="flex-1 flex flex-col min-w-0">
+                    {/* Top Bar */}
+                    <header className="bg-amber-800 text-white p-4 shadow-md">
+                        <div className="flex justify-between items-center">
+                            <div className="flex items-center gap-4">
+                                {/* Mobile Menu Button */}
+                                <button
+                                    onClick={() => setIsSidebarOpen(true)}
+                                    className="lg:hidden p-2 text-white hover:bg-amber-700 rounded-lg"
+                                >
+                                    <MenuIcon className="h-6 w-6" />
+                                </button>
+                                <div>
+                                    <h2 className="text-xl lg:text-2xl font-bold">SCHEDULE</h2>
+                                </div>
+                            </div>
+                            <div className="flex items-center gap-2 lg:gap-4">
+                                <span className="text-amber-200 text-xs lg:text-sm hidden sm:inline">Date: {getCurrentDate()}</span>
+                                <span className="text-amber-200 text-xs lg:text-sm hidden sm:inline">Time: {getCurrentTime()}</span>
+                                <div className="w-10 h-10 bg-yellow-400 rounded-full flex items-center justify-center">
+                                    <div className='relative'>
+                                        <button
+                                            onClick={() => setIsNotificationOpen(!isNotificationOpen)}
+                                            className="relative p-2 text-[#7a3d00] hover:bg-yellow-400 rounded-full"
+                                        >
+                                            <Bell className="h-6 w-6" />
+                                            {notificationCount > 0 && <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">{notificationCount}</span>}
+                                        </button>
+                                        {/* Notification Dropdown */}
+                                        {isNotificationOpen && (
+                                            <div className="absolute right-0 mt-2 w-80 md:w-96 bg-white rounded-lg shadow-lg border border-gray-200 z-50">
+                                                <div className="p-4 border-b border-gray-200">
+                                                    <h3 className="text-lg font-semibold text-gray-800">Notifications</h3>
+                                                </div>
+
+                                                <div className="max-h-80 overflow-y-auto">
+                                                    {notifications.map((notification, index) => (
+                                                        <div
+                                                            key={notification.id}
+                                                            className={`p-4 border-b border-gray-100 hover:bg-gray-50 cursor-pointer ${index === notifications.length - 1 ? 'border-b-0' : ''
+                                                                }`}
+                                                        >
+                                                            <div className="flex items-start gap-3">
+                                                                <div className="flex-shrink-0 w-10 h-10 bg-yellow-400 rounded-full flex items-center justify-center text-black">
+                                                                    {getNotificationIcon(notification.icon)}
+                                                                </div>
+                                                                <div className="flex-1 min-w-0">
+                                                                    <p className="text-sm text-gray-800 leading-relaxed">
+                                                                        {notification.title}
+                                                                    </p>
+                                                                    <p className="text-xs text-gray-500 mt-1">
+                                                                        {notification.time}
+                                                                    </p>
+                                                                </div>
                                                             </div>
                                                         </div>
-                                                    </div>
-                                                ))}
-                                            </div>
+                                                    ))}
+                                                </div>
 
-                                            <div className="p-4 border-t border-gray-200">
-                                                <button
-                                                    onClick={markAllAsRead}
-                                                    className="w-full bg-yellow-400 text-black py-2 px-4 rounded-lg font-medium hover:bg-yellow-500 transition-colors flex items-center justify-center gap-2"
-                                                >
-                                                    <Bell className="h-4 w-4" />
-                                                    Mark all as read
-                                                </button>
+                                                <div className="p-4 border-t border-gray-200">
+                                                    <button
+                                                        onClick={markAllAsRead}
+                                                        className="w-full bg-yellow-400 text-black py-2 px-4 rounded-lg font-medium hover:bg-yellow-500 transition-colors flex items-center justify-center gap-2"
+                                                    >
+                                                        <Bell className="h-4 w-4" />
+                                                        Mark all as read
+                                                    </button>
+                                                </div>
                                             </div>
-                                        </div>
-                                    )}
+                                        )}
+                                    </div>
                                 </div>
                             </div>
                         </div>
-                    </div>
-                </header>
+                    </header>
 
-                {/* Schedule Content */}
-                <div className="flex-1 p-3 md:p-8">
-                    <div className="max-w-7xl mx-auto">
-                        {loading ? (
-                            <div className="fixed inset-0 bg-black/50 flex justify-center items-center z-[60]">
-                                <div className="bg-white rounded-xl shadow-lg p-6 flex flex-col items-center gap-4">
-                                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#964B00]"></div>
-                                    <p className="text-gray-700 font-medium">Processing...</p>
+                    {/* Schedule Content */}
+                    <div className="flex-1 p-3 md:p-8">
+                        <div className="max-w-7xl mx-auto">
+                            {loading ? (
+                                <div className="fixed inset-0 bg-black/50 flex justify-center items-center z-[60]">
+                                    <div className="bg-white rounded-xl shadow-lg p-6 flex flex-col items-center gap-4">
+                                        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#964B00]"></div>
+                                        <p className="text-gray-700 font-medium">Processing...</p>
+                                    </div>
                                 </div>
-                            </div>
-                        ) : (
-                            <div className="bg-yellow-400 rounded-2xl p-4 md:p-8 shadow-xl">
-                                <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-8">
-                                    {/* Calendar Section */}
-                                    <div className="lg:col-span-2 space-y-3 md:space-y-6">
-                                        {/* Current Date Display */}
-                                        <div className="text-lg md:text-xl font-semibold text-gray-800">
-                                            {new Date(currentDate.getFullYear(), currentDate.getMonth(), selectedDate).toLocaleDateString('en-US', {
-                                                weekday: 'long',
-                                                month: 'long',
-                                                day: 'numeric'
-                                            })}
-                                        </div>
-
-                                        {/* Month Navigation */}
-                                        <div className="flex items-center justify-between border-b-2 border-gray-800 pb-3 md:pb-4">
-                                            <div className="text-lg md:text-xl font-bold text-gray-800">
-                                                {selectedMonth}
+                            ) : (
+                                <div className="bg-yellow-400 rounded-2xl p-4 md:p-8 shadow-xl">
+                                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-8">
+                                        {/* Calendar Section */}
+                                        <div className="lg:col-span-2 space-y-3 md:space-y-6">
+                                            {/* Current Date Display */}
+                                            <div className="text-lg md:text-xl font-semibold text-gray-800">
+                                                {new Date(currentDate.getFullYear(), currentDate.getMonth(), selectedDate).toLocaleDateString('en-US', {
+                                                    weekday: 'long',
+                                                    month: 'long',
+                                                    day: 'numeric'
+                                                })}
                                             </div>
-                                            <div className="flex gap-2">
-                                                <button
-                                                    onClick={() => navigateMonth('prev')}
-                                                    className="p-2 hover:bg-yellow-300 rounded-full transition-colors"
-                                                >
-                                                    <ChevronLeft className="w-5 h-5" />
-                                                </button>
-                                                <button
-                                                    onClick={() => navigateMonth('next')}
-                                                    className="p-2 hover:bg-yellow-300 rounded-full transition-colors"
-                                                >
-                                                    <ChevronRight className="w-5 h-5" />
-                                                </button>
-                                            </div>
-                                        </div>
 
-                                        {/* Calendar Grid */}
-                                        <div className="grid grid-cols-7 gap-1 md:gap-2">
-                                            {/* Day Headers */}
-                                            {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
-                                                <div key={day} className="text-center font-semibold text-gray-800 p-1 md:p-2 text-xs md:text-base">
-                                                    {day}
+                                            {/* Month Navigation */}
+                                            <div className="flex items-center justify-between border-b-2 border-gray-800 pb-3 md:pb-4">
+                                                <div className="text-lg md:text-xl font-bold text-gray-800">
+                                                    {selectedMonth}
                                                 </div>
-                                            ))}
+                                                <div className="flex gap-2">
+                                                    <button
+                                                        onClick={() => navigateMonth('prev')}
+                                                        className="p-2 hover:bg-yellow-300 rounded-full transition-colors"
+                                                    >
+                                                        <ChevronLeft className="w-5 h-5" />
+                                                    </button>
+                                                    <button
+                                                        onClick={() => navigateMonth('next')}
+                                                        className="p-2 hover:bg-yellow-300 rounded-full transition-colors"
+                                                    >
+                                                        <ChevronRight className="w-5 h-5" />
+                                                    </button>
+                                                </div>
+                                            </div>
 
-                                            {/* Calendar Days */}
-                                            {calendarData.map((day, index) => (
-                                                <button
-                                                    key={index}
-                                                    onClick={() => !day.isPastMonth && !day.isFutureMonth && setSelectedDate(day.date)}
-                                                    className={`
+                                            {/* Calendar Grid */}
+                                            <div className="grid grid-cols-7 gap-1 md:gap-2">
+                                                {/* Day Headers */}
+                                                {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
+                                                    <div key={day} className="text-center font-semibold text-gray-800 p-1 md:p-2 text-xs md:text-base">
+                                                        {day}
+                                                    </div>
+                                                ))}
+
+                                                {/* Calendar Days */}
+                                                {calendarData.map((day, index) => (
+                                                    <button
+                                                        key={index}
+                                                        onClick={() => !day.isPastMonth && !day.isFutureMonth && setSelectedDate(day.date)}
+                                                        className={`
                                                         relative p-1.5 md:p-3 rounded-lg text-center border-2 transition-all duration-200 active:scale-95 md:hover:scale-105 min-h-[60px] md:min-h-[80px] flex flex-col justify-center gap-0.5 md:gap-1 cursor-pointer
                                                         ${day.isPastMonth || day.isFutureMonth
-                                                            ? 'text-gray-400 border-transparent bg-white/30'
-                                                            : day.isSelected
-                                                                ? 'bg-amber-600 text-white border-amber-700 shadow-lg'
-                                                                : day.isToday
-                                                                    ? 'bg-white border-amber-600 text-gray-800 shadow-md'
-                                                                    : 'bg-white border-gray-300 text-gray-800 hover:border-amber-400'
-                                                        }
+                                                                ? 'text-gray-400 border-transparent bg-white/30'
+                                                                : day.isSelected
+                                                                    ? 'bg-amber-600 text-white border-amber-700 shadow-lg'
+                                                                    : day.isToday
+                                                                        ? 'bg-white border-amber-600 text-gray-800 shadow-md'
+                                                                        : 'bg-white border-gray-300 text-gray-800 hover:border-amber-400'
+                                                            }
                                                     `}
-                                                >
-                                                    <span className="font-semibold text-sm md:text-lg">{day.date}</span>
-                                                    {!day.isPastMonth && !day.isFutureMonth && (
-                                                        <>
-                                                            {day.isAvailable ? (
-                                                                <span className="text-[10px] md:text-xs text-blue-600 font-medium leading-tight">
-                                                                    {day.orders}/{day.maxOrders}
-                                                                </span>
-                                                            ) : (
-                                                                <span className="text-[10px] md:text-xs font-medium leading-tight">
-                                                                    N/A
-                                                                </span>
-                                                            )}
-                                                        </>
-                                                    )}
-                                                </button>
-                                            ))}
+                                                    >
+                                                        <span className="font-semibold text-sm md:text-lg">{day.date}</span>
+                                                        {!day.isPastMonth && !day.isFutureMonth && (
+                                                            <>
+                                                                {day.isAvailable ? (
+                                                                    <span className="text-[10px] md:text-xs text-blue-600 font-medium leading-tight">
+                                                                        {day.orders}/{day.maxOrders}
+                                                                    </span>
+                                                                ) : (
+                                                                    <span className="text-[10px] md:text-xs font-medium leading-tight">
+                                                                        N/A
+                                                                    </span>
+                                                                )}
+                                                            </>
+                                                        )}
+                                                    </button>
+                                                ))}
+                                            </div>
                                         </div>
-                                    </div>
 
-                                    {/* Right Sidebar - View Only */}
-                                    <div className="space-y-4 md:space-y-6">
-                                        {/* Selected Date Info */}
-                                        <div className="bg-green-50 rounded-lg p-4 md:p-6 border border-green-200 shadow-sm">
-                                            <h3 className="text-base md:text-lg font-semibold text-gray-800 mb-2">Selected Date</h3>
-                                            <div className="text-xl md:text-2xl font-bold text-gray-800 mb-4">
-                                                {monthNames[currentDate.getMonth()]} {selectedDate}, {currentDate.getFullYear()}
-                                            </div>
-                                            <div className="text-base md:text-lg text-gray-700 mb-4">
-                                                {selectedDayData?.orders || 0} Orders
-                                            </div>
+                                        {/* Right Sidebar - View Only */}
+                                        <div className="space-y-4 md:space-y-6">
+                                            {/* Selected Date Info */}
+                                            <div className="bg-green-50 rounded-lg p-4 md:p-6 border border-green-200 shadow-sm">
+                                                <h3 className="text-base md:text-lg font-semibold text-gray-800 mb-2">Selected Date</h3>
+                                                <div className="text-xl md:text-2xl font-bold text-gray-800 mb-4">
+                                                    {monthNames[currentDate.getMonth()]} {selectedDate}, {currentDate.getFullYear()}
+                                                </div>
+                                                <div className="text-base md:text-lg text-gray-700 mb-4">
+                                                    {selectedDayData?.orders || 0} Orders
+                                                </div>
 
-                                            <div className="space-y-3 max-h-48 overflow-y-auto pr-2">
-                                                <h4 className="font-semibold text-gray-800 text-sm md:text-base">Customer Orders</h4>
-                                                {customerOrders.length > 0 ? (
-                                                    customerOrders.map(member => (
-                                                        <div key={member.id} className="flex items-center gap-3">
-                                                            <div className={`w-3 h-8 ${member.color} rounded`}></div>
-                                                            <div>
-                                                                <div className="font-medium text-gray-800 text-sm md:text-base">{member.name}</div>
-                                                                <div className="text-xs md:text-sm text-gray-600">{member.time}</div>
+                                                <div className="space-y-3 max-h-48 overflow-y-auto pr-2">
+                                                    <h4 className="font-semibold text-gray-800 text-sm md:text-base">Customer Orders</h4>
+                                                    {customerOrders.length > 0 ? (
+                                                        customerOrders.map(member => (
+                                                            <div key={member.id} className="flex items-center gap-3">
+                                                                <div className={`w-3 h-8 ${member.color} rounded`}></div>
+                                                                <div>
+                                                                    <div className="font-medium text-gray-800 text-sm md:text-base">{member.name}</div>
+                                                                    <div className="text-xs md:text-sm text-gray-600">{member.time}</div>
+                                                                </div>
                                                             </div>
+                                                        ))
+                                                    ) : (
+                                                        <div className="text-sm text-gray-500 text-center py-4">
+                                                            No orders for this date
                                                         </div>
-                                                    ))
-                                                ) : (
-                                                    <div className="text-sm text-gray-500 text-center py-4">
-                                                        No orders for this date
-                                                    </div>
-                                                )}
-                                            </div>
-                                        </div>
-
-                                        {/* Availability Status (Read-only) */}
-                                        <div className="bg-green-50 rounded-lg p-4 md:p-6 border border-green-200 shadow-sm">
-                                            <div className="flex items-center justify-between">
-                                                <h3 className="text-base md:text-lg font-semibold text-gray-800">Current Status</h3>
-                                                <div className="flex items-center gap-2">
-                                                    <div className={`w-3 h-3 ${selectedDayData?.isAvailable ? 'bg-green-500' : 'bg-red-500'} rounded-full`}></div>
-                                                    <span className={`${selectedDayData?.isAvailable ? 'text-green-700' : 'text-red-700'} font-medium text-sm md:text-base`}>
-                                                        {selectedDayData?.isAvailable ? 'Available' : 'Unavailable'}
-                                                    </span>
+                                                    )}
                                                 </div>
                                             </div>
-                                        </div>
 
-                                        {/* Order Limit Display (Read-only) */}
-                                        <div className="bg-blue-50 rounded-lg p-4 md:p-6 border border-blue-200 shadow-sm">
-                                            <h3 className="text-base md:text-lg font-semibold text-gray-800 mb-4">Order Limit</h3>
-                                            <div className="text-xl md:text-2xl font-bold text-blue-700">
-                                                {selectedDayData?.maxOrders || 30} orders/day
-                                            </div>
-                                            <div className="text-xs md:text-sm text-blue-600 mt-2">
-                                                Current: {selectedDayData?.orders || 0} orders
-                                            </div>
-                                        </div>
-
-                                        {/* Time Slots (Read-only) */}
-                                        <div className="bg-purple-50 rounded-lg p-4 md:p-6 border border-purple-200 shadow-sm">
-                                            <h3 className="text-base md:text-lg font-semibold text-gray-800 mb-4">Time Availability</h3>
-                                            <div className="space-y-2 max-h-48 overflow-y-auto pr-2">
-                                                {timeSlots.map((slot, index) => (
-                                                    <div key={index} className="flex items-center justify-between p-2 md:p-3 bg-white rounded-lg border border-gray-200 shadow-sm">
-                                                        <span className="text-xs md:text-sm font-medium text-gray-700">
-                                                            {slot.hour} {slot.period}
+                                            {/* Availability Status (Read-only) */}
+                                            <div className="bg-green-50 rounded-lg p-4 md:p-6 border border-green-200 shadow-sm">
+                                                <div className="flex items-center justify-between">
+                                                    <h3 className="text-base md:text-lg font-semibold text-gray-800">Current Status</h3>
+                                                    <div className="flex items-center gap-2">
+                                                        <div className={`w-3 h-3 ${selectedDayData?.isAvailable ? 'bg-green-500' : 'bg-red-500'} rounded-full`}></div>
+                                                        <span className={`${selectedDayData?.isAvailable ? 'text-green-700' : 'text-red-700'} font-medium text-sm md:text-base`}>
+                                                            {selectedDayData?.isAvailable ? 'Available' : 'Unavailable'}
                                                         </span>
-                                                        <div className={`
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            {/* Order Limit Display (Read-only) */}
+                                            <div className="bg-blue-50 rounded-lg p-4 md:p-6 border border-blue-200 shadow-sm">
+                                                <h3 className="text-base md:text-lg font-semibold text-gray-800 mb-4">Order Limit</h3>
+                                                <div className="text-xl md:text-2xl font-bold text-blue-700">
+                                                    {selectedDayData?.maxOrders || 30} orders/day
+                                                </div>
+                                                <div className="text-xs md:text-sm text-blue-600 mt-2">
+                                                    Current: {selectedDayData?.orders || 0} orders
+                                                </div>
+                                            </div>
+
+                                            {/* Time Slots (Read-only) */}
+                                            <div className="bg-purple-50 rounded-lg p-4 md:p-6 border border-purple-200 shadow-sm">
+                                                <h3 className="text-base md:text-lg font-semibold text-gray-800 mb-4">Time Availability</h3>
+                                                <div className="space-y-2 max-h-48 overflow-y-auto pr-2">
+                                                    {timeSlots.map((slot, index) => (
+                                                        <div key={index} className="flex items-center justify-between p-2 md:p-3 bg-white rounded-lg border border-gray-200 shadow-sm">
+                                                            <span className="text-xs md:text-sm font-medium text-gray-700">
+                                                                {slot.hour} {slot.period}
+                                                            </span>
+                                                            <div className={`
                                                             px-2 md:px-3 py-1 rounded-full text-xs font-medium
                                                             ${slot.isAvailable
-                                                                ? 'bg-green-100 text-green-700'
-                                                                : 'bg-red-100 text-red-700'
-                                                            }
+                                                                    ? 'bg-green-100 text-green-700'
+                                                                    : 'bg-red-100 text-red-700'
+                                                                }
                                                         `}>
-                                                            {slot.isAvailable ? 'Available' : 'Unavailable'}
+                                                                {slot.isAvailable ? 'Available' : 'Unavailable'}
+                                                            </div>
                                                         </div>
-                                                    </div>
-                                                ))}
+                                                    ))}
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
                                 </div>
-                            </div>
-                        )}
+                            )}
+                        </div>
                     </div>
                 </div>
             </div>
-        </div>
+        </ProtectedRoute>
     )
 }

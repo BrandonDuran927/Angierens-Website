@@ -509,7 +509,6 @@ function RouteComponent() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    console.log("Submitting OTP request")
 
     try {
       // const formattedNumber = formatPhoneNumber(editableData.phoneNumber)
@@ -604,7 +603,8 @@ function RouteComponent() {
   `;
 
   return (
-    <ProtectedRoute>
+    <ProtectedRoute allowedRoles={['customer']}>
+
       <div className="min-h-screen bg-gradient-to-br from-amber-50 to-orange-100">
         {/* Password Verification Modal */}
         {showPasswordModal && (

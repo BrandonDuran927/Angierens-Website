@@ -684,7 +684,7 @@ function Signup() {
                   value="NCR"
                   onChange={handleChange}
                   className="w-full border rounded px-3 py-2 bg-gray-100 text-gray-600"
-                  required
+                  disabled={true}
                 >
                   <option value="NCR">NCR</option>
                 </select>

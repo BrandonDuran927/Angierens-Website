@@ -19,7 +19,8 @@ export const Route = createLazyFileRoute('/login')({
 })
 
 function RouteComponent() {
-  const { setUser } = useUser();
+  const { setUser, user } = useUser();
+
 
   const navigate = useNavigate()
   const [email, setEmail] = useState("");
@@ -52,6 +53,43 @@ function RouteComponent() {
   const [isNotificationOpen, setIsNotificationOpen] = useState(false)
   const [notificationCount, setNotificationCount] = useState(3)
 
+  useEffect(() => {
+    async function checkUserAndRedirect() {
+      if (user) {
+        // Fetch the user's role from your "users" table
+        const { data: userData, error: userError } = await supabase
+          .from("users")
+          .select("user_role")
+          .eq("user_uid", user.id)
+          .single();
+
+        if (userError || !userData) {
+          console.error("Error fetching user role:", userError);
+          return;
+        }
+
+        // Redirect based on role
+        switch (userData.user_role) {
+          case "owner":
+            navigate({ to: "/admin-interface" });
+            break;
+          case "staff":
+            navigate({ to: "/staff" });
+            break;
+          case "chef":
+            navigate({ to: "/chef-interface" });
+            break;
+          case "customer":
+          default:
+            navigate({ to: "/customer-interface/home" });
+            break;
+        }
+      }
+    }
+
+    checkUserAndRedirect();
+  }, [user, navigate]);
+
   // Check if user is coming from password reset email
   useEffect(() => {
     // Check for the hash fragment that Supabase adds
@@ -64,6 +102,7 @@ function RouteComponent() {
       setShowResetPasswordModal(true);
     }
   }, []);
+
 
   const logoStyle: React.CSSProperties = {
     width: '140px',
@@ -161,10 +200,12 @@ function RouteComponent() {
 
     setIsLoading(true);
 
+    console.log("Attempting to sign in with email:", email);
     const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,
     });
+    console.log("Sign-in response data:", data);
 
     setIsLoading(false);
 
@@ -198,16 +239,16 @@ function RouteComponent() {
     console.log("User role:", userData.user_role);
 
     switch (userData.user_role) {
-      case "Owner":
+      case "owner":
         navigate({ to: "/admin-interface" });
         break;
-      case "Staff":
+      case "staff":
         navigate({ to: "/staff" });
         break;
-      case "Chef":
+      case "chef":
         navigate({ to: "/chef-interface" });
         break;
-      case "Customer":
+      case "customer":
       default:
         navigate({ to: "/customer-interface/home" });
         break;

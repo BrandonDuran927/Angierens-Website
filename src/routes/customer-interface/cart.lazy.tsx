@@ -542,7 +542,7 @@ function RouteComponent() {
     }
 
     return (
-        <ProtectedRoute>
+        <ProtectedRoute allowedRoles={['customer']}>
             <div className="min-h-screen bg-gradient-to-br from-amber-50 to-orange-100">
                 <style dangerouslySetInnerHTML={{ __html: customStyles }} />
 
@@ -926,8 +926,8 @@ function RouteComponent() {
                                                 }
                                             }}
                                             className={`font-semibold px-6 py-2.5 sm:px-8 sm:py-3 rounded-full transition-colors flex items-center gap-2 order-1 sm:order-2 w-full sm:w-auto justify-center text-sm sm:text-base ${selectedItems.size === 0
-                                                    ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                                                    : 'bg-yellow-400 hover:bg-yellow-500 text-gray-800'
+                                                ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                                                : 'bg-yellow-400 hover:bg-yellow-500 text-gray-800'
                                                 }`}
                                         >
                                             Proceed to Checkout ({selectedItems.size}) →

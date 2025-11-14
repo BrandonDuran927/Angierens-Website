@@ -22,6 +22,7 @@ import {
     MenuIcon
 } from 'lucide-react'
 import { supabase } from '@/lib/supabaseClient'
+import { ProtectedRoute } from '@/components/ProtectedRoute'
 
 export const Route = createLazyFileRoute('/admin-interface/employee/')({
     component: RouteComponent,
@@ -111,15 +112,21 @@ function RouteComponent() {
             const { data: usersData, error: usersError } = await supabase
                 .from('users')
                 .select('*')
-                .in('user_role', ['rider', 'staff'])
+                .in('user_role', ['rider', 'staff', 'chef'])
                 .eq('is_active', true)
 
             if (usersError) throw usersError
 
+            const roleMap: Record<string, string> = {
+                rider: 'rider',
+                chef: 'chef',
+                staff: 'staff'
+            };
+
             // Transform data to match Employee interface
             const employeesData: Employee[] = (usersData || []).map((user: any) => ({
                 id: user.user_uid,
-                type: user.user_role === 'rider' ? 'rider' : 'staff',
+                type: roleMap[user.user_role] ?? 'staff',
                 name: `${user.first_name} ${user.middle_name ? user.middle_name + ' ' : ''}${user.last_name}`.trim(),
                 email: user.email,
                 phone: user.phone_number,
@@ -432,7 +439,8 @@ function RouteComponent() {
         const matchesSearch = employee.name.toLowerCase().includes(searchTerm.toLowerCase())
         const matchesFilter = filterType === 'All' ||
             (filterType === 'rider' && employee.type === 'rider') ||
-            (filterType === 'staff' && employee.type === 'staff')
+            (filterType === 'staff' && employee.type === 'staff') ||
+            (filterType === 'chef' && employee.type === 'chef')
         return matchesSearch && matchesFilter
     })
 
@@ -501,6 +509,7 @@ function RouteComponent() {
             console.error('Error creating account:', error)
             alert('Failed to create account. Please try again.')
         }
+        setLoading(false)
     }
 
     const generateTemporaryPassword = () => {
@@ -542,621 +551,624 @@ function RouteComponent() {
     );
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-amber-50 to-orange-100 flex overflow-x-hidden">
-            {/* Sidebar - Mobile Overlay */}
-            {isSidebarOpen && (
-                <div
-                    className="fixed inset-0 bg-black/50 z-40 lg:hidden"
-                    onClick={() => setIsSidebarOpen(false)}
-                />
-            )}
-            {/* Sidebar */}
-            <div className={`
+        <ProtectedRoute>
+            <div className="min-h-screen bg-gradient-to-br from-amber-50 to-orange-100 flex overflow-x-hidden">
+                {/* Sidebar - Mobile Overlay */}
+                {isSidebarOpen && (
+                    <div
+                        className="fixed inset-0 bg-black/50 z-40 lg:hidden"
+                        onClick={() => setIsSidebarOpen(false)}
+                    />
+                )}
+                {/* Sidebar */}
+                <div className={`
                                     fixed lg:static inset-y-0 left-0 z-50 w-64 bg-gradient-to-b from-yellow-400 to-amber-500 shadow-lg transform transition-transform duration-300 ease-in-out
                                     ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
                                 `}>
-                {/* Logo */}
-                <div className="p-6 border-b border-amber-600">
-                    <div className="flex justify-center items-center gap-3">
-                        <img src="/angierens-logo.png" alt="Logo" className="w-50 h-50 object-contain" />
-                    </div>
-                </div>
-
-                {/* Navigation */}
-                <nav className="p-4 space-y-2">
-                    {sidebarItems.map((item, index) => {
-                        const Icon = item.icon
-                        const isActive = location.pathname === item.route ||
-                            (location.pathname === '/admin-interface' && item.route === '/admin-interface/') ||
-                            (location.pathname === '/admin-interface/' && item.route === '/admin-interface/')
-
-                        return (
-                            <Link
-                                key={index}
-                                to={item.route}
-                                onClick={() => setIsSidebarOpen(false)} // Close sidebar on mobile when link is clicked
-                                className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left transition-all ${isActive
-                                    ? 'bg-amber-800 text-yellow-300 shadow-md'
-                                    : 'text-amber-900 hover:bg-amber-400 hover:text-amber-800'
-                                    }`}
-                            >
-                                <Icon className="h-5 w-5" />
-                                <span className="font-medium text-xl">{item.label}</span>
-                            </Link>
-                        )
-                    })}
-                </nav>
-
-                {/* Logout */}
-                <div className='border-t border-amber-600'>
-                    <div className='w-auto mx-4'>
-                        <button className="w-full flex items-center gap-3 px-4 py-3 mt-5 bg-gray-200 opacity-75 text-gray-950 rounded-lg hover:bg-amber-700 hover:text-white transition-colors">
-                            <LogOut className="h-5 w-5" />
-                            <span className="font-medium">Logout</span>
-                        </button>
-                    </div>
-                </div>
-            </div>
-
-            {/* Main Content */}
-            <div className="flex-1 flex flex-col min-w-0">
-                {/* Top Bar */}
-                <header className="bg-amber-800 text-white p-4 shadow-md">
-                    <div className="flex justify-between items-center">
-                        <div className="flex items-center gap-3">
-                            {/* Mobile Menu Button */}
-                            <button
-                                onClick={() => setIsSidebarOpen(true)}
-                                className="lg:hidden p-2 text-white hover:bg-amber-700 rounded-lg"
-                            >
-                                <MenuIcon className="h-6 w-6" />
-                            </button>
-                            <h2 className="text-lg sm:text-xl lg:text-2xl font-bold">EMPLOYEE</h2>
+                    {/* Logo */}
+                    <div className="p-6 border-b border-amber-600">
+                        <div className="flex justify-center items-center gap-3">
+                            <img src="/angierens-logo.png" alt="Logo" className="w-50 h-50 object-contain" />
                         </div>
-                        <div className="flex items-center gap-2 sm:gap-3 lg:gap-4">
-                            <span className="hidden sm:inline text-amber-200 text-xs lg:text-sm">Date: May 16, 2025</span>
-                            <span className="hidden sm:inline text-amber-200 text-xs lg:text-sm">Time: 11:00 AM</span>
-                            <div className="w-9 h-9 sm:w-10 sm:h-10 bg-yellow-400 rounded-full flex items-center justify-center">
-                                <div className="relative">
-                                    <button
-                                        onClick={() => setIsNotificationOpen(!isNotificationOpen)}
-                                        className="relative p-2 text-[#7a3d00] hover:bg-yellow-400 rounded-full"
-                                    >
-                                        <Bell className="h-5 w-5 sm:h-6 sm:w-6" />
-                                        {notificationCount > 0 && (
-                                            <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
-                                                {notificationCount}
-                                            </span>
-                                        )}
-                                    </button>
-                                    {/* Notification Dropdown */}
-                                    {isNotificationOpen && (
-                                        <div className="absolute right-0 mt-2 w-80 sm:w-96 bg-white rounded-lg shadow-lg border border-gray-200 z-50">
-                                            <div className="p-4 border-b border-gray-200">
-                                                <h3 className="text-base sm:text-lg font-semibold text-gray-800">Notifications</h3>
-                                            </div>
+                    </div>
 
-                                            <div className="max-h-80 overflow-y-auto">
-                                                {notifications.map((notification, index) => (
-                                                    <div
-                                                        key={notification.id}
-                                                        className={`p-3 sm:p-4 border-b border-gray-100 hover:bg-gray-50 cursor-pointer ${index === notifications.length - 1 ? 'border-b-0' : ''
-                                                            }`}
-                                                    >
-                                                        <div className="flex items-start gap-3">
-                                                            <div className="flex-shrink-0 w-8 h-8 sm:w-10 sm:h-10 bg-yellow-400 rounded-full flex items-center justify-center text-black">
-                                                                {getNotificationIcon(notification.icon)}
-                                                            </div>
-                                                            <div className="flex-1 min-w-0">
-                                                                <p className="text-sm text-gray-800 leading-relaxed">
-                                                                    {notification.title}
-                                                                </p>
-                                                                <p className="text-xs text-gray-500 mt-1">{notification.time}</p>
+                    {/* Navigation */}
+                    <nav className="p-4 space-y-2">
+                        {sidebarItems.map((item, index) => {
+                            const Icon = item.icon
+                            const isActive = location.pathname === item.route ||
+                                (location.pathname === '/admin-interface' && item.route === '/admin-interface/') ||
+                                (location.pathname === '/admin-interface/' && item.route === '/admin-interface/')
+
+                            return (
+                                <Link
+                                    key={index}
+                                    to={item.route}
+                                    onClick={() => setIsSidebarOpen(false)} // Close sidebar on mobile when link is clicked
+                                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left transition-all ${isActive
+                                        ? 'bg-amber-800 text-yellow-300 shadow-md'
+                                        : 'text-amber-900 hover:bg-amber-400 hover:text-amber-800'
+                                        }`}
+                                >
+                                    <Icon className="h-5 w-5" />
+                                    <span className="font-medium text-xl">{item.label}</span>
+                                </Link>
+                            )
+                        })}
+                    </nav>
+
+                    {/* Logout */}
+                    <div className='border-t border-amber-600'>
+                        <div className='w-auto mx-4'>
+                            <button className="w-full flex items-center gap-3 px-4 py-3 mt-5 bg-gray-200 opacity-75 text-gray-950 rounded-lg hover:bg-amber-700 hover:text-white transition-colors">
+                                <LogOut className="h-5 w-5" />
+                                <span className="font-medium">Logout</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Main Content */}
+                <div className="flex-1 flex flex-col min-w-0">
+                    {/* Top Bar */}
+                    <header className="bg-amber-800 text-white p-4 shadow-md">
+                        <div className="flex justify-between items-center">
+                            <div className="flex items-center gap-3">
+                                {/* Mobile Menu Button */}
+                                <button
+                                    onClick={() => setIsSidebarOpen(true)}
+                                    className="lg:hidden p-2 text-white hover:bg-amber-700 rounded-lg"
+                                >
+                                    <MenuIcon className="h-6 w-6" />
+                                </button>
+                                <h2 className="text-lg sm:text-xl lg:text-2xl font-bold">EMPLOYEE</h2>
+                            </div>
+                            <div className="flex items-center gap-2 sm:gap-3 lg:gap-4">
+                                <span className="hidden sm:inline text-amber-200 text-xs lg:text-sm">Date: May 16, 2025</span>
+                                <span className="hidden sm:inline text-amber-200 text-xs lg:text-sm">Time: 11:00 AM</span>
+                                <div className="w-9 h-9 sm:w-10 sm:h-10 bg-yellow-400 rounded-full flex items-center justify-center">
+                                    <div className="relative">
+                                        <button
+                                            onClick={() => setIsNotificationOpen(!isNotificationOpen)}
+                                            className="relative p-2 text-[#7a3d00] hover:bg-yellow-400 rounded-full"
+                                        >
+                                            <Bell className="h-5 w-5 sm:h-6 sm:w-6" />
+                                            {notificationCount > 0 && (
+                                                <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
+                                                    {notificationCount}
+                                                </span>
+                                            )}
+                                        </button>
+                                        {/* Notification Dropdown */}
+                                        {isNotificationOpen && (
+                                            <div className="absolute right-0 mt-2 w-80 sm:w-96 bg-white rounded-lg shadow-lg border border-gray-200 z-50">
+                                                <div className="p-4 border-b border-gray-200">
+                                                    <h3 className="text-base sm:text-lg font-semibold text-gray-800">Notifications</h3>
+                                                </div>
+
+                                                <div className="max-h-80 overflow-y-auto">
+                                                    {notifications.map((notification, index) => (
+                                                        <div
+                                                            key={notification.id}
+                                                            className={`p-3 sm:p-4 border-b border-gray-100 hover:bg-gray-50 cursor-pointer ${index === notifications.length - 1 ? 'border-b-0' : ''
+                                                                }`}
+                                                        >
+                                                            <div className="flex items-start gap-3">
+                                                                <div className="flex-shrink-0 w-8 h-8 sm:w-10 sm:h-10 bg-yellow-400 rounded-full flex items-center justify-center text-black">
+                                                                    {getNotificationIcon(notification.icon)}
+                                                                </div>
+                                                                <div className="flex-1 min-w-0">
+                                                                    <p className="text-sm text-gray-800 leading-relaxed">
+                                                                        {notification.title}
+                                                                    </p>
+                                                                    <p className="text-xs text-gray-500 mt-1">{notification.time}</p>
+                                                                </div>
                                                             </div>
                                                         </div>
-                                                    </div>
-                                                ))}
-                                            </div>
+                                                    ))}
+                                                </div>
 
-                                            <div className="p-3 sm:p-4 border-t border-gray-200">
-                                                <button
-                                                    onClick={markAllAsRead}
-                                                    className="w-full bg-yellow-400 text-black py-2 px-3 sm:px-4 rounded-lg font-medium hover:bg-yellow-500 transition-colors flex items-center justify-center gap-2 text-sm sm:text-base"
-                                                >
-                                                    <Bell className="h-4 w-4" />
-                                                    Mark all as read
-                                                </button>
+                                                <div className="p-3 sm:p-4 border-t border-gray-200">
+                                                    <button
+                                                        onClick={markAllAsRead}
+                                                        className="w-full bg-yellow-400 text-black py-2 px-3 sm:px-4 rounded-lg font-medium hover:bg-yellow-500 transition-colors flex items-center justify-center gap-2 text-sm sm:text-base"
+                                                    >
+                                                        <Bell className="h-4 w-4" />
+                                                        Mark all as read
+                                                    </button>
+                                                </div>
                                             </div>
-                                        </div>
-                                    )}
+                                        )}
+                                    </div>
                                 </div>
                             </div>
                         </div>
-                    </div>
-                </header>
+                    </header>
 
-                {/* Orders Content */}
-                <main className="flex-1 p-4 sm:p-6 overflow-y-auto">
-                    {/* Filter and Create Employee Section */}
-                    <div className="bg-white rounded-xl p-4 sm:p-6 shadow-sm border-2 border-yellow-400">
-                        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-6">
-                            <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
-                                <div className="flex items-center gap-2">
-                                    <span className="text-sm sm:text-lg font-medium text-gray-700">Filter:</span>
+                    {/* Orders Content */}
+                    <main className="flex-1 p-4 sm:p-6 overflow-y-auto">
+                        {/* Filter and Create Employee Section */}
+                        <div className="bg-white rounded-xl p-4 sm:p-6 shadow-sm border-2 border-yellow-400">
+                            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-6">
+                                <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-sm sm:text-lg font-medium text-gray-700">Filter:</span>
+                                        <div className="relative">
+                                            <select
+                                                value={filterType}
+                                                onChange={(e) => setFilterType(e.target.value)}
+                                                className="appearance-none bg-yellow-400 text-black px-3 py-2 pr-8 rounded-lg font-medium border-0 cursor-pointer focus:outline-none focus:ring-2 focus:ring-yellow-500 text-sm sm:text-base"
+                                            >
+                                                <option value="All">All</option>
+                                                <option value="rider">Rider</option>
+                                                <option value="staff">Staff</option>
+                                                <option value="chef">Chef</option>
+                                            </select>
+
+                                            <div className="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none">
+                                                <svg className="w-4 h-4 text-black" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                                </svg>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <button
+                                        onClick={() => setIsCreateModalOpen(true)}
+                                        className="bg-yellow-400 hover:bg-yellow-500 text-black px-3 sm:px-4 py-2 rounded-lg font-medium flex items-center gap-2 transition-colors text-sm sm:text-base"
+                                    >
+                                        <Plus className="h-4 w-4" />
+                                        Create Employee
+                                    </button>
+                                </div>
+
+                                <div className="relative">
+                                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4 sm:h-5 sm:w-5" />
+                                    <input
+                                        type="text"
+                                        placeholder="Search a name"
+                                        value={searchTerm}
+                                        onChange={(e) => setSearchTerm(e.target.value)}
+                                        className="pl-9 sm:pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-400 focus:border-transparent w-full sm:w-64 text-sm sm:text-base"
+                                    />
+                                </div>
+                            </div>
+
+                            {/* Employee Table */}
+                            <div className="overflow-x-auto">
+                                {loading ? (
+                                    <LoadingSpinner />
+                                ) : filteredEmployees.length === 0 ? (
+                                    <div className="text-center py-8">
+                                        <p className="text-gray-600">No employees found</p>
+                                    </div>
+                                ) : (
+                                    <table className="w-full min-w-[600px]">
+                                        <thead>
+                                            <tr className="bg-amber-800 text-white text-sm sm:text-base">
+                                                <th className="px-4 sm:px-6 py-3 sm:py-4 text-left font-medium">TYPE</th>
+                                                <th className="px-4 sm:px-6 py-3 sm:py-4 text-left font-medium">NAME</th>
+                                                <th className="px-4 sm:px-6 py-3 sm:py-4 text-center font-medium">ACTIONS</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-gray-200 text-sm sm:text-base">
+                                            {filteredEmployees.map((employee) => (
+                                                <tr
+                                                    key={employee.id}
+                                                    className="border-b border-gray-100 hover:bg-gray-50 cursor-pointer transition-colors"
+                                                >
+                                                    <td className="px-4 sm:px-6 py-3 sm:py-4 text-gray-800 font-medium">
+                                                        {employee.type.charAt(0).toUpperCase() + employee.type.slice(1).toLowerCase()}
+                                                    </td>
+
+                                                    <td className="px-4 sm:px-6 py-3 sm:py-4 text-gray-800 font-medium">
+                                                        {employee.name
+                                                            .toLowerCase()
+                                                            .split(' ')
+                                                            .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+                                                            .join(' ')}
+                                                    </td>
+
+                                                    <td className="px-4 sm:px-6 py-3 sm:py-4">
+                                                        <div
+                                                            className="flex justify-center cursor-pointer bg-yellow-500 text-white px-3 sm:px-4 py-1.5 sm:py-2 rounded hover:bg-yellow-600 text-sm sm:text-base"
+                                                            onClick={() => handleViewEmployee(employee)}
+                                                        >
+                                                            VIEW
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                )}
+                            </div>
+                        </div>
+                    </main>
+                </div>
+
+                {/* Employee Creation Modal */}
+                {isCreateModalOpen && (
+                    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+                        <div className="bg-yellow-400 rounded-xl p-8 w-[500px] max-w-[90vw] max-h-[90vh] overflow-y-auto">
+                            <h2 className="text-2xl font-bold text-black mb-6">Employee Account Creation</h2>
+
+                            <div className="space-y-4">
+                                {/* Full Name */}
+                                <div className="space-y-4">
+                                    {/* First Name */}
+                                    <div>
+                                        <label className="block text-black font-medium mb-2">First Name:</label>
+                                        <input
+                                            type="text"
+                                            placeholder="Enter first name"
+                                            value={formData.first_name}
+                                            onChange={(e) => handleFormChange('first_name', e.target.value)}
+                                            className="bg-white w-full px-4 py-3 rounded-lg border-0 focus:outline-none focus:ring-2 focus:ring-amber-600"
+                                        />
+                                    </div>
+
+                                    {/* Middle Name */}
+                                    <div>
+                                        <label className="block text-black font-medium mb-2">Middle Name (optional):</label>
+                                        <input
+                                            type="text"
+                                            placeholder="Enter middle name"
+                                            value={formData.middle_name}
+                                            onChange={(e) => handleFormChange('middle_name', e.target.value)}
+                                            className="bg-white w-full px-4 py-3 rounded-lg border-0 focus:outline-none focus:ring-2 focus:ring-amber-600"
+                                        />
+                                    </div>
+
+                                    {/* Last Name */}
+                                    <div>
+                                        <label className="block text-black font-medium mb-2">Last Name:</label>
+                                        <input
+                                            type="text"
+                                            placeholder="Enter last name"
+                                            value={formData.last_name}
+                                            onChange={(e) => handleFormChange('last_name', e.target.value)}
+                                            className="bg-white w-full px-4 py-3 rounded-lg border-0 focus:outline-none focus:ring-2 focus:ring-amber-600"
+                                        />
+                                    </div>
+                                </div>
+
+                                {/* Email Address */}
+                                <div>
+                                    <label className="block text-black font-medium mb-2">Email Address:</label>
+                                    <input
+                                        type="email"
+                                        placeholder="Type the working email address..."
+                                        value={formData.email}
+                                        onChange={(e) => handleFormChange('email', e.target.value)}
+                                        className="bg-white w-full px-4 py-3 rounded-lg border-0 focus:outline-none focus:ring-2 focus:ring-amber-600"
+                                    />
+                                </div>
+
+                                {/* Password */}
+                                <div>
+                                    <label className="block text-black font-medium mb-2">Password:</label>
+                                    <div className="flex gap-2">
+                                        <input
+                                            type="text"
+                                            placeholder="Type the password..."
+                                            value={formData.password}
+                                            onChange={(e) => handleFormChange('password', e.target.value)}
+                                            className="bg-white flex-1 px-4 py-3 rounded-lg border-0 focus:outline-none focus:ring-2 focus:ring-amber-600"
+                                        />
+                                        <button
+                                            type="button"
+                                            onClick={generateTemporaryPassword}
+                                            className="bg-green-500 hover:bg-green-600 text-white px-4 py-3 rounded-lg font-medium whitespace-nowrap"
+                                        >
+                                            Generate temporary
+                                        </button>
+                                    </div>
+                                </div>
+
+                                {/* Phone Number */}
+                                <div>
+                                    <label className="block text-black font-medium mb-2">Phone Number:</label>
+                                    <input
+                                        type="tel"
+                                        placeholder="Type the working phone number..."
+                                        value={formData.phoneNumber}
+                                        onChange={(e) => handleFormChange('phoneNumber', e.target.value)}
+                                        className="bg-white w-full px-4 py-3 rounded-lg border-0 focus:outline-none focus:ring-2 focus:ring-amber-600"
+                                    />
+                                </div>
+
+                                {/* Employee Type */}
+                                <div>
+                                    <label className="block text-black font-medium mb-2">Employee Type / Role:</label>
                                     <div className="relative">
                                         <select
-                                            value={filterType}
-                                            onChange={(e) => setFilterType(e.target.value)}
-                                            className="appearance-none bg-yellow-400 text-black px-3 py-2 pr-8 rounded-lg font-medium border-0 cursor-pointer focus:outline-none focus:ring-2 focus:ring-yellow-500 text-sm sm:text-base"
+                                            value={formData.employeeType}
+                                            onChange={(e) => handleFormChange('employeeType', e.target.value)}
+                                            className="w-full px-4 py-3 pr-10 rounded-lg border-0 focus:outline-none focus:ring-2 focus:ring-amber-600 appearance-none bg-white"
                                         >
-                                            <option value="All">All</option>
                                             <option value="rider">Rider</option>
                                             <option value="staff">Staff</option>
                                             <option value="chef">Chef</option>
                                         </select>
-
-                                        <div className="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none">
-                                            <svg className="w-4 h-4 text-black" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                                            <svg className="w-5 h-5 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                                             </svg>
                                         </div>
                                     </div>
                                 </div>
-                                <button
-                                    onClick={() => setIsCreateModalOpen(true)}
-                                    className="bg-yellow-400 hover:bg-yellow-500 text-black px-3 sm:px-4 py-2 rounded-lg font-medium flex items-center gap-2 transition-colors text-sm sm:text-base"
-                                >
-                                    <Plus className="h-4 w-4" />
-                                    Create Employee
-                                </button>
-                            </div>
-
-                            <div className="relative">
-                                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4 sm:h-5 sm:w-5" />
-                                <input
-                                    type="text"
-                                    placeholder="Search a name"
-                                    value={searchTerm}
-                                    onChange={(e) => setSearchTerm(e.target.value)}
-                                    className="pl-9 sm:pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-400 focus:border-transparent w-full sm:w-64 text-sm sm:text-base"
-                                />
-                            </div>
-                        </div>
-
-                        {/* Employee Table */}
-                        <div className="overflow-x-auto">
-                            {loading ? (
-                                <LoadingSpinner />
-                            ) : filteredEmployees.length === 0 ? (
-                                <div className="text-center py-8">
-                                    <p className="text-gray-600">No employees found</p>
-                                </div>
-                            ) : (
-                                <table className="w-full min-w-[600px]">
-                                    <thead>
-                                        <tr className="bg-amber-800 text-white text-sm sm:text-base">
-                                            <th className="px-4 sm:px-6 py-3 sm:py-4 text-left font-medium">TYPE</th>
-                                            <th className="px-4 sm:px-6 py-3 sm:py-4 text-left font-medium">NAME</th>
-                                            <th className="px-4 sm:px-6 py-3 sm:py-4 text-center font-medium">ACTIONS</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-gray-200 text-sm sm:text-base">
-                                        {filteredEmployees.map((employee) => (
-                                            <tr
-                                                key={employee.id}
-                                                className="border-b border-gray-100 hover:bg-gray-50 cursor-pointer transition-colors"
-                                            >
-                                                <td className="px-4 sm:px-6 py-3 sm:py-4 text-gray-800 font-medium">
-                                                    {employee.type.charAt(0).toUpperCase() + employee.type.slice(1).toLowerCase()}
-                                                </td>
-
-                                                <td className="px-4 sm:px-6 py-3 sm:py-4 text-gray-800 font-medium">
-                                                    {employee.name
-                                                        .toLowerCase()
-                                                        .split(' ')
-                                                        .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-                                                        .join(' ')}
-                                                </td>
-
-                                                <td className="px-4 sm:px-6 py-3 sm:py-4">
-                                                    <div
-                                                        className="flex justify-center cursor-pointer bg-yellow-500 text-white px-3 sm:px-4 py-1.5 sm:py-2 rounded hover:bg-yellow-600 text-sm sm:text-base"
-                                                        onClick={() => handleViewEmployee(employee)}
-                                                    >
-                                                        VIEW
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            )}
-                        </div>
-                    </div>
-                </main>
-            </div>
-
-            {/* Employee Creation Modal */}
-            {isCreateModalOpen && (
-                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-                    <div className="bg-yellow-400 rounded-xl p-8 w-[500px] max-w-[90vw] max-h-[90vh] overflow-y-auto">
-                        <h2 className="text-2xl font-bold text-black mb-6">Employee Account Creation</h2>
-
-                        <div className="space-y-4">
-                            {/* Full Name */}
-                            <div className="space-y-4">
-                                {/* First Name */}
-                                <div>
-                                    <label className="block text-black font-medium mb-2">First Name:</label>
-                                    <input
-                                        type="text"
-                                        placeholder="Enter first name"
-                                        value={formData.first_name}
-                                        onChange={(e) => handleFormChange('first_name', e.target.value)}
-                                        className="bg-white w-full px-4 py-3 rounded-lg border-0 focus:outline-none focus:ring-2 focus:ring-amber-600"
-                                    />
-                                </div>
-
-                                {/* Middle Name */}
-                                <div>
-                                    <label className="block text-black font-medium mb-2">Middle Name (optional):</label>
-                                    <input
-                                        type="text"
-                                        placeholder="Enter middle name"
-                                        value={formData.middle_name}
-                                        onChange={(e) => handleFormChange('middle_name', e.target.value)}
-                                        className="bg-white w-full px-4 py-3 rounded-lg border-0 focus:outline-none focus:ring-2 focus:ring-amber-600"
-                                    />
-                                </div>
-
-                                {/* Last Name */}
-                                <div>
-                                    <label className="block text-black font-medium mb-2">Last Name:</label>
-                                    <input
-                                        type="text"
-                                        placeholder="Enter last name"
-                                        value={formData.last_name}
-                                        onChange={(e) => handleFormChange('last_name', e.target.value)}
-                                        className="bg-white w-full px-4 py-3 rounded-lg border-0 focus:outline-none focus:ring-2 focus:ring-amber-600"
-                                    />
-                                </div>
-                            </div>
-
-                            {/* Email Address */}
-                            <div>
-                                <label className="block text-black font-medium mb-2">Email Address:</label>
-                                <input
-                                    type="email"
-                                    placeholder="Type the working email address..."
-                                    value={formData.email}
-                                    onChange={(e) => handleFormChange('email', e.target.value)}
-                                    className="bg-white w-full px-4 py-3 rounded-lg border-0 focus:outline-none focus:ring-2 focus:ring-amber-600"
-                                />
-                            </div>
-
-                            {/* Password */}
-                            <div>
-                                <label className="block text-black font-medium mb-2">Password:</label>
-                                <div className="flex gap-2">
-                                    <input
-                                        type="text"
-                                        placeholder="Type the password..."
-                                        value={formData.password}
-                                        onChange={(e) => handleFormChange('password', e.target.value)}
-                                        className="bg-white flex-1 px-4 py-3 rounded-lg border-0 focus:outline-none focus:ring-2 focus:ring-amber-600"
-                                    />
+                                {/* Action Buttons */}
+                                <div className="flex gap-4 pt-4">
                                     <button
-                                        type="button"
-                                        onClick={generateTemporaryPassword}
-                                        className="bg-green-500 hover:bg-green-600 text-white px-4 py-3 rounded-lg font-medium whitespace-nowrap"
+                                        onClick={() => setIsCreateModalOpen(false)}
+                                        className="flex-1 bg-red-400 hover:bg-red-500 text-white px-6 py-3 rounded-lg font-bold transition-colors"
                                     >
-                                        Generate temporary
+                                        Cancel Creation
+                                    </button>
+                                    <button
+                                        onClick={handleCreateAccount}
+                                        className="flex-1 bg-green-500 hover:bg-green-600 text-white px-6 py-3 rounded-lg font-bold transition-colors"
+                                    >
+                                        Create Account
                                     </button>
                                 </div>
                             </div>
-
-                            {/* Phone Number */}
-                            <div>
-                                <label className="block text-black font-medium mb-2">Phone Number:</label>
-                                <input
-                                    type="tel"
-                                    placeholder="Type the working phone number..."
-                                    value={formData.phoneNumber}
-                                    onChange={(e) => handleFormChange('phoneNumber', e.target.value)}
-                                    className="bg-white w-full px-4 py-3 rounded-lg border-0 focus:outline-none focus:ring-2 focus:ring-amber-600"
-                                />
-                            </div>
-
-                            {/* Employee Type */}
-                            <div>
-                                <label className="block text-black font-medium mb-2">Employee Type / Role:</label>
-                                <div className="relative">
-                                    <select
-                                        value={formData.employeeType}
-                                        onChange={(e) => handleFormChange('employeeType', e.target.value)}
-                                        className="w-full px-4 py-3 pr-10 rounded-lg border-0 focus:outline-none focus:ring-2 focus:ring-amber-600 appearance-none bg-white"
-                                    >
-                                        <option value="Rider">Rider</option>
-                                        <option value="Staff">Staff</option>
-                                    </select>
-                                    <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
-                                        <svg className="w-5 h-5 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                                        </svg>
-                                    </div>
-                                </div>
-                            </div>
-                            {/* Action Buttons */}
-                            <div className="flex gap-4 pt-4">
-                                <button
-                                    onClick={() => setIsCreateModalOpen(false)}
-                                    className="flex-1 bg-red-400 hover:bg-red-500 text-white px-6 py-3 rounded-lg font-bold transition-colors"
-                                >
-                                    Cancel Creation
-                                </button>
-                                <button
-                                    onClick={handleCreateAccount}
-                                    className="flex-1 bg-green-500 hover:bg-green-600 text-white px-6 py-3 rounded-lg font-bold transition-colors"
-                                >
-                                    Create Account
-                                </button>
-                            </div>
                         </div>
                     </div>
-                </div>
-            )}
+                )}
 
-            {/* Employee View Modal */}
-            {isViewModalOpen && selectedEmployee && (
-                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-                    <div className="bg-yellow-400 rounded-xl w-[600px] max-w-[90vw] max-h-[90vh] overflow-y-auto">
-                        {/* Employee Header */}
-                        <div className="bg-amber-800 text-white p-6 rounded-t-xl">
-                            <div className="flex items-center gap-4">
-                                <div className="flex-1">
-                                    <h2 className="text-2xl font-bold">
-                                        {selectedEmployee.name
-                                            .toLowerCase()
-                                            .split(' ')
-                                            .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-                                            .join(' ')}
-                                    </h2>
+                {/* Employee View Modal */}
+                {isViewModalOpen && selectedEmployee && (
+                    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+                        <div className="bg-yellow-400 rounded-xl w-[600px] max-w-[90vw] max-h-[90vh] overflow-y-auto">
+                            {/* Employee Header */}
+                            <div className="bg-amber-800 text-white p-6 rounded-t-xl">
+                                <div className="flex items-center gap-4">
+                                    <div className="flex-1">
+                                        <h2 className="text-2xl font-bold">
+                                            {selectedEmployee.name
+                                                .toLowerCase()
+                                                .split(' ')
+                                                .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+                                                .join(' ')}
+                                        </h2>
 
-                                    <p className="text-amber-200 text-sm mt-1">
-                                        {selectedEmployee.type.charAt(0).toUpperCase() + selectedEmployee.type.slice(1).toLowerCase()}
+                                        <p className="text-amber-200 text-sm mt-1">
+                                            {selectedEmployee.type.charAt(0).toUpperCase() + selectedEmployee.type.slice(1).toLowerCase()}
+                                        </p>
+
+                                    </div>
+                                </div>
+                                <div className="mt-4 space-y-2">
+                                    <p className="text-amber-200">
+                                        {employeeDetails[selectedEmployee.id]?.phone || 'N/A'}
                                     </p>
-
+                                    <p className="text-amber-200">
+                                        {employeeDetails[selectedEmployee.id]?.email || 'N/A'}
+                                    </p>
                                 </div>
                             </div>
-                            <div className="mt-4 space-y-2">
-                                <p className="text-amber-200">
-                                    {employeeDetails[selectedEmployee.id]?.phone || 'N/A'}
-                                </p>
-                                <p className="text-amber-200">
-                                    {employeeDetails[selectedEmployee.id]?.email || 'N/A'}
-                                </p>
-                            </div>
-                        </div>
 
-                        {/* Employee Details */}
-                        <div className="p-6 space-y-4">
+                            {/* Employee Details */}
+                            <div className="p-6 space-y-4">
 
-                            {/* Recent Deliveries */}
-                            <div className="bg-white bg-opacity-80 rounded-lg p-4">
-                                <h3 className="text-lg font-bold text-gray-800 mb-4 text-center">RECENT DELIVERIES TODAY</h3>
+                                {/* Recent Deliveries */}
+                                <div className="bg-white bg-opacity-80 rounded-lg p-4">
+                                    <h3 className="text-lg font-bold text-gray-800 mb-4 text-center">RECENT DELIVERIES TODAY</h3>
 
-                                {employeeDetails[selectedEmployee.id]?.recentDeliveries.length > 0 ? (
-                                    <div className="overflow-x-auto">
-                                        <div className="max-h-80 overflow-y-auto border rounded-lg">
-                                            <table className="w-full text-sm">
-                                                <thead>
-                                                    <tr className="border-b-2 border-gray-400">
-                                                        <th className="text-left py-2 px-2 font-bold text-gray-700">ORDER</th>
-                                                        <th className="text-left py-2 px-2 font-bold text-gray-700">DATE</th>
-                                                        <th className="text-left py-2 px-2 font-bold text-gray-700">TIME</th>
-                                                        <th className="text-left py-2 px-2 font-bold text-gray-700">CUSTOMER NAME</th>
-                                                        <th className="text-left py-2 px-2 font-bold text-gray-700">STATUS</th>
-                                                        <th className="text-left py-2 px-2 font-bold text-gray-700">DELIVERY ADDRESS</th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody>
-                                                    {employeeDetails[selectedEmployee.id]?.recentDeliveries.map((delivery, index) => (
-                                                        <tr key={index} className="border-b border-gray-300">
-                                                            <td className="py-2 px-2 text-gray-700">{delivery.order}</td>
-                                                            <td className="py-2 px-2 text-gray-700">{delivery.date}</td>
-                                                            <td className="py-2 px-2 text-gray-700">{delivery.time}</td>
-                                                            <td className="py-2 px-2 text-gray-700">{delivery.customerName}</td>
-                                                            <td className="py-2 px-2 text-gray-700">{delivery.status}</td>
-                                                            <td className="py-2 px-2 text-gray-700">{delivery.address}</td>
+                                    {employeeDetails[selectedEmployee.id]?.recentDeliveries.length > 0 ? (
+                                        <div className="overflow-x-auto">
+                                            <div className="max-h-80 overflow-y-auto border rounded-lg">
+                                                <table className="w-full text-sm">
+                                                    <thead>
+                                                        <tr className="border-b-2 border-gray-400">
+                                                            <th className="text-left py-2 px-2 font-bold text-gray-700">ORDER</th>
+                                                            <th className="text-left py-2 px-2 font-bold text-gray-700">DATE</th>
+                                                            <th className="text-left py-2 px-2 font-bold text-gray-700">TIME</th>
+                                                            <th className="text-left py-2 px-2 font-bold text-gray-700">CUSTOMER NAME</th>
+                                                            <th className="text-left py-2 px-2 font-bold text-gray-700">STATUS</th>
+                                                            <th className="text-left py-2 px-2 font-bold text-gray-700">DELIVERY ADDRESS</th>
                                                         </tr>
-                                                    ))}
-                                                </tbody>
-                                            </table>
+                                                    </thead>
+                                                    <tbody>
+                                                        {employeeDetails[selectedEmployee.id]?.recentDeliveries.map((delivery, index) => (
+                                                            <tr key={index} className="border-b border-gray-300">
+                                                                <td className="py-2 px-2 text-gray-700">{delivery.order}</td>
+                                                                <td className="py-2 px-2 text-gray-700">{delivery.date}</td>
+                                                                <td className="py-2 px-2 text-gray-700">{delivery.time}</td>
+                                                                <td className="py-2 px-2 text-gray-700">{delivery.customerName}</td>
+                                                                <td className="py-2 px-2 text-gray-700">{delivery.status}</td>
+                                                                <td className="py-2 px-2 text-gray-700">{delivery.address}</td>
+                                                            </tr>
+                                                        ))}
+                                                    </tbody>
+                                                </table>
+                                            </div>
                                         </div>
-                                    </div>
-                                ) : (
-                                    <div className="text-center py-8">
-                                        <p className="text-gray-600">No deliveries today</p>
-                                    </div>
-                                )}
-                            </div>
+                                    ) : (
+                                        <div className="text-center py-8">
+                                            <p className="text-gray-600">No deliveries today</p>
+                                        </div>
+                                    )}
+                                </div>
 
-                            {/* Action Buttons */}
-                            <div className="flex justify-between pt-4">
-                                <button
-                                    onClick={() => setIsViewModalOpen(false)}
-                                    className="bg-gray-500 hover:bg-gray-600 text-white px-6 py-2 rounded-lg font-medium transition-colors"
-                                >
-                                    Close
-                                </button>
-                                <button
-                                    onClick={() => handleDeleteEmployee(selectedEmployee.id)}
-                                    className="bg-red-500 hover:bg-red-600 text-white px-6 py-2 rounded-lg font-medium transition-colors"
-                                >
-                                    Delete Employee
-                                </button>
+                                {/* Action Buttons */}
+                                <div className="flex justify-between pt-4">
+                                    <button
+                                        onClick={() => setIsViewModalOpen(false)}
+                                        className="bg-gray-500 hover:bg-gray-600 text-white px-6 py-2 rounded-lg font-medium transition-colors"
+                                    >
+                                        Close
+                                    </button>
+                                    <button
+                                        onClick={() => handleDeleteEmployee(selectedEmployee.id)}
+                                        className="bg-red-500 hover:bg-red-600 text-white px-6 py-2 rounded-lg font-medium transition-colors"
+                                    >
+                                        Delete Employee
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     </div>
-                </div>
-            )}
-            {/* Employee Assign Modal */}
-            {isAssignModalOpen && selectedEmployeeForAssign && (
-                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-                    <div className="bg-white rounded-xl w-[800px] max-w-[90vw] max-h-[90vh] overflow-y-auto">
-                        {/* Header */}
-                        <div className="bg-amber-800 text-white p-6 rounded-t-xl">
-                            <h2 className="text-2xl font-bold">Assign Orders to {selectedEmployeeForAssign.name}</h2>
-                            <p className="text-amber-200 mt-2">
-                                Current Orders: {selectedEmployeeForAssign.assignedOrders.join(', ') || 'None'}
-                            </p>
-                        </div>
+                )}
+                {/* Employee Assign Modal */}
+                {isAssignModalOpen && selectedEmployeeForAssign && (
+                    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+                        <div className="bg-white rounded-xl w-[800px] max-w-[90vw] max-h-[90vh] overflow-y-auto">
+                            {/* Header */}
+                            <div className="bg-amber-800 text-white p-6 rounded-t-xl">
+                                <h2 className="text-2xl font-bold">Assign Orders to {selectedEmployeeForAssign.name}</h2>
+                                <p className="text-amber-200 mt-2">
+                                    Current Orders: {selectedEmployeeForAssign.assignedOrders.join(', ') || 'None'}
+                                </p>
+                            </div>
 
-                        {/* Content */}
-                        <div className="p-6">
-                            {/* Available Orders */}
-                            <div className="mb-6">
-                                <h3 className="text-lg font-bold text-gray-800 mb-4">Available Orders ({availableOrders.length})</h3>
-                                <p className="text-sm text-gray-600 mb-4">Select orders to assign to this employee:</p>
+                            {/* Content */}
+                            <div className="p-6">
+                                {/* Available Orders */}
+                                <div className="mb-6">
+                                    <h3 className="text-lg font-bold text-gray-800 mb-4">Available Orders ({availableOrders.length})</h3>
+                                    <p className="text-sm text-gray-600 mb-4">Select orders to assign to this employee:</p>
 
-                                <div className="space-y-3 max-h-96 overflow-y-auto">
-                                    {availableOrders.map((order) => (
-                                        <div key={order.id} className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50">
-                                            <div className="flex items-start gap-3">
-                                                <input
-                                                    type="checkbox"
-                                                    id={`order-${order.id}`}
-                                                    checked={selectedOrders.includes(order.id)}
-                                                    onChange={() => handleOrderSelection(order.id)}
-                                                    className="mt-1 h-4 w-4 text-yellow-400 border-gray-300 rounded focus:ring-yellow-400"
-                                                />
-                                                <div className="flex-1">
-                                                    <div className="flex items-center justify-between mb-2">
-                                                        <div className="flex items-center gap-3">
-                                                            <h4 className="font-bold text-gray-800">{order.id}</h4>
-                                                            <span className={`px-2 py-1 rounded-full text-xs font-medium border ${getPriorityColor(order.priority)}`}>
-                                                                {order.priority}
-                                                            </span>
+                                    <div className="space-y-3 max-h-96 overflow-y-auto">
+                                        {availableOrders.map((order) => (
+                                            <div key={order.id} className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50">
+                                                <div className="flex items-start gap-3">
+                                                    <input
+                                                        type="checkbox"
+                                                        id={`order-${order.id}`}
+                                                        checked={selectedOrders.includes(order.id)}
+                                                        onChange={() => handleOrderSelection(order.id)}
+                                                        className="mt-1 h-4 w-4 text-yellow-400 border-gray-300 rounded focus:ring-yellow-400"
+                                                    />
+                                                    <div className="flex-1">
+                                                        <div className="flex items-center justify-between mb-2">
+                                                            <div className="flex items-center gap-3">
+                                                                <h4 className="font-bold text-gray-800">{order.id}</h4>
+                                                                <span className={`px-2 py-1 rounded-full text-xs font-medium border ${getPriorityColor(order.priority)}`}>
+                                                                    {order.priority}
+                                                                </span>
+                                                            </div>
+                                                            <div className="text-right">
+                                                                <p className="font-bold text-lg text-gray-800">{order.total}</p>
+                                                                <p className="text-xs text-gray-500">{order.orderTime}</p>
+                                                            </div>
                                                         </div>
-                                                        <div className="text-right">
-                                                            <p className="font-bold text-lg text-gray-800">{order.total}</p>
-                                                            <p className="text-xs text-gray-500">{order.orderTime}</p>
-                                                        </div>
-                                                    </div>
 
-                                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
-                                                        <div>
-                                                            <p className="text-gray-600"><strong>Customer:</strong> {order.customerName}</p>
-                                                            <p className="text-gray-600"><strong>Address:</strong> {order.address}</p>
-                                                        </div>
-                                                        <div>
-                                                            <p className="text-gray-600"><strong>Items:</strong> {order.items.join(", ")}</p>
-                                                            <p className="text-gray-600"><strong>Est. Time:</strong> {order.estimatedTime}</p>
+                                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
+                                                            <div>
+                                                                <p className="text-gray-600"><strong>Customer:</strong> {order.customerName}</p>
+                                                                <p className="text-gray-600"><strong>Address:</strong> {order.address}</p>
+                                                            </div>
+                                                            <div>
+                                                                <p className="text-gray-600"><strong>Items:</strong> {order.items.join(", ")}</p>
+                                                                <p className="text-gray-600"><strong>Est. Time:</strong> {order.estimatedTime}</p>
+                                                            </div>
                                                         </div>
                                                     </div>
                                                 </div>
                                             </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-
-                            {/* Selected Orders Summary */}
-                            {selectedOrders.length > 0 && (
-                                <div className="bg-green-50 border-2 border-green-400 rounded-lg p-4 mb-6">
-                                    <h4 className="font-bold text-green-800 mb-2">
-                                        Selected Orders ({selectedOrders.length})
-                                    </h4>
-                                    <div className="flex flex-wrap gap-2">
-                                        {selectedOrders.map((orderId) => (
-                                            <span key={orderId} className="bg-green-200 text-green-800 px-2 py-1 rounded-lg text-sm font-medium">
-                                                {orderId}
-                                            </span>
                                         ))}
                                     </div>
-                                    <p className="text-sm text-green-700 mt-2">
-                                        Total selected: {selectedOrders.length} order{selectedOrders.length !== 1 ? 's' : ''}
-                                    </p>
                                 </div>
-                            )}
 
-                            {/* Action Buttons */}
-                            <div className="flex justify-between gap-4 pt-4">
-                                <button
-                                    onClick={() => setIsAssignModalOpen(false)}
-                                    className="flex-1 bg-gray-500 hover:bg-gray-600 text-white px-6 py-3 rounded-lg font-medium transition-colors"
-                                >
-                                    Cancel
-                                </button>
-                                <button
-                                    onClick={handleConfirmAssignment}
-                                    disabled={selectedOrders.length === 0}
-                                    className={`flex-1 px-6 py-3 rounded-lg font-medium transition-colors ${selectedOrders.length === 0
-                                        ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                                        : 'bg-yellow-400 hover:bg-yellow-500 text-black'
-                                        }`}
-                                >
-                                    Assign {selectedOrders.length} Order{selectedOrders.length !== 1 ? 's' : ''}
-                                </button>
+                                {/* Selected Orders Summary */}
+                                {selectedOrders.length > 0 && (
+                                    <div className="bg-green-50 border-2 border-green-400 rounded-lg p-4 mb-6">
+                                        <h4 className="font-bold text-green-800 mb-2">
+                                            Selected Orders ({selectedOrders.length})
+                                        </h4>
+                                        <div className="flex flex-wrap gap-2">
+                                            {selectedOrders.map((orderId) => (
+                                                <span key={orderId} className="bg-green-200 text-green-800 px-2 py-1 rounded-lg text-sm font-medium">
+                                                    {orderId}
+                                                </span>
+                                            ))}
+                                        </div>
+                                        <p className="text-sm text-green-700 mt-2">
+                                            Total selected: {selectedOrders.length} order{selectedOrders.length !== 1 ? 's' : ''}
+                                        </p>
+                                    </div>
+                                )}
+
+                                {/* Action Buttons */}
+                                <div className="flex justify-between gap-4 pt-4">
+                                    <button
+                                        onClick={() => setIsAssignModalOpen(false)}
+                                        className="flex-1 bg-gray-500 hover:bg-gray-600 text-white px-6 py-3 rounded-lg font-medium transition-colors"
+                                    >
+                                        Cancel
+                                    </button>
+                                    <button
+                                        onClick={handleConfirmAssignment}
+                                        disabled={selectedOrders.length === 0}
+                                        className={`flex-1 px-6 py-3 rounded-lg font-medium transition-colors ${selectedOrders.length === 0
+                                            ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                                            : 'bg-yellow-400 hover:bg-yellow-500 text-black'
+                                            }`}
+                                    >
+                                        Assign {selectedOrders.length} Order{selectedOrders.length !== 1 ? 's' : ''}
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     </div>
-                </div>
-            )}
+                )}
 
-            {/* Employee Track Modal */}
-            {isTrackModalOpen && selectedEmployeeForTrack && (
-                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-                    <div className="bg-white rounded-xl w-[800px] max-w-[90vw] max-h-[90vh] overflow-hidden">
-                        {/* Header */}
-                        <div className="bg-yellow-400 text-black p-4 rounded-t-xl">
-                            <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-4">
-                                    <img
-                                        src="/model.png" // Add rider avatar
-                                        alt={selectedEmployeeForTrack.name}
-                                        className="w-12 h-12 rounded-full object-cover"
-                                    />
-                                    <div>
-                                        <p className="text-sm font-medium opacity-80">Rider</p>
-                                        <h2 className="text-xl font-bold">{selectedEmployeeForTrack.name}</h2>
+                {/* Employee Track Modal */}
+                {isTrackModalOpen && selectedEmployeeForTrack && (
+                    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+                        <div className="bg-white rounded-xl w-[800px] max-w-[90vw] max-h-[90vh] overflow-hidden">
+                            {/* Header */}
+                            <div className="bg-yellow-400 text-black p-4 rounded-t-xl">
+                                <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-4">
+                                        <img
+                                            src="/model.png" // Add rider avatar
+                                            alt={selectedEmployeeForTrack.name}
+                                            className="w-12 h-12 rounded-full object-cover"
+                                        />
+                                        <div>
+                                            <p className="text-sm font-medium opacity-80">Rider</p>
+                                            <h2 className="text-xl font-bold">{selectedEmployeeForTrack.name}</h2>
+                                        </div>
+                                    </div>
+                                    <div className="text-center">
+                                        <p className="text-sm opacity-80">Estimated Delivery Time</p>
+                                        <p className="text-2xl font-bold">5:37PM</p>
+                                    </div>
+                                    <button
+                                        onClick={() => setIsTrackModalOpen(false)}
+                                        className="bg-red-500 hover:bg-red-600 text-white w-8 h-8 rounded-full flex items-center justify-center text-lg font-bold transition-colors"
+                                    >
+                                        ×
+                                    </button>
+                                </div>
+                                <div className="flex items-center justify-between mt-3">
+                                    <div className="flex items-center gap-2">
+                                        <div className="flex text-black">
+                                            {'★'.repeat(5)}
+                                        </div>
+                                        <span className="text-sm opacity-80">(32 ratings)</span>
+                                    </div>
+                                    <div className="text-right">
+                                        <span className="font-bold">TRACK ORDER: {selectedEmployeeForTrack.assignedOrders[0] || "3204"}</span>
                                     </div>
                                 </div>
-                                <div className="text-center">
-                                    <p className="text-sm opacity-80">Estimated Delivery Time</p>
-                                    <p className="text-2xl font-bold">5:37PM</p>
-                                </div>
-                                <button
-                                    onClick={() => setIsTrackModalOpen(false)}
-                                    className="bg-red-500 hover:bg-red-600 text-white w-8 h-8 rounded-full flex items-center justify-center text-lg font-bold transition-colors"
-                                >
-                                    ×
-                                </button>
                             </div>
-                            <div className="flex items-center justify-between mt-3">
-                                <div className="flex items-center gap-2">
-                                    <div className="flex text-black">
-                                        {'★'.repeat(5)}
-                                    </div>
-                                    <span className="text-sm opacity-80">(32 ratings)</span>
-                                </div>
-                                <div className="text-right">
-                                    <span className="font-bold">TRACK ORDER: {selectedEmployeeForTrack.assignedOrders[0] || "3204"}</span>
-                                </div>
-                            </div>
-                        </div>
 
-                        {/* Map Section - Full Width */}
-                        <div className="relative">
-                            <img
-                                src="/tmp-map.png" // Use your actual map image
-                                alt="Delivery Route Map"
-                                className="w-full h-96 object-cover"
-                            />
+                            {/* Map Section - Full Width */}
+                            <div className="relative">
+                                <img
+                                    src="/tmp-map.png" // Use your actual map image
+                                    alt="Delivery Route Map"
+                                    className="w-full h-96 object-cover"
+                                />
+                            </div>
                         </div>
                     </div>
-                </div>
-            )}
-        </div>
+                )}
+            </div>
+        </ProtectedRoute>
     )
 }

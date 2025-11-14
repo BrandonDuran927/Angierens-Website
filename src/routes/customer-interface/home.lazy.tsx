@@ -210,7 +210,7 @@ function RouteComponent() {
   `;
 
   return (
-    <ProtectedRoute>
+    <ProtectedRoute allowedRoles={['customer']}>
       <div className="min-h-screen min-w-[320px] bg-gradient-to-br from-amber-50 to-orange-100">
         <style dangerouslySetInnerHTML={{ __html: customStyles }} />
 

@@ -329,6 +329,59 @@ function RouteComponent() {
         }
     }
 
+    const handleRemoveProof = async () => {
+        if (!currentOrderId) return
+
+        const confirmed = window.confirm('Are you sure you want to remove the proof of payment? You will need to upload a new one.')
+        if (!confirmed) return
+
+        setIsUploading(true)
+        try {
+            const { data: orderData, error: orderError } = await supabase
+                .from('order')
+                .select(`
+                  payment_id,
+                  payment:payment_id (
+                  proof_of_payment_url
+                )
+                `)
+                .eq('order_id', currentOrderId)
+                .single();
+
+
+            if (orderError) throw orderError
+
+            const proofUrl = orderData.payment?.[0]?.proof_of_payment_url;
+
+            if (proofUrl) {
+                const urlParts = proofUrl.split('/')
+                const fileName = urlParts[urlParts.length - 1]
+
+                await supabase.storage
+                    .from('payment-receipts')
+                    .remove([fileName])
+            }
+
+            const { error: paymentError } = await supabase
+                .from('payment')
+                .update({
+                    proof_of_payment_url: null
+                })
+                .eq('payment_id', orderData.payment_id)
+
+            if (paymentError) throw paymentError
+
+            alert('Proof of payment removed successfully. You can now upload a new one.')
+            handleCloseViewReceipt()
+            await fetchOrders() // Refresh orders
+        } catch (error) {
+            console.error('Error removing proof:', error)
+            alert('Failed to remove proof of payment. Please try again.')
+        } finally {
+            setIsUploading(false)
+        }
+    }
+
     const markAllAsRead = () => {
         setNotifications(prev => prev.map(notif => ({ ...notif, read: true })))
     }
@@ -528,8 +581,9 @@ function RouteComponent() {
         await fetchOrders() // Refresh orders list
     }
 
-    const handleOpenViewReceipt = (receiptUrl: string) => {
+    const handleOpenViewReceipt = (receiptUrl: string, orderId: string) => {
         setViewReceiptUrl(receiptUrl)
+        setCurrentOrderId(orderId)
         setShowViewReceiptModal(true)
     }
 
@@ -588,7 +642,7 @@ function RouteComponent() {
     }
 
     return (
-        <ProtectedRoute>
+        <ProtectedRoute allowedRoles={['customer']}>
             <div className="min-h-screen bg-gradient-to-br from-amber-50 to-orange-100">
                 <style dangerouslySetInnerHTML={{ __html: customStyles }} />
                 {/* Customer Header */}
@@ -875,43 +929,64 @@ function RouteComponent() {
                                             )}
                                             {order.status === 'to-pay' && (
                                                 <>
-                                                    <button
-                                                        onClick={(e) => {
-                                                            e.preventDefault();
-                                                            e.stopPropagation();
-                                                            handleOpenCancelModal(order.id);
-                                                        }}
-                                                        className="px-3 sm:px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 text-sm sm:text-base"
-                                                    >
-                                                        Cancel
-                                                    </button>
                                                     {order.proofOfPaymentUrl ? (
-                                                        <button
-                                                            onClick={(e) => {
-                                                                e.preventDefault();
-                                                                e.stopPropagation();
-                                                                if (order.proofOfPaymentUrl) {
-                                                                    handleOpenViewReceipt(order.proofOfPaymentUrl);
-                                                                }
-                                                            }}
-                                                            className="px-3 sm:px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 text-sm sm:text-base whitespace-nowrap"
-                                                        >
-                                                            View Receipt
-                                                        </button>
+                                                        <>
+                                                            {/* Refund Button */}
+                                                            <button
+                                                                onClick={(e) => {
+                                                                    e.preventDefault();
+                                                                    e.stopPropagation();
+                                                                    handleOpenRefundModal(order.id);
+                                                                }}
+                                                                className="px-3 sm:px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 text-sm sm:text-base"
+                                                            >
+                                                                Refund
+                                                            </button>
+
+                                                            {/* View Receipt Button */}
+                                                            <button
+                                                                onClick={(e) => {
+                                                                    e.preventDefault();
+                                                                    e.stopPropagation();
+                                                                    if (order.proofOfPaymentUrl) {
+                                                                        handleOpenViewReceipt(order.proofOfPaymentUrl, order.id);
+                                                                    }
+                                                                }}
+                                                                className="px-3 sm:px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 text-sm sm:text-base whitespace-nowrap"
+                                                            >
+                                                                View Receipt
+                                                            </button>
+                                                        </>
                                                     ) : (
-                                                        <button
-                                                            onClick={(e) => {
-                                                                e.preventDefault();
-                                                                e.stopPropagation();
-                                                                handleOpenUploadModal(order.id);
-                                                            }}
-                                                            className="px-3 sm:px-4 py-2 bg-yellow-400 text-black rounded-lg hover:bg-yellow-500 text-sm sm:text-base whitespace-nowrap"
-                                                        >
-                                                            Upload Proof of Payment
-                                                        </button>
+                                                        <>
+                                                            {/* Cancel Button */}
+                                                            <button
+                                                                onClick={(e) => {
+                                                                    e.preventDefault();
+                                                                    e.stopPropagation();
+                                                                    handleOpenCancelModal(order.id);
+                                                                }}
+                                                                className="px-3 sm:px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 text-sm sm:text-base"
+                                                            >
+                                                                Cancel
+                                                            </button>
+
+                                                            {/* Upload Proof of Payment Button */}
+                                                            <button
+                                                                onClick={(e) => {
+                                                                    e.preventDefault();
+                                                                    e.stopPropagation();
+                                                                    handleOpenUploadModal(order.id);
+                                                                }}
+                                                                className="px-3 sm:px-4 py-2 bg-yellow-400 text-black rounded-lg hover:bg-yellow-500 text-sm sm:text-base whitespace-nowrap"
+                                                            >
+                                                                Upload Proof of Payment
+                                                            </button>
+                                                        </>
                                                     )}
                                                 </>
                                             )}
+
                                             {order.status === 'in-process' && order.deliveryStatus === 'on-delivery' && (
                                                 <Link
                                                     to="/customer-interface/specific-order/$orderId"
@@ -932,16 +1007,15 @@ function RouteComponent() {
                                                         <Star className="h-4 w-4" />
                                                         <span className="hidden sm:inline">Rate</span>
                                                     </Link>
-                                                    <button
-                                                        onClick={(e) => {
-                                                            e.preventDefault();
-                                                            e.stopPropagation();
-                                                            alert('Buy Again feature - to be implemented');
-                                                        }}
+                                                    <Link
+                                                        to="/customer-interface"
                                                         className="px-3 sm:px-4 py-2 bg-yellow-400 text-black rounded-lg hover:bg-yellow-500 text-sm sm:text-base"
+                                                        onClick={(e) => {
+                                                            e.stopPropagation()
+                                                        }}
                                                     >
-                                                        Buy Again
-                                                    </button>
+                                                        <span className="hidden sm:inline">Buy Again</span>
+                                                    </Link>
                                                 </>
                                             )}
                                         </div>
@@ -1487,18 +1561,21 @@ function RouteComponent() {
             {/* View Receipt Modal */}
             {showViewReceiptModal && (
                 <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
-                    <div className="bg-white rounded-xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-hidden">
-                        <div className="p-4 border-b border-gray-200 flex items-center justify-between">
+                    <div className="bg-white rounded-xl shadow-2xl max-w-3xl w-full max-h-[90vh] flex flex-col">
+                        {/* Header with title and close button */}
+                        <div className="flex items-center justify-between p-4 border-b border-gray-200">
                             <h2 className="text-xl font-bold text-black">Payment Receipt</h2>
                             <button
                                 onClick={handleCloseViewReceipt}
-                                className="text-gray-500 hover:text-gray-700 text-2xl font-bold"
+                                disabled={isUploading}
+                                className="text-gray-500 hover:text-gray-700 disabled:text-gray-300"
                             >
-                                ×
+                                <X className="h-6 w-6" />
                             </button>
                         </div>
 
-                        <div className="p-4 overflow-auto max-h-[calc(90vh-120px)]">
+                        {/* Image Container */}
+                        <div className="flex-1 overflow-auto p-4">
                             <img
                                 src={viewReceiptUrl}
                                 alt="Payment Receipt"
@@ -1506,12 +1583,21 @@ function RouteComponent() {
                             />
                         </div>
 
-                        <div className="p-4 border-t border-gray-200 flex justify-end">
+                        {/* Footer with action buttons */}
+                        <div className="flex gap-3 p-4 border-t border-gray-200">
                             <button
                                 onClick={handleCloseViewReceipt}
-                                className="bg-gray-300 hover:bg-gray-400 text-gray-800 font-medium py-2 px-6 rounded-lg transition-colors"
+                                disabled={isUploading}
+                                className="flex-1 bg-gray-300 hover:bg-gray-400 disabled:bg-gray-200 text-gray-800 font-medium py-3 px-6 rounded-lg transition-colors"
                             >
                                 Close
+                            </button>
+                            <button
+                                onClick={handleRemoveProof}
+                                disabled={isUploading}
+                                className="flex-1 bg-red-500 hover:bg-red-600 disabled:bg-red-300 text-white font-medium py-3 px-6 rounded-lg transition-colors"
+                            >
+                                {isUploading ? 'Removing...' : 'Remove & Replace'}
                             </button>
                         </div>
                     </div>

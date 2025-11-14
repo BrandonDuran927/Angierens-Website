@@ -4,6 +4,7 @@ import { ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Bell, Menu, Clock, T
 import { supabase } from '@/lib/supabaseClient'
 import { useNavigate } from '@tanstack/react-router'
 import { useUser } from '@/context/UserContext'
+import { ProtectedRoute } from '@/components/ProtectedRoute'
 
 export const Route = createLazyFileRoute('/staff/schedule')({
   component: RouteComponent,
@@ -609,391 +610,394 @@ function RouteComponent() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-amber-50 to-orange-100 flex">
-      {/* paste the same Sidebar code here */}
-      <div
-        className={`
+    <ProtectedRoute allowedRoles={['staff']}>
+
+      <div className="min-h-screen bg-gradient-to-br from-amber-50 to-orange-100 flex">
+        {/* paste the same Sidebar code here */}
+        <div
+          className={`
     fixed inset-y-0 left-0 z-50 w-64 bg-yellow-400 transform transition-transform duration-300 ease-in-out
     ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}
   `}
-      >
-        <div className="bg-amber-800 text-white px-6 py-4 relative">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-full flex items-center justify-center">
-                <img src="/public/angierens-logo.png" alt="Logo" className="w-12 h-12 rounded-full" />
+        >
+          <div className="bg-amber-800 text-white px-6 py-4 relative">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-full flex items-center justify-center">
+                  <img src="/public/angierens-logo.png" alt="Logo" className="w-12 h-12 rounded-full" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-bold">Angieren's</h2>
+                  <p className="text-lg font-bold">Lutong Bahay</p>
+                </div>
               </div>
-              <div>
-                <h2 className="text-lg font-bold">Angieren's</h2>
-                <p className="text-lg font-bold">Lutong Bahay</p>
-              </div>
+              <button
+                onClick={() => setIsSidebarOpen(false)}
+                className="lg:hidden p-2 hover:bg-amber-700 rounded-lg"
+              >
+                <X className="h-6 w-6" />
+              </button>
             </div>
+          </div>
+
+          <div className="px-6 py-4 border-b-2 border-amber-600">
+            <h3 className="font-bold text-lg text-amber-900">Jenny Frenzzy</h3>
+            <p className="text-sm text-amber-800">+63 912 212 1209</p>
+            <p className="text-sm text-amber-800">jennyfrenzzy@gmail.com</p>
+          </div>
+
+          <nav className="flex-1 px-4 py-6 space-y-2">
+            {navigationItems.map((item) => (
+              <Link
+                key={item.name}
+                to={item.route}
+                className={`
+                flex items-center gap-3 px-4 py-3 rounded-lg text-left font-semibold transition-colors w-full
+                ${item.active
+                    ? 'bg-amber-700 text-white shadow-lg'
+                    : 'text-amber-900 hover:bg-amber-300'
+                  }
+              `}
+              >
+                {item.icon}
+                {item.name}
+              </Link>
+            ))}
+          </nav>
+
+          <div className="px-4 pb-6">
             <button
-              onClick={() => setIsSidebarOpen(false)}
-              className="lg:hidden p-2 hover:bg-amber-700 rounded-lg"
+              className="flex items-center gap-3 px-4 py-3 text-amber-900 hover:bg-red-100 hover:text-red-600 rounded-lg w-full transition-colors cursor-pointer"
+              onClick={handleLogout}
             >
-              <X className="h-6 w-6" />
+              <LogOut className="h-5 w-5" />
+              Logout
             </button>
           </div>
         </div>
 
-        <div className="px-6 py-4 border-b-2 border-amber-600">
-          <h3 className="font-bold text-lg text-amber-900">Jenny Frenzzy</h3>
-          <p className="text-sm text-amber-800">+63 912 212 1209</p>
-          <p className="text-sm text-amber-800">jennyfrenzzy@gmail.com</p>
-        </div>
+        {isSidebarOpen && (
+          <div
+            className="fixed inset-0 bg-black/50 z-40"
+            onClick={() => setIsSidebarOpen(false)}
+          />
+        )}
 
-        <nav className="flex-1 px-4 py-6 space-y-2">
-          {navigationItems.map((item) => (
-            <Link
-              key={item.name}
-              to={item.route}
-              className={`
-                flex items-center gap-3 px-4 py-3 rounded-lg text-left font-semibold transition-colors w-full
-                ${item.active
-                  ? 'bg-amber-700 text-white shadow-lg'
-                  : 'text-amber-900 hover:bg-amber-300'
-                }
-              `}
-            >
-              {item.icon}
-              {item.name}
-            </Link>
-          ))}
-        </nav>
-
-        <div className="px-4 pb-6">
-          <button
-            className="flex items-center gap-3 px-4 py-3 text-amber-900 hover:bg-red-100 hover:text-red-600 rounded-lg w-full transition-colors cursor-pointer"
-            onClick={handleLogout}
-          >
-            <LogOut className="h-5 w-5" />
-            Logout
-          </button>
-        </div>
-      </div>
-
-      {isSidebarOpen && (
-        <div
-          className="fixed inset-0 bg-black/50 z-40"
-          onClick={() => setIsSidebarOpen(false)}
-        />
-      )}
-
-      {/* Main Content */}
-      <div className="flex-1 flex flex-col lg:ml-0">
-        {/* paste the same header code here */}
-        <header className="bg-amber-800 text-white p-4 shadow-md">
-          <div className="flex justify-between items-center">
-            <div className="flex items-center gap-4">
-              <button
-                onClick={() => setIsSidebarOpen(true)}
-                className="p-2 text-white hover:bg-amber-700 rounded-lg"
-              >
-                <Menu className="h-6 w-6" />
-              </button>
-              <div className="flex items-center gap-2">
-                <h1 className="text-xl lg:text-3xl font-bold">SCHEDULE</h1>
-              </div>
-            </div>
-            <div className="flex items-center gap-2 lg:gap-6">
-              <span className="text-amber-200 text-xs lg:text-lg font-semibold hidden sm:inline">Date: {getCurrentDate()}</span>
-              <span className="text-amber-200 text-xs lg:text-lg font-semibold hidden sm:inline">Time: {getCurrentTime()}</span>
-              <div className="w-10 h-10 bg-yellow-400 rounded-full flex items-center justify-center">
-                <div className="relative">
-                  <button
-                    onClick={() => setIsNotificationOpen(!isNotificationOpen)}
-                    className="relative p-2 text-[#7a3d00] hover:bg-yellow-400 rounded-full"
-                  >
-                    <Bell className="h-6 w-6" />
-                    {notificationCount > 0 && (
-                      <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
-                        {notificationCount}
-                      </span>
-                    )}
-                  </button>
-                  {isNotificationOpen && (
-                    <div className="absolute right-0 mt-2 w-96 bg-white rounded-lg shadow-lg border border-gray-200 z-50">
-                      <div className="p-4 border-b border-gray-200">
-                        <h3 className="text-lg font-semibold text-gray-800">Notifications</h3>
-                      </div>
-
-                      <div className="max-h-80 overflow-y-auto">
-                        {notifications.map((notification, index) => (
-                          <div
-                            key={notification.id}
-                            className={`p-4 border-b border-gray-100 hover:bg-gray-50 cursor-pointer ${index === notifications.length - 1 ? 'border-b-0' : ''
-                              }`}
-                          >
-                            <div className="flex items-start gap-3">
-                              <div className="flex-shrink-0 w-10 h-10 bg-yellow-400 rounded-full flex items-center justify-center text-black">
-                                {getNotificationIcon(notification.icon)}
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                <p className="text-sm text-gray-800 leading-relaxed">
-                                  {notification.title}
-                                </p>
-                                <p className="text-xs text-gray-500 mt-1">
-                                  {notification.time}
-                                </p>
-                              </div>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-
-                      <div className="p-4 border-t border-gray-200">
-                        <button
-                          onClick={markAllAsRead}
-                          className="w-full bg-yellow-400 text-black py-2 px-4 rounded-lg font-medium hover:bg-yellow-500 transition-colors flex items-center justify-center gap-2"
-                        >
-                          <Bell className="h-4 w-4" />
-                          Mark all as read
-                        </button>
-                      </div>
-                    </div>
-                  )}
+        {/* Main Content */}
+        <div className="flex-1 flex flex-col lg:ml-0">
+          {/* paste the same header code here */}
+          <header className="bg-amber-800 text-white p-4 shadow-md">
+            <div className="flex justify-between items-center">
+              <div className="flex items-center gap-4">
+                <button
+                  onClick={() => setIsSidebarOpen(true)}
+                  className="p-2 text-white hover:bg-amber-700 rounded-lg"
+                >
+                  <Menu className="h-6 w-6" />
+                </button>
+                <div className="flex items-center gap-2">
+                  <h1 className="text-xl lg:text-3xl font-bold">SCHEDULE</h1>
                 </div>
               </div>
-            </div>
-          </div>
-        </header>
-
-        <div className="flex-1 p-3 md:p-8">
-          <div className="max-w-7xl mx-auto">
-            <div className="bg-yellow-400 rounded-2xl p-4 md:p-8 shadow-xl">
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-8">
-
-                <div className="lg:col-span-2 space-y-3 md:space-y-6">
-                  {/* paste the same Current Date Display and Month Navigation */}
-                  <div className="text-lg md:text-xl font-semibold text-gray-800">
-                    {new Date(currentDate.getFullYear(), currentDate.getMonth(), selectedDate).toLocaleDateString('en-US', {
-                      weekday: 'long',
-                      month: 'long',
-                      day: 'numeric'
-                    })}
-                  </div>
-
-                  <div className="flex items-center justify-between border-b-2 border-gray-800 pb-3 md:pb-4">
-                    <div className="text-lg md:text-xl font-bold text-gray-800">
-                      {selectedMonth}
-                    </div>
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => navigateMonth('prev')}
-                        className="p-2 hover:bg-yellow-300 rounded-full transition-colors"
-                      >
-                        <ChevronLeft className="w-5 h-5" />
-                      </button>
-                      <button
-                        onClick={() => navigateMonth('next')}
-                        className="p-2 hover:bg-yellow-300 rounded-full transition-colors"
-                      >
-                        <ChevronRight className="w-5 h-5" />
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* paste the same Calendar Grid */}
-                  <div className="grid grid-cols-7 gap-1 md:gap-2">
-                    {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
-                      <div key={day} className="text-center font-semibold text-gray-800 p-1 md:p-2 text-xs md:text-base">
-                        {day}
-                      </div>
-                    ))}
-
-                    {/* Calendar Days */}
-                    {calendarData.map((day, index) => (
-                      <button
-                        key={index}
-                        onClick={() => !day.isPastMonth && !day.isFutureMonth && setSelectedDate(day.date)}
-                        className={`
-                            relative p-1.5 md:p-3 rounded-lg text-center border-2 transition-all duration-200 active:scale-95 md:hover:scale-105 min-h-[60px] md:min-h-[80px] flex flex-col justify-center gap-0.5 md:gap-1 cursor-pointer
-                            ${day.isPastMonth || day.isFutureMonth
-                            ? 'text-gray-400 border-transparent bg-white/30'
-                            : day.isSelected
-                              ? 'bg-amber-600 text-white border-amber-700 shadow-lg'
-                              : day.isToday
-                                ? 'bg-white border-amber-600 text-gray-800 shadow-md'
-                                : 'bg-white border-gray-300 text-gray-800 hover:border-amber-400'
-                          }
-                          `}
-                      >
-                        <span className="font-semibold text-sm md:text-lg">{day.date}</span>
-                        {!day.isPastMonth && !day.isFutureMonth && (
-                          <>
-                            {day.isAvailable ? (
-                              <span className="text-[10px] md:text-xs text-blue-600 font-medium leading-tight">
-                                {day.orders}/{day.maxOrders}
-                              </span>
-                            ) : (
-                              <span className="text-[10px] md:text-xs font-medium leading-tight">
-                                N/A
-                              </span>
-                            )}
-                          </>
-                        )}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Right Sidebar - EDITABLE */}
-                <div className="space-y-4 md:space-y-6">
-                  {/* Selected Date Info */}
-                  <div className="bg-green-50 rounded-lg p-4 md:p-6 border border-green-200 shadow-sm">
-                    <h3 className="text-base md:text-lg font-semibold text-gray-800 mb-2">Selected Date</h3>
-                    <div className="text-xl md:text-2xl font-bold text-gray-800 mb-4">
-                      {monthNames[currentDate.getMonth()]} {selectedDate}, {currentDate.getFullYear()}
-                    </div>
-                    <div className="text-base md:text-lg text-gray-700 mb-4">
-                      {selectedDayData?.orders || 0} Orders
-                    </div>
-
-                    <div className="space-y-3 max-h-48 overflow-y-auto pr-2">
-                      <h4 className="font-semibold text-gray-800 text-sm md:text-base">Customer Orders</h4>
-                      {customerOrders.length > 0 ? (
-                        customerOrders.map(member => (
-                          <div key={member.id} className="flex items-center gap-3">
-                            <div className={`w-3 h-8 ${member.color} rounded`}></div>
-                            <div>
-                              <div className="font-medium text-gray-800 text-sm md:text-base">{member.name}</div>
-                              <div className="text-xs md:text-sm text-gray-600">{member.time}</div>
-                            </div>
-                          </div>
-                        ))
-                      ) : (
-                        <div className="text-sm text-gray-500 text-center py-4">
-                          No orders for this date
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Availability Status - EDITABLE */}
-                  <div className="bg-green-50 rounded-lg p-4 md:p-6 border border-green-200 shadow-sm">
-                    <h3 className="text-base md:text-lg font-semibold text-gray-800 mb-4">Availability Status</h3>
-                    <div className="flex items-center justify-between mb-4">
-                      <div className="flex items-center gap-2">
-                        <div className={`w-3 h-3 ${selectedDayData?.isAvailable ? 'bg-green-500' : 'bg-red-500'} rounded-full`}></div>
-                        <span className={`${selectedDayData?.isAvailable ? 'text-green-700' : 'text-red-700'} font-medium text-sm md:text-base`}>
-                          {selectedDayData?.isAvailable ? 'Available' : 'Unavailable'}
-                        </span>
-                      </div>
-                    </div>
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => updateAvailabilityStatus(true)}
-                        disabled={saving}
-                        className="flex-1 bg-green-600 text-white py-2 px-4 rounded-lg font-medium hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm md:text-base"
-                      >
-                        Set Available
-                      </button>
-                      <button
-                        onClick={() => updateAvailabilityStatus(false)}
-                        disabled={saving}
-                        className="flex-1 bg-red-600 text-white py-2 px-4 rounded-lg font-medium hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm md:text-base"
-                      >
-                        Set Unavailable
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Order Limit - EDITABLE */}
-                  <div className="bg-blue-50 rounded-lg p-4 md:p-6 border border-blue-200 shadow-sm">
-                    <h3 className="text-base md:text-lg font-semibold text-gray-800 mb-4">Order Limit</h3>
-                    <div className="flex items-center gap-3 mb-4">
-                      <input
-                        type="number"
-                        value={orderLimit}
-                        onChange={(e) => setOrderLimit(parseInt(e.target.value) || 0)}
-                        min="1"
-                        max="100"
-                        className="flex-1 px-3 py-2 border border-blue-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-lg font-semibold"
-                      />
-                      <span className="text-blue-700 font-medium">orders/day</span>
-                    </div>
+              <div className="flex items-center gap-2 lg:gap-6">
+                <span className="text-amber-200 text-xs lg:text-lg font-semibold hidden sm:inline">Date: {getCurrentDate()}</span>
+                <span className="text-amber-200 text-xs lg:text-lg font-semibold hidden sm:inline">Time: {getCurrentTime()}</span>
+                <div className="w-10 h-10 bg-yellow-400 rounded-full flex items-center justify-center">
+                  <div className="relative">
                     <button
-                      onClick={() => updateOrderLimit(orderLimit)}
-                      disabled={saving}
-                      className="w-full bg-amber-600 text-white py-2 px-4 rounded-lg font-medium hover:bg-amber-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                      onClick={() => setIsNotificationOpen(!isNotificationOpen)}
+                      className="relative p-2 text-[#7a3d00] hover:bg-yellow-400 rounded-full"
                     >
-                      <Save className="h-4 w-4" />
-                      Save Order Limit
+                      <Bell className="h-6 w-6" />
+                      {notificationCount > 0 && (
+                        <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
+                          {notificationCount}
+                        </span>
+                      )}
                     </button>
-                    <div className="text-xs md:text-sm text-blue-600 mt-2">
-                      Current: {selectedDayData?.orders || 0} orders
-                    </div>
-                  </div>
+                    {isNotificationOpen && (
+                      <div className="absolute right-0 mt-2 w-96 bg-white rounded-lg shadow-lg border border-gray-200 z-50">
+                        <div className="p-4 border-b border-gray-200">
+                          <h3 className="text-lg font-semibold text-gray-800">Notifications</h3>
+                        </div>
 
-                  {/* Time Slots - EDITABLE */}
-                  <div className="bg-purple-50 rounded-lg p-4 md:p-6 border border-purple-200 shadow-sm">
-                    <div className="flex items-center justify-between mb-4">
-                      <h3 className="text-base md:text-lg font-semibold text-gray-800">Time Slots (9AM - 5PM)</h3>
-                    </div>
+                        <div className="max-h-80 overflow-y-auto">
+                          {notifications.map((notification, index) => (
+                            <div
+                              key={notification.id}
+                              className={`p-4 border-b border-gray-100 hover:bg-gray-50 cursor-pointer ${index === notifications.length - 1 ? 'border-b-0' : ''
+                                }`}
+                            >
+                              <div className="flex items-start gap-3">
+                                <div className="flex-shrink-0 w-10 h-10 bg-yellow-400 rounded-full flex items-center justify-center text-black">
+                                  {getNotificationIcon(notification.icon)}
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-sm text-gray-800 leading-relaxed">
+                                    {notification.title}
+                                  </p>
+                                  <p className="text-xs text-gray-500 mt-1">
+                                    {notification.time}
+                                  </p>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
 
-                    {/* Add Time Slot Buttons */}
-                    <div className="mb-4 grid grid-cols-3 gap-2">
-                      {[9, 10, 11, 12, 13, 14, 15, 16, 17].map(hour => {
-                        const timeStr = `${String(hour).padStart(2, '0')}:00:00`
-                        const year = currentDate.getFullYear()
-                        const month = currentDate.getMonth()
-                        const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(selectedDate).padStart(2, '0')}`
-                        const exists = scheduleData.some(s => s.schedule_date === dateStr && s.schedule_time === timeStr)
-                        const displayHour = hour > 12 ? hour - 12 : hour
-                        const period = hour < 12 ? 'AM' : 'PM'
-
-                        return (
+                        <div className="p-4 border-t border-gray-200">
                           <button
-                            key={hour}
-                            onClick={() => addTimeSlot(hour)}
-                            disabled={saving || exists}
-                            className={`py-1.5 px-2 rounded-lg text-xs font-medium transition-colors ${exists
-                              ? 'bg-gray-300 text-gray-600 cursor-not-allowed'
-                              : 'bg-amber-600 text-white hover:bg-amber-700'
-                              } disabled:opacity-50`}
+                            onClick={markAllAsRead}
+                            className="w-full bg-yellow-400 text-black py-2 px-4 rounded-lg font-medium hover:bg-yellow-500 transition-colors flex items-center justify-center gap-2"
                           >
-                            {exists ? '✓' : '+'} {displayHour}{period}
+                            <Bell className="h-4 w-4" />
+                            Mark all as read
                           </button>
-                        )
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </header>
+
+          <div className="flex-1 p-3 md:p-8">
+            <div className="max-w-7xl mx-auto">
+              <div className="bg-yellow-400 rounded-2xl p-4 md:p-8 shadow-xl">
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-8">
+
+                  <div className="lg:col-span-2 space-y-3 md:space-y-6">
+                    {/* paste the same Current Date Display and Month Navigation */}
+                    <div className="text-lg md:text-xl font-semibold text-gray-800">
+                      {new Date(currentDate.getFullYear(), currentDate.getMonth(), selectedDate).toLocaleDateString('en-US', {
+                        weekday: 'long',
+                        month: 'long',
+                        day: 'numeric'
                       })}
                     </div>
 
-                    {/* Existing Time Slots */}
-                    <div className="space-y-2 max-h-64 overflow-y-auto pr-2">
-                      {timeSlots.length > 0 ? (
-                        timeSlots.map((slot, index) => (
-                          <div key={index} className="flex items-center justify-between p-2 md:p-3 bg-white rounded-lg border border-gray-200 shadow-sm">
-                            <span className="text-xs md:text-sm font-medium text-gray-700">
-                              {slot.hour} {slot.period}
-                            </span>
-                            <div className="flex items-center gap-2">
-                              <button
-                                onClick={() => slot.scheduleId && toggleTimeSlotAvailability(slot.scheduleId, slot.isAvailable)}
-                                disabled={saving}
-                                className={`px-2 md:px-3 py-1 rounded-full text-xs font-medium transition-colors ${slot.isAvailable
-                                  ? 'bg-green-100 text-green-700 hover:bg-green-200'
-                                  : 'bg-red-100 text-red-700 hover:bg-red-200'
-                                  } disabled:opacity-50`}
-                              >
-                                {slot.isAvailable ? 'Available' : 'Unavailable'}
-                              </button>
-                              <button
-                                onClick={() => slot.scheduleId && deleteTimeSlot(slot.scheduleId)}
-                                disabled={saving}
-                                className="p-1.5 text-red-600 hover:bg-red-100 rounded transition-colors disabled:opacity-50"
-                                title="Delete time slot"
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </button>
-                            </div>
-                          </div>
-                        ))
-                      ) : (
-                        <div className="text-sm text-gray-500 text-center py-4">
-                          No time slots available. Add time slots using the buttons above.
+                    <div className="flex items-center justify-between border-b-2 border-gray-800 pb-3 md:pb-4">
+                      <div className="text-lg md:text-xl font-bold text-gray-800">
+                        {selectedMonth}
+                      </div>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => navigateMonth('prev')}
+                          className="p-2 hover:bg-yellow-300 rounded-full transition-colors"
+                        >
+                          <ChevronLeft className="w-5 h-5" />
+                        </button>
+                        <button
+                          onClick={() => navigateMonth('next')}
+                          className="p-2 hover:bg-yellow-300 rounded-full transition-colors"
+                        >
+                          <ChevronRight className="w-5 h-5" />
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* paste the same Calendar Grid */}
+                    <div className="grid grid-cols-7 gap-1 md:gap-2">
+                      {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
+                        <div key={day} className="text-center font-semibold text-gray-800 p-1 md:p-2 text-xs md:text-base">
+                          {day}
                         </div>
-                      )}
+                      ))}
+
+                      {/* Calendar Days */}
+                      {calendarData.map((day, index) => (
+                        <button
+                          key={index}
+                          onClick={() => !day.isPastMonth && !day.isFutureMonth && setSelectedDate(day.date)}
+                          className={`
+                            relative p-1.5 md:p-3 rounded-lg text-center border-2 transition-all duration-200 active:scale-95 md:hover:scale-105 min-h-[60px] md:min-h-[80px] flex flex-col justify-center gap-0.5 md:gap-1 cursor-pointer
+                            ${day.isPastMonth || day.isFutureMonth
+                              ? 'text-gray-400 border-transparent bg-white/30'
+                              : day.isSelected
+                                ? 'bg-amber-600 text-white border-amber-700 shadow-lg'
+                                : day.isToday
+                                  ? 'bg-white border-amber-600 text-gray-800 shadow-md'
+                                  : 'bg-white border-gray-300 text-gray-800 hover:border-amber-400'
+                            }
+                          `}
+                        >
+                          <span className="font-semibold text-sm md:text-lg">{day.date}</span>
+                          {!day.isPastMonth && !day.isFutureMonth && (
+                            <>
+                              {day.isAvailable ? (
+                                <span className="text-[10px] md:text-xs text-blue-600 font-medium leading-tight">
+                                  {day.orders}/{day.maxOrders}
+                                </span>
+                              ) : (
+                                <span className="text-[10px] md:text-xs font-medium leading-tight">
+                                  N/A
+                                </span>
+                              )}
+                            </>
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Right Sidebar - EDITABLE */}
+                  <div className="space-y-4 md:space-y-6">
+                    {/* Selected Date Info */}
+                    <div className="bg-green-50 rounded-lg p-4 md:p-6 border border-green-200 shadow-sm">
+                      <h3 className="text-base md:text-lg font-semibold text-gray-800 mb-2">Selected Date</h3>
+                      <div className="text-xl md:text-2xl font-bold text-gray-800 mb-4">
+                        {monthNames[currentDate.getMonth()]} {selectedDate}, {currentDate.getFullYear()}
+                      </div>
+                      <div className="text-base md:text-lg text-gray-700 mb-4">
+                        {selectedDayData?.orders || 0} Orders
+                      </div>
+
+                      <div className="space-y-3 max-h-48 overflow-y-auto pr-2">
+                        <h4 className="font-semibold text-gray-800 text-sm md:text-base">Customer Orders</h4>
+                        {customerOrders.length > 0 ? (
+                          customerOrders.map(member => (
+                            <div key={member.id} className="flex items-center gap-3">
+                              <div className={`w-3 h-8 ${member.color} rounded`}></div>
+                              <div>
+                                <div className="font-medium text-gray-800 text-sm md:text-base">{member.name}</div>
+                                <div className="text-xs md:text-sm text-gray-600">{member.time}</div>
+                              </div>
+                            </div>
+                          ))
+                        ) : (
+                          <div className="text-sm text-gray-500 text-center py-4">
+                            No orders for this date
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Availability Status - EDITABLE */}
+                    <div className="bg-green-50 rounded-lg p-4 md:p-6 border border-green-200 shadow-sm">
+                      <h3 className="text-base md:text-lg font-semibold text-gray-800 mb-4">Availability Status</h3>
+                      <div className="flex items-center justify-between mb-4">
+                        <div className="flex items-center gap-2">
+                          <div className={`w-3 h-3 ${selectedDayData?.isAvailable ? 'bg-green-500' : 'bg-red-500'} rounded-full`}></div>
+                          <span className={`${selectedDayData?.isAvailable ? 'text-green-700' : 'text-red-700'} font-medium text-sm md:text-base`}>
+                            {selectedDayData?.isAvailable ? 'Available' : 'Unavailable'}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => updateAvailabilityStatus(true)}
+                          disabled={saving}
+                          className="flex-1 bg-green-600 text-white py-2 px-4 rounded-lg font-medium hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm md:text-base"
+                        >
+                          Set Available
+                        </button>
+                        <button
+                          onClick={() => updateAvailabilityStatus(false)}
+                          disabled={saving}
+                          className="flex-1 bg-red-600 text-white py-2 px-4 rounded-lg font-medium hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm md:text-base"
+                        >
+                          Set Unavailable
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Order Limit - EDITABLE */}
+                    <div className="bg-blue-50 rounded-lg p-4 md:p-6 border border-blue-200 shadow-sm">
+                      <h3 className="text-base md:text-lg font-semibold text-gray-800 mb-4">Order Limit</h3>
+                      <div className="flex items-center gap-3 mb-4">
+                        <input
+                          type="number"
+                          value={orderLimit}
+                          onChange={(e) => setOrderLimit(parseInt(e.target.value) || 0)}
+                          min="1"
+                          max="100"
+                          className="flex-1 px-3 py-2 border border-blue-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-lg font-semibold"
+                        />
+                        <span className="text-blue-700 font-medium">orders/day</span>
+                      </div>
+                      <button
+                        onClick={() => updateOrderLimit(orderLimit)}
+                        disabled={saving}
+                        className="w-full bg-amber-600 text-white py-2 px-4 rounded-lg font-medium hover:bg-amber-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                      >
+                        <Save className="h-4 w-4" />
+                        Save Order Limit
+                      </button>
+                      <div className="text-xs md:text-sm text-blue-600 mt-2">
+                        Current: {selectedDayData?.orders || 0} orders
+                      </div>
+                    </div>
+
+                    {/* Time Slots - EDITABLE */}
+                    <div className="bg-purple-50 rounded-lg p-4 md:p-6 border border-purple-200 shadow-sm">
+                      <div className="flex items-center justify-between mb-4">
+                        <h3 className="text-base md:text-lg font-semibold text-gray-800">Time Slots (9AM - 5PM)</h3>
+                      </div>
+
+                      {/* Add Time Slot Buttons */}
+                      <div className="mb-4 grid grid-cols-3 gap-2">
+                        {[9, 10, 11, 12, 13, 14, 15, 16, 17].map(hour => {
+                          const timeStr = `${String(hour).padStart(2, '0')}:00:00`
+                          const year = currentDate.getFullYear()
+                          const month = currentDate.getMonth()
+                          const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(selectedDate).padStart(2, '0')}`
+                          const exists = scheduleData.some(s => s.schedule_date === dateStr && s.schedule_time === timeStr)
+                          const displayHour = hour > 12 ? hour - 12 : hour
+                          const period = hour < 12 ? 'AM' : 'PM'
+
+                          return (
+                            <button
+                              key={hour}
+                              onClick={() => addTimeSlot(hour)}
+                              disabled={saving || exists}
+                              className={`py-1.5 px-2 rounded-lg text-xs font-medium transition-colors ${exists
+                                ? 'bg-gray-300 text-gray-600 cursor-not-allowed'
+                                : 'bg-amber-600 text-white hover:bg-amber-700'
+                                } disabled:opacity-50`}
+                            >
+                              {exists ? '✓' : '+'} {displayHour}{period}
+                            </button>
+                          )
+                        })}
+                      </div>
+
+                      {/* Existing Time Slots */}
+                      <div className="space-y-2 max-h-64 overflow-y-auto pr-2">
+                        {timeSlots.length > 0 ? (
+                          timeSlots.map((slot, index) => (
+                            <div key={index} className="flex items-center justify-between p-2 md:p-3 bg-white rounded-lg border border-gray-200 shadow-sm">
+                              <span className="text-xs md:text-sm font-medium text-gray-700">
+                                {slot.hour} {slot.period}
+                              </span>
+                              <div className="flex items-center gap-2">
+                                <button
+                                  onClick={() => slot.scheduleId && toggleTimeSlotAvailability(slot.scheduleId, slot.isAvailable)}
+                                  disabled={saving}
+                                  className={`px-2 md:px-3 py-1 rounded-full text-xs font-medium transition-colors ${slot.isAvailable
+                                    ? 'bg-green-100 text-green-700 hover:bg-green-200'
+                                    : 'bg-red-100 text-red-700 hover:bg-red-200'
+                                    } disabled:opacity-50`}
+                                >
+                                  {slot.isAvailable ? 'Available' : 'Unavailable'}
+                                </button>
+                                <button
+                                  onClick={() => slot.scheduleId && deleteTimeSlot(slot.scheduleId)}
+                                  disabled={saving}
+                                  className="p-1.5 text-red-600 hover:bg-red-100 rounded transition-colors disabled:opacity-50"
+                                  title="Delete time slot"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </button>
+                              </div>
+                            </div>
+                          ))
+                        ) : (
+                          <div className="text-sm text-gray-500 text-center py-4">
+                            No time slots available. Add time slots using the buttons above.
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -1002,6 +1006,6 @@ function RouteComponent() {
           </div>
         </div>
       </div>
-    </div>
+    </ProtectedRoute>
   )
 }

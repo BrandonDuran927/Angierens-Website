@@ -327,7 +327,7 @@ function RouteComponent() {
     );
 
     return (
-        <ProtectedRoute>
+        <ProtectedRoute allowedRoles={['owner']}>
             <div className="min-h-screen bg-gradient-to-br from-amber-50 to-orange-100 flex overflow-x-hidden">
                 {/* Sidebar - Mobile Overlay */}
                 {isSidebarOpen && (
