@@ -58,7 +58,6 @@ interface Order {
     products: Product[]
     totalAmount: number
     phoneNumber?: string
-    fulfillmentType?: string
     deliveryOption?: string
     paymentMethod?: string
     deliveryAddress?: string
@@ -154,7 +153,7 @@ function RouteComponent() {
                     // Add add-ons
                     item.order_item_add_on?.forEach((addOn: any) => {
                         product.items.push({
-                            name: addOn.add_on?.add_on_name || 'Unknown Add-on',
+                            name: addOn.add_on?.name || 'Unknown Add-on',
                             quantity: Number(addOn.quantity),
                             completed: addOn.is_completed || false,
                             order_item_add_on_id: addOn.order_item_add_on_id,
@@ -189,7 +188,6 @@ function RouteComponent() {
                     products: Array.from(productMap.values()),
                     totalAmount: Number(order.total_price),
                     phoneNumber: order.users?.phone_number,
-                    fulfillmentType: order.order_type,
                     deliveryOption: order.order_type,
                     paymentMethod: order.payment?.payment_method,
                     deliveryAddress: order.delivery?.delivery_address,
@@ -688,7 +686,6 @@ function RouteComponent() {
                                                             <p><span className="font-semibold">Current status:</span> {order.status}</p>
                                                             <p><span className="font-semibold">Order Placed:</span> {order.date} {order.time}</p>
                                                             {order.phoneNumber && <p><span className="font-semibold">Phone Number:</span> {order.phoneNumber}</p>}
-                                                            {order.fulfillmentType && <p><span className="font-semibold">Fulfillment Type:</span> {order.fulfillmentType}</p>}
                                                             {order.deliveryOption && <p><span className="font-semibold">Delivery Option:</span> {order.deliveryOption}</p>}
                                                             {order.paymentMethod && <p><span className="font-semibold">Payment Method:</span> {order.paymentMethod}</p>}
                                                             {order.deliveryAddress && <p><span className="font-semibold">Delivery Address:</span> {order.deliveryAddress}</p>}

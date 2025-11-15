@@ -56,29 +56,20 @@ export function UserProvider({ children }: { children: ReactNode }) {
         };
 
         fetchUserRole();
-    }, [user]); // Re-run whenever user changes
-
-    // Auth listener - just handles user state, NOT role fetching
+    }, [user]);
     useEffect(() => {
-        console.log("Setting up auth listener");
-
-        // Get initial session
         supabase.auth.getSession().then(({ data: { session } }) => {
-            console.log("Initial session:", session?.user);
             setUser(session?.user ?? null);
         });
 
         // Listen for auth changes
         const { data: { subscription } } = supabase.auth.onAuthStateChange(
             (event, session) => {
-                console.log("Auth event:", event);
-                console.log("New user:", session?.user);
                 setUser(session?.user ?? null);
             }
         );
 
         return () => {
-            console.log("Cleaning up auth listener");
             subscription.unsubscribe();
         };
     }, []);

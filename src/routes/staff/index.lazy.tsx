@@ -99,6 +99,8 @@ interface Filters {
     status: string
 }
 
+
+
 function RouteComponent() {
     const navigate = useNavigate();
     type TabType = 'New Orders' | 'In Process' | 'Completed'
@@ -126,8 +128,8 @@ function RouteComponent() {
 
     const statusGroups = {
         'New Orders': ['Pending'],
-        'In Process': ['Queueing', 'On Delivery', 'Claim Order'],
-        'Completed': ['Cancelled', 'Refunding', 'Refund', 'Completed'],
+        'In Process': ['Queueing', 'Preparing', 'Cooking', 'Ready', 'Refunding', 'On Delivery', 'Claim Order'],
+        'Completed': ['Completed', 'Cancelled', 'Refund']
     }
 
     const handleReturnPaymentProofUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -546,6 +548,30 @@ function RouteComponent() {
         return menuTotal + addOnsTotal
     }
 
+    const handleNotifyCustomer = async (orderId: string) => {
+        const order = orders.find(o => o.id === orderId)
+        if (!order?.orderData) return
+
+        try {
+            const { error } = await supabase
+                .from('order')
+                .update({
+                    order_status: 'Claim Order',
+                    status_updated_at: new Date().toISOString()
+                })
+                .eq('order_id', order.orderData.order_id)
+
+            if (error) throw error
+
+            await loadOrders()
+            closeOrderDetails()
+            alert('Customer has been notified! Order status updated to "Claim Order".')
+        } catch (error) {
+            console.error('Error updating order status:', error)
+            alert('Failed to notify customer')
+        }
+    }
+
     // Submit manual order
     const handleSubmitOrder = async () => {
         try {
@@ -653,21 +679,33 @@ function RouteComponent() {
                 if (itemError) throw itemError
             }
 
-            // Create add-on items if any
-            for (const [addOnId, quantity] of Object.entries(orderForm.addOns)) {
-                if (quantity > 0) {
-                    const addOn = addOns.find(a => a.add_on === addOnId)
-                    if (addOn) {
-                        const { error: addOnError } = await supabase
-                            .from('order_item')
-                            .insert({
-                                order_id: order.order_id,
-                                menu_id: addOnId,
-                                quantity: quantity,
-                                subtotal_price: Number(addOn.price) * quantity
-                            })
+            // Create add-on items if any - link them to the first order item (or modify logic as needed)
+            if (Object.values(orderForm.addOns).some(qty => qty > 0)) {
+                // Get the first order item to attach add-ons to
+                const { data: firstOrderItem } = await supabase
+                    .from('order_item')
+                    .select('order_item_id')
+                    .eq('order_id', order.order_id)
+                    .limit(1)
+                    .single()
 
-                        if (addOnError) throw addOnError
+                if (firstOrderItem) {
+                    for (const [addOnId, quantity] of Object.entries(orderForm.addOns)) {
+                        if (quantity > 0) {
+                            const addOn = addOns.find(a => a.add_on === addOnId)
+                            if (addOn) {
+                                const { error: addOnError } = await supabase
+                                    .from('order_item_add_on')
+                                    .insert({
+                                        order_item_id: firstOrderItem.order_item_id,
+                                        add_on_id: addOnId,
+                                        quantity: quantity,
+                                        subtotal_price: Number(addOn.price) * quantity
+                                    })
+
+                                if (addOnError) throw addOnError
+                            }
+                        }
                     }
                 }
             }
@@ -714,7 +752,16 @@ function RouteComponent() {
     }
 
     const orderPrice = selectedOrder?.orderData?.order_item.reduce((sum, item) => {
-        return sum + Number(item.subtotal_price);
+        let itemTotal = Number(item.subtotal_price);
+
+        if (item.order_item_add_on && item.order_item_add_on.length > 0) {
+            const addOnsTotal = item.order_item_add_on.reduce((addOnSum: number, addon: any) => {
+                return addOnSum + Number(addon.subtotal_price);
+            }, 0);
+            itemTotal += addOnsTotal;
+        }
+
+        return sum + itemTotal;
     }, 0) || 0;
 
     const handleOpenViewReceipt = (receiptUrl: string) => {
@@ -818,7 +865,7 @@ function RouteComponent() {
                                     <Menu className="h-6 w-6" />
                                 </button>
                                 <div className="flex items-center gap-2">
-                                    <h1 className="text-xl lg:text-3xl font-bold">DELIVERIES</h1>
+                                    <h1 className="text-xl lg:text-3xl font-bold">ORDERS</h1>
                                 </div>
                             </div>
                             <div className="flex items-center gap-2 lg:gap-6">
@@ -1437,18 +1484,38 @@ function RouteComponent() {
 
                                     <div className="space-y-3">
                                         {selectedOrder.orderData.order_item?.length ? (
-                                            selectedOrder.orderData.order_item.map((item: any) => (
-                                                <div key={item.order_item_id} className="grid grid-cols-3 gap-4 items-start">
-                                                    <div>
-                                                        <p className="font-medium text-gray-800">{item.menu.name} (₱ {item.menu.price})</p>
-                                                        {item.menu.inclusion && (
-                                                            <p className="text-sm text-gray-600 mb-1.5">inclusions: {item.menu.inclusion}</p>
+                                            <>
+                                                {selectedOrder.orderData.order_item.map((item: any) => (
+                                                    <div key={item.order_item_id}>
+                                                        {/* Main menu item */}
+                                                        <div className="grid grid-cols-3 gap-4 items-start">
+                                                            <div>
+                                                                <p className="font-medium text-gray-800">{item.menu.name}</p>
+                                                                {item.menu.inclusion && (
+                                                                    <p className="text-sm text-gray-600 mb-1.5">inclusions: {item.menu.inclusion}</p>
+                                                                )}
+                                                            </div>
+                                                            <div className="text-center font-medium">{item.quantity}</div>
+                                                            <div className="text-right font-bold">₱ {Number(item.subtotal_price).toLocaleString()}</div>
+                                                        </div>
+
+                                                        {/* Add-ons for this item */}
+                                                        {item.order_item_add_on && item.order_item_add_on.length > 0 && (
+                                                            <div className="ml-6 mt-2 space-y-2">
+                                                                {item.order_item_add_on.map((addon: any) => (
+                                                                    <div key={addon.order_item_add_on_id} className="grid grid-cols-3 gap-4 items-start">
+                                                                        <div>
+                                                                            <p className="text-sm text-gray-600">+ {addon.add_on.name} (x{addon.quantity})</p>
+                                                                        </div>
+                                                                        <div className="text-center text-sm text-gray-600"></div>
+                                                                        <div className="text-right text-sm font-semibold text-gray-600">₱ {Number(addon.subtotal_price).toLocaleString()}</div>
+                                                                    </div>
+                                                                ))}
+                                                            </div>
                                                         )}
                                                     </div>
-                                                    <div className="text-center font-medium">{item.quantity}</div>
-                                                    <div className="text-right font-bold">₱ {Number(item.subtotal_price).toLocaleString()}</div>
-                                                </div>
-                                            ))
+                                                ))}
+                                            </>
                                         ) : (
                                             <p className="text-gray-500 text-center italic">No items found.</p>
                                         )}
@@ -1544,6 +1611,15 @@ function RouteComponent() {
                                                 Accept Order
                                             </button>
                                         </div>
+                                    )}
+                                    {selectedOrder.order_status === 'Ready' && (
+                                        <button
+                                            onClick={() => handleNotifyCustomer(selectedOrder.id)}
+                                            className="px-6 py-2.5 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors font-medium flex items-center gap-2"
+                                        >
+                                            <Bell className="h-5 w-5" />
+                                            Notify Customer
+                                        </button>
                                     )}
                                 </div>
                             </div>

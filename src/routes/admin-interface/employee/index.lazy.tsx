@@ -15,7 +15,7 @@ import {
     Star,
     Search,
     Plus,
-    Eye,
+    X,
     UserPlus,
     MapPin,
     LucideCalendar,
@@ -930,94 +930,94 @@ function RouteComponent() {
 
                 {/* Employee View Modal */}
                 {isViewModalOpen && selectedEmployee && (
-                    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-                        <div className="bg-yellow-400 rounded-xl w-[600px] max-w-[90vw] max-h-[90vh] overflow-y-auto">
+                    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+                        <div className="bg-white rounded-xl w-[650px] max-w-[90vw] max-h-[90vh] overflow-hidden shadow-2xl">
+                            {/* Close Button */}
+                            <button
+                                onClick={() => setIsViewModalOpen(false)}
+                                className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition-colors z-10"
+                            >
+                                <X className="h-6 w-6" />
+                            </button>
+
                             {/* Employee Header */}
-                            <div className="bg-amber-800 text-white p-6 rounded-t-xl">
-                                <div className="flex items-center gap-4">
+                            <div className="bg-gradient-to-r from-amber-700 to-amber-900 text-white p-8">
+                                <div className="flex items-start gap-4">
                                     <div className="flex-1">
-                                        <h2 className="text-2xl font-bold">
+                                        <h2 className="text-3xl font-bold mb-1">
                                             {selectedEmployee.name
                                                 .toLowerCase()
                                                 .split(' ')
                                                 .map(word => word.charAt(0).toUpperCase() + word.slice(1))
                                                 .join(' ')}
                                         </h2>
-
-                                        <p className="text-amber-200 text-sm mt-1">
+                                        <div className="inline-block bg-yellow-400 text-amber-900 px-3 py-1 rounded-full text-sm font-semibold">
                                             {selectedEmployee.type.charAt(0).toUpperCase() + selectedEmployee.type.slice(1).toLowerCase()}
-                                        </p>
-
+                                        </div>
                                     </div>
-                                </div>
-                                <div className="mt-4 space-y-2">
-                                    <p className="text-amber-200">
-                                        {employeeDetails[selectedEmployee.id]?.phone || 'N/A'}
-                                    </p>
-                                    <p className="text-amber-200">
-                                        {employeeDetails[selectedEmployee.id]?.email || 'N/A'}
-                                    </p>
                                 </div>
                             </div>
 
                             {/* Employee Details */}
-                            <div className="p-6 space-y-4">
-
-                                {/* Recent Deliveries */}
-                                <div className="bg-white bg-opacity-80 rounded-lg p-4">
-                                    <h3 className="text-lg font-bold text-gray-800 mb-4 text-center">RECENT DELIVERIES TODAY</h3>
-
-                                    {employeeDetails[selectedEmployee.id]?.recentDeliveries.length > 0 ? (
-                                        <div className="overflow-x-auto">
-                                            <div className="max-h-80 overflow-y-auto border rounded-lg">
-                                                <table className="w-full text-sm">
-                                                    <thead>
-                                                        <tr className="border-b-2 border-gray-400">
-                                                            <th className="text-left py-2 px-2 font-bold text-gray-700">ORDER</th>
-                                                            <th className="text-left py-2 px-2 font-bold text-gray-700">DATE</th>
-                                                            <th className="text-left py-2 px-2 font-bold text-gray-700">TIME</th>
-                                                            <th className="text-left py-2 px-2 font-bold text-gray-700">CUSTOMER NAME</th>
-                                                            <th className="text-left py-2 px-2 font-bold text-gray-700">STATUS</th>
-                                                            <th className="text-left py-2 px-2 font-bold text-gray-700">DELIVERY ADDRESS</th>
-                                                        </tr>
-                                                    </thead>
-                                                    <tbody>
-                                                        {employeeDetails[selectedEmployee.id]?.recentDeliveries.map((delivery, index) => (
-                                                            <tr key={index} className="border-b border-gray-300">
-                                                                <td className="py-2 px-2 text-gray-700">{delivery.order}</td>
-                                                                <td className="py-2 px-2 text-gray-700">{delivery.date}</td>
-                                                                <td className="py-2 px-2 text-gray-700">{delivery.time}</td>
-                                                                <td className="py-2 px-2 text-gray-700">{delivery.customerName}</td>
-                                                                <td className="py-2 px-2 text-gray-700">{delivery.status}</td>
-                                                                <td className="py-2 px-2 text-gray-700">{delivery.address}</td>
-                                                            </tr>
-                                                        ))}
-                                                    </tbody>
-                                                </table>
+                            <div className="p-8 space-y-6 overflow-y-auto max-h-[calc(90vh-250px)]">
+                                {/* Contact Information Section */}
+                                <div>
+                                    <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
+                                        <div className="w-1 h-6 bg-amber-700 rounded"></div>
+                                        Contact Information
+                                    </h3>
+                                    <div className="space-y-3 bg-gray-50 p-4 rounded-lg">
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-10 h-10 bg-amber-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                                                <svg className="w-5 h-5 text-amber-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+                                                </svg>
+                                            </div>
+                                            <div>
+                                                <p className="text-xs text-gray-500 font-medium">Phone Number</p>
+                                                <p className="text-gray-800 font-medium">
+                                                    {employeeDetails[selectedEmployee.id]?.phone || 'Not provided'}
+                                                </p>
                                             </div>
                                         </div>
-                                    ) : (
-                                        <div className="text-center py-8">
-                                            <p className="text-gray-600">No deliveries today</p>
+
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-10 h-10 bg-amber-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                                                <svg className="w-5 h-5 text-amber-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                                                </svg>
+                                            </div>
+                                            <div>
+                                                <p className="text-xs text-gray-500 font-medium">Email Address</p>
+                                                <p className="text-gray-800 font-medium break-all">
+                                                    {employeeDetails[selectedEmployee.id]?.email || 'Not provided'}
+                                                </p>
+                                            </div>
                                         </div>
-                                    )}
+                                    </div>
                                 </div>
 
-                                {/* Action Buttons */}
-                                <div className="flex justify-between pt-4">
-                                    <button
-                                        onClick={() => setIsViewModalOpen(false)}
-                                        className="bg-gray-500 hover:bg-gray-600 text-white px-6 py-2 rounded-lg font-medium transition-colors"
-                                    >
-                                        Close
-                                    </button>
-                                    <button
-                                        onClick={() => handleDeleteEmployee(selectedEmployee.id)}
-                                        className="bg-red-500 hover:bg-red-600 text-white px-6 py-2 rounded-lg font-medium transition-colors"
-                                    >
-                                        Delete Employee
-                                    </button>
-                                </div>
+                                {/* Additional Information (if you want to add more later) */}
+                                {/* You can add more sections here like employment date, status, etc. */}
+                            </div>
+
+                            {/* Action Buttons */}
+                            <div className="p-6 bg-gray-50 border-t border-gray-200 flex justify-between gap-4">
+                                <button
+                                    onClick={() => setIsViewModalOpen(false)}
+                                    className="flex-1 bg-white border-2 border-gray-300 hover:border-gray-400 text-gray-700 px-6 py-3 rounded-lg font-semibold transition-all hover:shadow-md"
+                                >
+                                    Close
+                                </button>
+                                <button
+                                    onClick={() => handleDeleteEmployee(selectedEmployee.id)}
+                                    className="flex-1 bg-red-500 hover:bg-red-600 text-white px-6 py-3 rounded-lg font-semibold transition-all hover:shadow-md flex items-center justify-center gap-2"
+                                >
+                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                    </svg>
+                                    Delete Employee
+                                </button>
                             </div>
                         </div>
                     </div>

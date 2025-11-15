@@ -329,7 +329,7 @@ function SpecificOrder() {
         icon: ShoppingBag,
         completed: true
       })
-    } else if (orderData.status === 'Ready') {
+    } else if (orderData.status === 'Ready' || orderData.status === 'On Delivery' || orderData.status === 'Claim Order' || orderData.status === 'Completed') {
       steps.push({
         key: 'ready',
         label: 'Ready',
@@ -338,6 +338,7 @@ function SpecificOrder() {
         completed: true
       })
     }
+
 
     if (orderData.status === 'Refunding' || orderData.status === 'Refund') {
       steps.push({
@@ -859,10 +860,8 @@ function SpecificOrder() {
                   <div className="lg:col-span-2">
                     <div className="space-y-4 sm:space-y-6">
                       {orderData.items.map((item) => (
-                        <div
-                          key={item.id}
-                          className="flex flex-col sm:flex-row sm:items-start space-y-4 sm:space-y-0 sm:space-x-6"
-                        >
+                        <div key={item.id} className="flex flex-col sm:flex-row sm:items-start space-y-4 sm:space-y-0 sm:space-x-6">
+                          {/* Item image */}
                           <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full overflow-hidden flex-shrink-0 mx-auto sm:mx-0">
                             <img
                               src={getImageUrl(item.image)}
@@ -870,6 +869,7 @@ function SpecificOrder() {
                               className="w-full h-full object-cover"
                             />
                           </div>
+                          {/* Item details */}
                           <div className="flex-1">
                             <h4 className="font-bold text-black text-lg sm:text-xl mb-2 sm:mb-3 text-center sm:text-left">
                               {item.name} {item.quantity > 1 && `${item.quantity}x`}
@@ -893,28 +893,37 @@ function SpecificOrder() {
                               </div>
                             </div>
                           </div>
-                          <div className="text-center sm:text-right text-sm text-gray-600 flex-shrink-0 border-t sm:border-t-0 pt-4 sm:pt-0">
-                            <div className="space-y-1">
-                              <div>
-                                <span className="font-semibold text-black">Delivery Option:</span>{' '}
-                                {orderData.deliveryOption}
-                              </div>
-                              <div>
-                                <span className="font-semibold text-black">Payment Method:</span>{' '}
-                                {orderData.paymentMethod}
-                              </div>
-                              <div>
-                                <span className="font-semibold text-black">Schedule Date:</span>{' '}
-                                {orderData.pickDate}
-                              </div>
-                              <div>
-                                <span className="font-semibold text-black">Schedule Time:</span>{' '}
-                                {orderData.pickTime}
-                              </div>
+                          {/* Price */}
+                          <div className="text-right text-sm flex-shrink-0">
+                            <div className="font-bold text-black text-lg">
+                              {formatPrice(item.price * item.quantity)}
                             </div>
                           </div>
                         </div>
                       ))}
+
+                      {/* Move order details OUTSIDE the map, show once */}
+                      <div className="mt-6 pt-6 border-t border-gray-200">
+                        <h4 className="font-bold text-black text-lg mb-4">Order Details</h4>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
+                          <div>
+                            <span className="font-semibold text-black">Delivery Option:</span>{' '}
+                            <span className="text-gray-600">{orderData.deliveryOption}</span>
+                          </div>
+                          <div>
+                            <span className="font-semibold text-black">Payment Method:</span>{' '}
+                            <span className="text-gray-600">{orderData.paymentMethod}</span>
+                          </div>
+                          <div>
+                            <span className="font-semibold text-black">Schedule Date:</span>{' '}
+                            <span className="text-gray-600">{orderData.pickDate}</span>
+                          </div>
+                          <div>
+                            <span className="font-semibold text-black">Schedule Time:</span>{' '}
+                            <span className="text-gray-600">{orderData.pickTime}</span>
+                          </div>
+                        </div>
+                      </div>
 
                       {/* Special Instructions */}
                       <div className="mt-4 sm:mt-6">

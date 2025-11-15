@@ -364,7 +364,7 @@ function Signup() {
             email: form.email,
             phone_number: form.phone_number,
             is_active: true,
-            user_role: "Customer",
+            user_role: "customer",
             date_hired: null,
             birth_date: `${form.birthYear}-${form.birthMonth}-${form.birthDay}`,
             gender: form.gender,

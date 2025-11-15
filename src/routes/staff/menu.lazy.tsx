@@ -223,6 +223,7 @@ function RouteComponent() {
 
             if (error) throw error
 
+            console.log('Fetched menu items:', data)
             setMenuItems(data || [])
         } catch (err) {
             console.error('Error fetching menu items:', err)

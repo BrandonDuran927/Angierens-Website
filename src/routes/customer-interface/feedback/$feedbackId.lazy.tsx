@@ -17,6 +17,7 @@ export const Route = createLazyFileRoute(
 interface FeedbackData {
   orderId: string
   orderNumber: number | null
+  orderType: string | null
   deliveryRating: number
   deliveryFeedback: string
   deliveryReviewId: string | null
@@ -130,13 +131,14 @@ function RouteComponent() {
     { name: 'HOME', route: '/customer-interface/home', active: false },
     { name: 'MENU', route: '/customer-interface/', active: false },
     { name: 'ORDER', route: '/customer-interface/order', active: false },
-    { name: 'FEEDBACK', route: '/customer-interface/feedback', active: true },
+    { name: 'REVIEW', route: '/customer-interface/feedback', active: true },
     { name: 'MY INFO', route: '/customer-interface/my-info', active: false },
   ]
 
   const [feedbackData, setFeedbackData] = useState<FeedbackData>({
     orderId: feedbackId,
     orderNumber: null,
+    orderType: null,
     deliveryRating: 0,
     deliveryFeedback: '',
     deliveryReviewId: null,
@@ -150,7 +152,6 @@ function RouteComponent() {
     riderFeedback: '',
     riderReviewId: null
   })
-
   // Fetch order and reviews from Supabase
   useEffect(() => {
     const fetchOrderAndReviews = async () => {
@@ -165,7 +166,7 @@ function RouteComponent() {
         // Fetch order details
         const { data: orderData, error: orderError } = await supabase
           .from('order')
-          .select('order_number')
+          .select('order_number, order_type')  // CHANGE THIS LINE - add order_type
           .eq('order_id', feedbackId)
           .single()
 
@@ -189,6 +190,7 @@ function RouteComponent() {
         const newFeedbackData: FeedbackData = {
           orderId: feedbackId,
           orderNumber: orderData?.order_number || null,
+          orderType: orderData?.order_type || null,
           deliveryRating: 0,
           deliveryFeedback: '',
           deliveryReviewId: null,
@@ -239,14 +241,27 @@ function RouteComponent() {
     fetchOrderAndReviews()
   }, [feedbackId])
 
-  const tabs = [
+
+
+  const allTabs = [
     { id: 'delivery', label: 'Delivery Review', rating: feedbackData.deliveryRating, feedback: feedbackData.deliveryFeedback },
     { id: 'food', label: 'Food Review', rating: feedbackData.foodRating, feedback: feedbackData.foodFeedback },
     { id: 'staff', label: 'Staff Review', rating: feedbackData.staffRating, feedback: feedbackData.staffFeedback },
     { id: 'rider', label: 'Rider Review', rating: feedbackData.riderRating, feedback: feedbackData.riderFeedback }
   ]
 
+  const tabs = feedbackData.orderType === 'Pick-up'
+    ? allTabs.filter(tab => tab.id !== 'delivery' && tab.id !== 'rider')
+    : allTabs
+
   const currentTab = tabs.find(tab => tab.id === activeTab) || tabs[0]
+
+  // If current activeTab is filtered out, switch to first available tab
+  useEffect(() => {
+    if (!tabs.find(tab => tab.id === activeTab)) {
+      setActiveTab(tabs[0]?.id || 'food')
+    }
+  }, [feedbackData.orderType, activeTab, tabs])
 
   const handleStarClick = (rating: number) => {
     if (!isEditing) return

@@ -670,6 +670,21 @@ function RouteComponent() {
         }
     };
 
+    const getImageUrl = (imageUrl: string | null): string => {
+        if (!imageUrl) return '/api/placeholder/300/200'
+
+        // If it's already a full URL, return it
+        if (imageUrl.startsWith('http://') || imageUrl.startsWith('https://')) {
+            return imageUrl
+        }
+
+        // Construct the Supabase storage URL
+        // Encode the filename to handle spaces and special characters
+        const encodedFileName = encodeURIComponent(imageUrl)
+        return `https://tvuawpgcpmqhsmwbwypy.supabase.co/storage/v1/object/public/menu-images/${encodedFileName}`
+    }
+
+
     const logoStyle: React.CSSProperties = {
         width: '140px',
         height: '140px',
@@ -1134,44 +1149,87 @@ function RouteComponent() {
                                 <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
                                     <h2 className="text-xl font-semibold text-gray-800 mb-4">Your Order</h2>
 
-                                    {selectedCartItems.map((item) => (
-                                        <div key={item.cart_item_id} className="mb-4">
-                                            <div className="flex justify-between items-start mb-1">
-                                                <div className="flex-1">
-                                                    <p className="font-medium text-gray-800">{item.menu.name}</p>
-                                                    {item.cart_item_add_on && item.cart_item_add_on.length > 0 && (
-                                                        <p className="text-sm text-gray-600">
-                                                            add-ons: {item.cart_item_add_on.map(addOn =>
-                                                                `${addOn.quantity} ${addOn.add_on.name}`
-                                                            ).join(', ')}
-                                                        </p>
+                                    {/* Items List with max height and scroll */}
+                                    <div className="max-h-96 overflow-y-auto mb-4">
+                                        {selectedCartItems.map((item) => (
+                                            <div key={item.cart_item_id} className="mb-4 pb-4 border-b border-gray-200 last:border-b-0">
+                                                {/* Main Menu Item with Image */}
+                                                <div className="flex gap-3 mb-2">
+                                                    {/* Item Image */}
+                                                    {item.menu.image_url && (
+                                                        <div className="w-16 h-16 flex-shrink-0 rounded-lg overflow-hidden bg-gray-100">
+                                                            <img
+                                                                src={getImageUrl(item.menu.image_url)}
+                                                                alt={item.menu.name}
+                                                                className="w-full h-full object-cover"
+                                                            />
+                                                        </div>
                                                     )}
-                                                </div>
-                                                <div className="text-right">
-                                                    <p className="text-sm text-gray-600">x{item.quantity}</p>
-                                                    <p className="font-semibold">
-                                                        {formatPrice(
-                                                            (item.price * item.quantity) +
-                                                            (item.cart_item_add_on?.reduce((sum, addOn) => sum + (addOn.price * addOn.quantity), 0) || 0)
-                                                        )}
-                                                    </p>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    ))}
 
-                                    <div className="border-t pt-4 space-y-2">
+                                                    {/* Item Details */}
+                                                    <div className="flex-1 min-w-0">
+                                                        <div className="flex justify-between items-start gap-2">
+                                                            <div className="flex-1">
+                                                                <p className="font-medium text-gray-800 line-clamp-2">{item.menu.name}</p>
+                                                                <p className="text-xs text-gray-500 mt-0.5">
+                                                                    {formatPrice(item.menu.price)} each
+                                                                </p>
+                                                            </div>
+                                                            <div className="text-right flex-shrink-0">
+                                                                <p className="text-sm text-gray-600 mb-1">×{item.quantity}</p>
+                                                                <p className="font-semibold text-gray-800">
+                                                                    {formatPrice(item.menu.price * item.quantity)}
+                                                                </p>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                {/* Add-ons */}
+                                                {item.cart_item_add_on && item.cart_item_add_on.length > 0 && (
+                                                    <div className="ml-4 pl-4 border-l-2 border-gray-200 space-y-1.5 mt-2">
+                                                        {item.cart_item_add_on.map((addOn, index) => (
+                                                            <div key={index} className="flex justify-between items-center text-sm">
+                                                                <div className="flex-1">
+                                                                    <p className="text-gray-600">
+                                                                        <span className="text-amber-600">+</span> {addOn.add_on.name}
+                                                                    </p>
+                                                                    <p className="text-xs text-gray-400">
+                                                                        {formatPrice(addOn.price)} each
+                                                                    </p>
+                                                                </div>
+                                                                <div className="text-right flex-shrink-0">
+                                                                    <span className="text-gray-500 text-xs mr-2">×{addOn.quantity}</span>
+                                                                    <span className="text-gray-700 font-medium">
+                                                                        {formatPrice(addOn.price * addOn.quantity)}
+                                                                    </span>
+                                                                </div>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        ))}
+                                    </div>
+
+                                    {/* Summary Totals */}
+                                    <div className="border-t-2 border-gray-200 pt-4 space-y-3">
                                         <div className="flex justify-between text-gray-600">
                                             <span>Subtotal</span>
-                                            <span>{formatPrice(subtotal)}</span>
+                                            <span className="font-medium">{formatPrice(subtotal)}</span>
                                         </div>
                                         <div className="flex justify-between text-gray-600">
-                                            <span>Delivery fee</span>
-                                            <span>{formatPrice(deliveryFee)}</span>
+                                            <span className="flex items-center gap-1">
+                                                Delivery fee
+                                                {deliveryOption === 'Pick-up' && (
+                                                    <span className="text-xs text-green-600 font-medium">(Free)</span>
+                                                )}
+                                            </span>
+                                            <span className="font-medium">{formatPrice(deliveryFee)}</span>
                                         </div>
-                                        <div className="flex justify-between font-semibold text-lg">
-                                            <span>Total</span>
-                                            <span>{formatPrice(total)}</span>
+                                        <div className="flex justify-between items-center font-bold text-lg pt-2 border-t border-gray-300">
+                                            <span className="text-gray-800">Total</span>
+                                            <span className="text-amber-600">{formatPrice(total)}</span>
                                         </div>
                                     </div>
                                 </div>

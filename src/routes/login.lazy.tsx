@@ -21,7 +21,6 @@ export const Route = createLazyFileRoute('/login')({
 function RouteComponent() {
   const { setUser, user } = useUser();
 
-
   const navigate = useNavigate()
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -53,8 +52,26 @@ function RouteComponent() {
   const [isNotificationOpen, setIsNotificationOpen] = useState(false)
   const [notificationCount, setNotificationCount] = useState(3)
 
+  // Check if user is coming from password reset email
+  useEffect(() => {
+    // Check for the hash fragment that Supabase adds
+    const hashParams = new URLSearchParams(window.location.hash.substring(1));
+    const accessToken = hashParams.get('access_token');
+    const type = hashParams.get('type');
+
+    if (accessToken && type === 'recovery') {
+      setIsResettingPassword(true);
+      setShowResetPasswordModal(true);
+    }
+  }, []);
+
   useEffect(() => {
     async function checkUserAndRedirect() {
+      // Don't redirect if user is resetting password
+      if (isResettingPassword) {
+        return;
+      }
+
       if (user) {
         // Fetch the user's role from your "users" table
         const { data: userData, error: userError } = await supabase
@@ -67,6 +84,8 @@ function RouteComponent() {
           console.error("Error fetching user role:", userError);
           return;
         }
+
+        console.log("User role:", userData.user_role);
 
         // Redirect based on role
         switch (userData.user_role) {
@@ -88,20 +107,9 @@ function RouteComponent() {
     }
 
     checkUserAndRedirect();
-  }, [user, navigate]);
+  }, [user, navigate, isResettingPassword]);
 
-  // Check if user is coming from password reset email
-  useEffect(() => {
-    // Check for the hash fragment that Supabase adds
-    const hashParams = new URLSearchParams(window.location.hash.substring(1));
-    const accessToken = hashParams.get('access_token');
-    const type = hashParams.get('type');
 
-    if (accessToken && type === 'recovery') {
-      setIsResettingPassword(true);
-      setShowResetPasswordModal(true);
-    }
-  }, []);
 
 
   const logoStyle: React.CSSProperties = {
@@ -316,6 +324,11 @@ function RouteComponent() {
       console.error("Update password error:", error);
     } else {
       alert("Password updated successfully! You can now log in with your new password.");
+
+      // Sign out the user to force manual login
+      await supabase.auth.signOut();
+      setUser(null);
+
       handleCloseResetModal();
       setIsResettingPassword(false);
       window.history.replaceState(null, '', window.location.pathname);

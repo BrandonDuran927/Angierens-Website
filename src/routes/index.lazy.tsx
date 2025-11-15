@@ -4,7 +4,6 @@ import { useState, useEffect } from 'react'
 import { useUser } from '@/context/UserContext'
 import { useNavigate } from '@tanstack/react-router'
 import { ProtectedRoute } from '@/components/ProtectedRoute'
-import { SupabaseTest } from '@/components/SupabaseTest'
 
 export const Route = createLazyFileRoute('/')({
   component: App,
@@ -676,8 +675,6 @@ function App() {
           </div>
         </footer>
       </div>
-      <SupabaseTest />
-
     </div>
 
   );

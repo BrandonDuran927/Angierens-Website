@@ -9,7 +9,6 @@ type ProtectedRouteProps = {
 export function ProtectedRoute({ children, allowedRoles }: ProtectedRouteProps) {
     const { user, userRole, loading } = useUser();
 
-    // Show loading spinner while checking auth
     if (loading) {
         return (
             <div className="flex items-center justify-center h-screen">
@@ -18,21 +17,17 @@ export function ProtectedRoute({ children, allowedRoles }: ProtectedRouteProps) 
         );
     }
 
-    // Not logged in - redirect to login
     if (!user) {
         return <Navigate to="/login" />;
     }
 
-    // Check if role is required and user has permission
-    if (allowedRoles && allowedRoles.length > 0) {
-        console.log("User role:", userRole, "Allowed roles:", allowedRoles);
+    if (allowedRoles && allowedRoles.length > 0 && userRole) {
+        console.log("User role:", userRole, "Allowed roles:", allowedRoles);  // TODO: This is the culprit, it returns null on userRole
         if (!userRole || !allowedRoles.includes(userRole)) {
             console.log("User role not authorized, redirecting to /unauthorized");
-            // User doesn't have required role - redirect to unauthorized
             return <Navigate to="/unauthorized" />;
         }
     }
 
-    // User is authenticated and has correct role
     return <>{children}</>;
 }

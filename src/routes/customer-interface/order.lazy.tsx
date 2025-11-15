@@ -25,6 +25,14 @@ interface Order {
     deliveryStatus?: 'queueing' | 'on-delivery' | 'claim-order' | 'refunding'
     createdAt: string
     proofOfPaymentUrl?: string | null
+    order_items?: Array<{
+        id: string
+        name: string
+        quantity: number
+        subtotal: number
+        image: string
+        inclusions: string[]
+    }>
 }
 interface Notification {
     id: string
@@ -188,38 +196,65 @@ function RouteComponent() {
                     uiStatus = 'refunded'
                 }
 
-                // Get first menu item for display (or aggregate if needed)
+                // Build detailed order items array
+                const orderItems = order.order_item.map((item: any) => {
+                    const inclusions = item.menu?.inclusion
+                        ? item.menu.inclusion.split(',').map((i: string) => i.trim())
+                        : []
+
+                    return {
+                        id: item.order_item_id,
+                        name: item.menu?.name || 'Unknown Item',
+                        quantity: Number(item.quantity),
+                        subtotal: Number(item.subtotal_price),
+                        image: item.menu?.image_url || '/placeholder.png',
+                        inclusions: inclusions
+                    }
+                })
+
+                // Get first item for summary display
                 const firstItem = order.order_item[0]
-                const menuName = firstItem?.menu?.name || 'Unknown Item'
-                const menuImage = firstItem?.menu?.image_url || '/placeholder.png'
-                const inclusions = firstItem?.menu?.inclusion
-                    ? firstItem.menu.inclusion.split(',').map((i: string) => i.trim())
-                    : []
+                const displayImage = firstItem?.menu?.image_url || '/placeholder.png'
+
+                // Create summary name
+                const itemCount = order.order_item.length
+                let summaryName = ''
+                if (itemCount === 1) {
+                    summaryName = firstItem?.menu?.name || 'Unknown Item'
+                } else {
+                    summaryName = `${itemCount} items`
+                }
 
                 // Aggregate add-ons from all order items
                 const allAddOns: string[] = []
                 order.order_item.forEach((item: any) => {
                     item.order_item_add_on?.forEach((addOn: any) => {
                         if (addOn.add_on?.name) {
-                            allAddOns.push(`${addOn.add_on.name} ${addOn.quantity}x`)
+                            allAddOns.push(`${addOn.add_on.name} (${addOn.quantity}x)`)
                         }
                     })
                 })
 
+                // Get inclusions from first item only for summary
+                const summaryInclusions = firstItem?.menu?.inclusion
+                    ? firstItem.menu.inclusion.split(',').map((i: string) => i.trim())
+                    : []
+
                 return {
                     id: order.order_id,
                     orderNumber: `#${String(order.order_number).padStart(2, '0')}`,
-                    name: menuName,
-                    inclusions: inclusions,
+                    name: summaryName,
+                    inclusions: summaryInclusions,
                     addOns: allAddOns.length > 0 ? allAddOns.join(', ') : 'None',
                     price: Number(firstItem?.menu?.price || 0),
                     quantity: order.order_item.reduce((sum: number, item: any) => sum + Number(item.quantity), 0),
                     status: uiStatus,
                     deliveryStatus: deliveryStatus,
-                    image: menuImage,
+                    image: displayImage,
                     totalAmount: Number(order.total_price),
                     createdAt: order.created_at,
-                    proofOfPaymentUrl: order.payment?.proof_of_payment_url
+                    proofOfPaymentUrl: order.payment?.proof_of_payment_url,
+                    order_items: orderItems
                 }
             })
 
@@ -318,7 +353,7 @@ function RouteComponent() {
 
             if (paymentError) throw paymentError
 
-            alert('Proof of payment uploaded successfully! Waiting for admin verification.')
+            alert('Proof of payment uploaded successfully! Waiting for staff verification.')
             handleCloseUploadModal()
             await fetchOrders() // Refresh orders
         } catch (error) {
@@ -881,33 +916,82 @@ function RouteComponent() {
                                             >
                                                 <div className="flex flex-col sm:flex-row sm:justify-between gap-3 sm:gap-0">
                                                     <div className="flex-1">
-                                                        <h3 className="text-lg sm:text-xl font-semibold text-gray-800 mb-1">{order.name} {order.quantity > 1 && `${order.quantity}x`}</h3>
-                                                        {order.inclusions.length > 0 && (
-                                                            <div className="text-sm text-gray-600 mb-2">
-                                                                <div className="mb-1 font-medium">Inclusion:</div>
-                                                                <div className="grid grid-cols-2 gap-x-4 gap-y-1">
-                                                                    {order.inclusions.map((item, i) => (
-                                                                        <div key={i} className="text-xs">{item}</div>
+                                                        {/* Check if multiple items */}
+                                                        {order.order_items && order.order_items.length > 1 ? (
+                                                            <>
+                                                                <h3 className="text-lg sm:text-xl font-semibold text-gray-800 mb-3">
+                                                                    Order {order.orderNumber} ({order.order_items.length} items)
+                                                                </h3>
+                                                                <div className="space-y-2 mb-3">
+                                                                    {order.order_items.map((item, idx) => (
+                                                                        <div key={item.id} className="flex items-start gap-2 text-sm">
+                                                                            <span className="text-gray-400 mt-1">•</span>
+                                                                            <div className="flex-1">
+                                                                                <div className="flex justify-between items-start">
+                                                                                    <span className="font-medium text-gray-800">
+                                                                                        {item.name}
+                                                                                    </span>
+                                                                                    <span className="text-gray-600 ml-2 whitespace-nowrap">
+                                                                                        {item.quantity}x - {formatPrice(item.subtotal)}
+                                                                                    </span>
+                                                                                </div>
+                                                                                {item.inclusions.length > 0 && (
+                                                                                    <div className="text-xs text-gray-500 mt-1">
+                                                                                        Inclusions: {item.inclusions.join(', ')}
+                                                                                    </div>
+                                                                                )}
+                                                                            </div>
+                                                                        </div>
                                                                     ))}
                                                                 </div>
-                                                            </div>
+                                                                {order.addOns !== 'None' && (
+                                                                    <div className="text-sm text-gray-600 mt-2">
+                                                                        <span className="font-medium">Add-ons:</span> {order.addOns}
+                                                                    </div>
+                                                                )}
+                                                            </>
+                                                        ) : (
+                                                            <>
+                                                                <h3 className="text-lg sm:text-xl font-semibold text-gray-800 mb-1">
+                                                                    {order.order_items?.[0]?.name || order.name} {order.quantity > 1 && `(${order.quantity}x)`}
+                                                                </h3>
+                                                                {order.inclusions.length > 0 && (
+                                                                    <div className="text-sm text-gray-600 mb-2">
+                                                                        <div className="mb-1 font-medium">Inclusions:</div>
+                                                                        <div className="grid grid-cols-2 gap-x-4 gap-y-1">
+                                                                            {order.inclusions.map((item, i) => (
+                                                                                <div key={i} className="text-xs">{item}</div>
+                                                                            ))}
+                                                                        </div>
+                                                                    </div>
+                                                                )}
+                                                                <div className="text-sm text-gray-600">
+                                                                    <span className="font-medium">Add-ons:</span> {order.addOns}
+                                                                </div>
+                                                            </>
                                                         )}
-                                                        <div className="text-sm text-gray-600">
-                                                            <span className="font-medium">Add-ons:</span> {order.addOns}
-                                                        </div>
                                                     </div>
 
-                                                    <div className="text-left sm:text-right">
-                                                        <div className={`font-bold text-base sm:text-lg mb-2 ${getStatusColor(order.status)}`}>
-                                                            {order.status.toUpperCase().replace('-', ' ')}
-                                                        </div>
-                                                        {order.status === 'in-process' && order.deliveryStatus && (
-                                                            <div className={`inline-block px-3 py-1 rounded-full text-sm font-semibold mb-2 border ${getDeliveryStatusInfo(order.deliveryStatus).color}`}>
-                                                                {getDeliveryStatusInfo(order.deliveryStatus).text}
+                                                    <div className="text-left sm:text-right sm:min-w-[200px] flex flex-col justify-between">
+                                                        {/* Top section - Status and Delivery Status */}
+                                                        <div className="space-y-2 mb-3">
+                                                            <div className={`font-bold text-base sm:text-lg ${getStatusColor(order.status)}`}>
+                                                                {order.status.toUpperCase().replace('-', ' ')}
                                                             </div>
-                                                        )}
-                                                        <div className="text-sm text-gray-600 mb-2">Order ID: {order.orderNumber}</div>
-                                                        <div className="text-lg sm:text-xl font-bold text-gray-800 mb-2 sm:mb-4">Total: {formatPrice(order.totalAmount)}</div>
+                                                            {order.status === 'in-process' && order.deliveryStatus && (
+                                                                <div className={`inline-block px-3 py-1 rounded-full text-sm font-semibold border ${getDeliveryStatusInfo(order.deliveryStatus).color}`}>
+                                                                    {getDeliveryStatusInfo(order.deliveryStatus).text}
+                                                                </div>
+                                                            )}
+                                                        </div>
+
+                                                        {/* Bottom section - Order ID and Total */}
+                                                        <div className="space-y-2">
+
+                                                            <div className="text-xl sm:text-2xl font-bold text-gray-900">
+                                                                {formatPrice(order.totalAmount)}
+                                                            </div>
+                                                        </div>
                                                     </div>
                                                 </div>
                                             </Link>

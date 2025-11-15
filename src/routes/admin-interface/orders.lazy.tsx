@@ -57,16 +57,27 @@ function AdminOrdersInterface() {
     const [isSidebarOpen, setIsSidebarOpen] = useState(false)
     const [isNotificationOpen, setIsNotificationOpen] = useState(false)
     const orderPrice = selectedOrder?.order_item.reduce((sum, item) => {
-        return sum + Number(item.subtotal_price);
-    }, 0);
+        let itemTotal = Number(item.subtotal_price);
+
+        if (item.order_item_add_on && item.order_item_add_on.length > 0) {
+            const addOnsTotal = item.order_item_add_on.reduce((addOnSum: number, addon: any) => {
+                return addOnSum + Number(addon.subtotal_price);
+            }, 0);
+            itemTotal += addOnsTotal;
+        }
+
+        return sum + itemTotal;
+    }, 0) || 0;
 
 
     const location = useLocation()
     const statusGroups = {
         'New Orders': ['Pending'],
-        'In Process': ['Queueing', 'Cancelled', 'Refunding', 'Refund', 'On Delivery', 'Claim Order'],
-        'Completed': ['Completed'],
+        'In Process': ['Queueing', 'Preparing', 'Cooking', 'Ready', 'Refunding', 'On Delivery', 'Claim Order'],
+        'Completed': ['Completed', 'Cancelled', 'Refund']
     };
+
+
 
     const { data: orders = [], isLoading, error, refetch } = useQuery({
         queryKey: ['orders'],
@@ -749,54 +760,75 @@ function AdminOrdersInterface() {
 
                                     <div className="space-y-3">
                                         {selectedOrder?.order_item?.length ? (
-                                            selectedOrder.order_item.map((item) => (
-                                                <div key={item.order_item_id} className="grid grid-cols-3 gap-4 items-start">
-                                                    <div>
-                                                        <p className="font-medium text-gray-800">{item.menu.name} (₱ {item.menu.price})</p>
-                                                        {item.menu.inclusion && (
-                                                            <p className="text-sm text-gray-600 mb-1.5">inclusions: {item.menu.inclusion}</p>
-                                                        )}
-                                                        {/* 
-                                                    // TODO: Implement add-ons
-                                                    {item.menu.add_ons && (
-                                                        <p className="text-sm text-gray-600">add-ons: {item.menu.add_ons}</p>
-                                                    )} */}
-                                                    </div>
-                                                    <div className="text-center font-medium">{item.quantity}</div>
-                                                    <div className="text-right font-bold">₱ {(item.subtotal_price * item.quantity).toLocaleString()}</div>
+                                            <>
+                                                {selectedOrder.order_item.map((item) => (
+                                                    <div key={item.order_item_id}>
+                                                        {/* Main menu item */}
+                                                        <div className="grid grid-cols-3 gap-4 items-start">
+                                                            <div>
+                                                                <p className="font-medium text-gray-800">{item.menu.name} (₱ {item.menu.price})</p>
+                                                                {item.menu.inclusion && (
+                                                                    <p className="text-sm text-gray-600 mb-1.5">inclusions: {item.menu.inclusion}</p>
+                                                                )}
+                                                            </div>
+                                                            <div className="text-center font-medium">{item.quantity}</div>
+                                                            <div className="text-right font-bold">₱ {Number(item.subtotal_price).toLocaleString()}</div>
+                                                        </div>
 
-                                                </div>
-                                            ))
+                                                        {/* Add-ons for this item */}
+                                                        {item.order_item_add_on && item.order_item_add_on.length > 0 && (
+                                                            <div className="ml-6 mt-2 space-y-2">
+                                                                {item.order_item_add_on.map((addon: any) => (
+                                                                    <div key={addon.order_item_add_on_id} className="grid grid-cols-3 gap-4 items-start">
+                                                                        <div>
+                                                                            <p className="text-sm text-gray-600">+ {addon.add_on.name} (₱ {addon.add_on.price})</p>
+                                                                        </div>
+                                                                        <div className="text-center text-sm text-gray-600">{addon.quantity}</div>
+                                                                        <div className="text-right text-sm font-semibold text-gray-600">₱ {Number(addon.subtotal_price).toLocaleString()}</div>
+                                                                    </div>
+                                                                ))}
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                ))}
+                                            </>
                                         ) : (
                                             <p className="text-gray-500 text-center italic">No items found.</p>
                                         )}
-                                        {/* <div className="grid grid-cols-3 gap-4 items-start">
-                                        <div>
-                                            <p className="font-medium text-gray-800">{selectedOrder.}</p>
-                                            <p className="text-sm text-gray-600">add-ons: 20 pcs. Puto</p>
-                                        </div>
-                                        <div className="text-center font-medium">2</div>
-                                        <div className="text-right font-bold">₱ 4,100</div>
-                                    </div> */}
                                     </div>
                                 </div>
 
                                 {/* Pricing Summary */}
                                 <div className="border-t border-gray-200 pt-4 space-y-3">
                                     <div className="flex justify-between items-center">
-                                        <span className="text-lg font-medium">Price</span>
-                                        <span className="text-lg font-bold">₱ {orderPrice}</span>
+                                        <span className="text-lg font-medium">Subtotal</span>
+                                        <span className="text-lg font-bold">₱ {orderPrice?.toLocaleString()}</span>
                                     </div>
                                     {selectedOrder.delivery && (
                                         <div className="flex justify-between items-center">
                                             <span className="text-lg font-medium">Delivery fee</span>
-                                            <span className="text-lg font-bold">₱ {selectedOrder.delivery.delivery_fee}</span>
+                                            <span className="text-lg font-bold">
+                                                ₱ {Number(selectedOrder.delivery.delivery_fee || 0).toLocaleString()}
+                                            </span>
                                         </div>
                                     )}
-                                    <div className="flex justify-between items-center text-xl font-bold border-t border-gray-200 pt-3">
-                                        <span>Total</span>
-                                        <span>₱ {orderPrice + selectedOrder.delivery.delivery_fee}</span>
+                                    <div className="flex justify-between items-center border-t-2 border-gray-300 pt-3">
+                                        <span className="text-xl font-bold">Total</span>
+                                        <span className="text-2xl font-bold text-amber-600">
+                                            ₱ {(orderPrice + (selectedOrder.delivery ? Number(selectedOrder.delivery.delivery_fee || 0) : 0)).toLocaleString()}
+                                        </span>
                                     </div>
+                                </div>
+
+                                {/* Payment Method */}
+                                <div className="bg-gray-50 p-4 rounded-lg">
+                                    <div className="flex items-center gap-2 mb-2">
+                                        <CreditCard className="h-5 w-5 text-gray-600" />
+                                        <span className="font-medium text-gray-700">Payment Method</span>
+                                    </div>
+                                    <p className="text-lg font-semibold text-gray-800">
+                                        {selectedOrder.payment.paymentMethod || 'On-Site Payment'}
+                                    </p>
                                 </div>
                             </div>
 

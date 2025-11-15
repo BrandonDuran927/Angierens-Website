@@ -50,6 +50,7 @@ interface MenuItem {
     name: string
     orders: number
     menu_id: string
+    image_url: string
 }
 
 interface FulfillmentData {
@@ -254,8 +255,8 @@ function RouteComponent() {
 
             if (error) throw error
 
-            const pickupCount = orders?.filter(o => o.order_type === 'pickup').length || 0
-            const deliveryCount = orders?.filter(o => o.order_type === 'delivery').length || 0
+            const pickupCount = orders?.filter(o => o.order_type === 'Pick-up').length || 0
+            const deliveryCount = orders?.filter(o => o.order_type === 'Delivery').length || 0
             const total = pickupCount + deliveryCount
 
             setFulfillmentData([
@@ -283,7 +284,8 @@ function RouteComponent() {
                     quantity,
                     menu_id,
                     menu (
-                        name
+                        name,
+                        image_url
                     ),
                     order!inner (
                         order_status
@@ -294,7 +296,7 @@ function RouteComponent() {
             if (error) throw error
 
             // Group by menu item
-            const itemCounts: { [key: string]: { name: string; count: number; menu_id: string } } = {}
+            const itemCounts: { [key: string]: { name: string; count: number; menu_id: string; image_url: string } } = {}
 
             orderItems?.forEach(item => {
                 const menuId = item.menu_id
@@ -304,7 +306,8 @@ function RouteComponent() {
                     itemCounts[menuId] = {
                         name: menuData?.name || 'Unknown',
                         count: 0,
-                        menu_id: menuId
+                        menu_id: menuId,
+                        image_url: menuData?.image_url || ''
                     }
                 }
                 itemCounts[menuId].count += item.quantity
@@ -317,14 +320,16 @@ function RouteComponent() {
                 rank: index + 1,
                 name: item.name,
                 orders: item.count,
-                menu_id: item.menu_id
+                menu_id: item.menu_id,
+                image_url: item.image_url
             }))
 
             const least = sortedItems.slice(-10).reverse().map((item, index) => ({
                 rank: index + 1,
                 name: item.name,
                 orders: item.count,
-                menu_id: item.menu_id
+                menu_id: item.menu_id,
+                image_url: item.image_url
             }))
 
             setBestSalesItems(best)
@@ -894,12 +899,8 @@ function RouteComponent() {
                                         <div key={item.rank} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                                             <div className="flex items-center gap-3">
                                                 <span className="text-sm font-bold text-gray-500 w-6">#{item.rank}</span>
-                                                <div className="w-10 h-10 bg-amber-100 rounded-lg flex items-center justify-center text-xl overflow-hidden">
-                                                    {/* {item.image.startsWith('http') ? (
-                                                            <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
-                                                        ) : (
-                                                            <span>{item.image}</span>
-                                                        )} */}
+                                                <div className="w-10 h-10 bg-amber-300 rounded-lg flex items-center justify-center text-xl overflow-hidden">
+                                                    // TODO: Add image rendering logic here
                                                 </div>
                                                 <div>
                                                     <p className="font-medium text-gray-800">{item.name}</p>

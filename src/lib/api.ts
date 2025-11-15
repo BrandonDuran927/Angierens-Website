@@ -59,6 +59,18 @@ export interface OrderItem {
   subtotal_price: number
   order_id: string
   menu: Menu
+  order_item_add_on?: OrderItemAddOn[]
+}
+
+export interface OrderItemAddOn {
+  order_item_add_on_id: string
+  quantity: number
+  subtotal_price: number
+  add_on: {
+    add_on: string
+    name: string
+    price: number
+  }
 }
 
 export interface Menu {
@@ -151,12 +163,22 @@ export async function fetchOrders(): Promise<Order[]> {
       subtotal_price,
       order_id,
       menu:menu_id (
-         menu_id,
-         name,
-         price,
-         inclusion
-      )
-    )
+        menu_id,
+        name,
+        price,
+        inclusion
+      ),
+      order_item_add_on (
+        order_item_add_on_id,
+        quantity,
+        subtotal_price,
+        add_on:add_on_id (
+          add_on,
+          name,
+          price
+        )
+  )
+)
   `,
     )
     .order('created_at', { ascending: false })
@@ -237,6 +259,16 @@ export async function fetchOrders(): Promise<Order[]> {
           price: item.menu?.price ?? 0,
           inclusion: item.menu?.inclusion ?? '',
         },
+        order_item_add_on: (item.order_item_add_on || []).map((addon: any) => ({
+          order_item_add_on_id: addon.order_item_add_on_id,
+          quantity: addon.quantity,
+          subtotal_price: addon.subtotal_price,
+          add_on: {
+            add_on: addon.add_on?.add_on ?? '',
+            name: addon.add_on?.name ?? '',
+            price: addon.add_on?.price ?? 0,
+          },
+        })),
       })),
     }
   })
