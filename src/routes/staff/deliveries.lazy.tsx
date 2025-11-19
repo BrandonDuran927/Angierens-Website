@@ -306,7 +306,7 @@ function RouteComponent() {
             const { data: riderData, error: riderError } = await supabase
                 .from('users')
                 .select('user_uid')
-                .eq('user_role', 'Rider')
+                .eq('user_role', 'rider')
                 .ilike('first_name', riderName.split(' ')[0])
                 .ilike('last_name', riderName.split(' ')[1])
                 .single()
@@ -339,7 +339,10 @@ function RouteComponent() {
                 // Update order with new delivery_id
                 const { error: orderUpdateError } = await supabase
                     .from('order')
-                    .update({ delivery_id: newDelivery.delivery_id })
+                    .update({
+                        delivery_id: newDelivery.delivery_id,
+                        order_status: 'On Delivery',
+                    })
                     .eq('order_id', order.orderId)
 
                 if (orderUpdateError) throw orderUpdateError

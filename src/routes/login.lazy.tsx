@@ -240,7 +240,7 @@ function RouteComponent() {
 
     if (userError || !userData) {
       console.error("Error fetching user role:", userError);
-      alert("Unable to identify your role. Please contact support.");
+      alert("Error fetching user. Please contact support.");
       return;
     }
 

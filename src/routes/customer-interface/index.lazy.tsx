@@ -72,10 +72,9 @@ function RouteComponent() {
   const [loading, setLoading] = useState(true)
   const [categories, setCategories] = useState<string[]>(['All Categories'])
 
-  // Fetch menu items from Supabase
   useEffect(() => {
     fetchMenuItems()
-    fetchAddOns()
+    // fetchAddOns()
     if (user) {
       fetchCartCount()
     }
@@ -107,22 +106,22 @@ function RouteComponent() {
     }
   }
 
-  const fetchAddOns = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('add_on')
-        .select('*')
-        .order('name', { ascending: true })
+  // const fetchAddOns = async () => {
+  //   try {
+  //     const { data, error } = await supabase
+  //       .from('add_on')
+  //       .select('*')
+  //       .order('name', { ascending: true })
 
-      if (error) throw error
+  //     if (error) throw error
 
-      if (data) {
-        setAddOnOptions(data)
-      }
-    } catch (error) {
-      console.error('Error fetching add-ons:', error)
-    }
-  }
+  //     if (data) {
+  //       setAddOnOptions(data)
+  //     }
+  //   } catch (error) {
+  //     console.error('Error fetching add-ons:', error)
+  //   }
+  // }
 
   const fetchCartCount = async () => {
     if (!user?.id) return
@@ -705,101 +704,77 @@ function RouteComponent() {
 
         {/* Order Modal */}
         {isModalOpen && selectedItem && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
-              <div className="flex flex-col lg:flex-row">
-                {/* Left side - Item details */}
-                <div className="flex-1 p-4 sm:p-6">
-                  <div className="flex justify-between items-start mb-4">
-                    <div className="flex-1 pr-4">
-                      <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-2">{selectedItem.name}</h2>
-                      <p className="text-gray-600 mb-4 text-sm sm:text-base">{selectedItem.description}</p>
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-in fade-in duration-200">
+            <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-hidden shadow-2xl animate-in zoom-in-95 duration-200">
+              {/* Header with close button */}
+              <div className="sticky top-0 bg-white border-b border-gray-100 px-6 py-4 flex justify-between items-center">
+                <h2 className="text-2xl font-bold text-gray-900">{selectedItem.name}</h2>
+                <button
+                  onClick={closeModal}
+                  className="text-gray-400 hover:text-gray-600 hover:bg-gray-100 p-2 rounded-full transition-all duration-200"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+
+              {/* Scrollable content */}
+              <div className="overflow-y-auto max-h-[calc(90vh-180px)] px-6 py-6">
+                {/* Description */}
+                <p className="text-gray-600 mb-6 leading-relaxed">{selectedItem.description}</p>
+
+                {/* Inclusions */}
+                {parseInclusions(selectedItem.inclusion).length > 0 && (
+                  <div className="mb-6 bg-gray-50 rounded-xl p-4">
+                    <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wide mb-3">What's Included</h3>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      {parseInclusions(selectedItem.inclusion).map((inclusion: string, index: number) => (
+                        <div key={index} className="flex items-start gap-2">
+                          <div className="w-1.5 h-1.5 rounded-full bg-yellow-400 mt-2 flex-shrink-0"></div>
+                          <p className="text-gray-700 text-sm">{inclusion}</p>
+                        </div>
+                      ))}
                     </div>
+                  </div>
+                )}
+
+                {/* Quantity selector */}
+                <div className="mb-6">
+                  <label className="block text-sm font-semibold text-gray-700 mb-3">Quantity</label>
+                  <div className="flex items-center gap-4">
                     <button
-                      onClick={closeModal}
-                      className="text-gray-400 hover:text-gray-600 p-2 flex-shrink-0"
+                      onClick={() => setOrderQuantity(Math.max(1, orderQuantity - 1))}
+                      className="w-11 h-11 rounded-full border-2 border-gray-300 flex items-center justify-center hover:bg-gray-100 hover:border-gray-400 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                      disabled={orderQuantity <= 1}
                     >
-                      <X className="h-6 w-6" />
+                      <Minus className="h-4 w-4 text-gray-700" />
                     </button>
-                  </div>
-
-                  {parseInclusions(selectedItem.inclusion).length > 0 && (
-                    <div className="mb-6">
-                      <h3 className="text-base sm:text-lg font-semibold text-gray-800 mb-3">Inclusion:</h3>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                        {parseInclusions(selectedItem.inclusion).map((inclusion: string, index: number) => (
-                          <p key={index} className="text-gray-600 text-sm">{inclusion}</p>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Quantity selector */}
-                  <div className="flex flex-col sm:flex-row sm:items-center gap-4 mb-6">
-                    <span className="text-gray-700 font-medium">Quantity:</span>
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => setOrderQuantity(Math.max(1, orderQuantity - 1))}
-                        className="w-10 h-10 rounded-full border-2 border-gray-300 flex items-center justify-center hover:bg-gray-100"
-                      >
-                        <Minus className="h-4 w-4" />
-                      </button>
-                      <span className="text-xl font-semibold w-12 text-center">{orderQuantity}</span>
-                      <button
-                        onClick={() => setOrderQuantity(orderQuantity + 1)}
-                        className="w-10 h-10 rounded-full border-2 border-gray-300 flex items-center justify-center hover:bg-gray-100"
-                      >
-                        <Plus className="h-4 w-4" />
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Total and Add to Cart */}
-                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between pt-4 border-t gap-4">
-                    <div className="text-xl sm:text-2xl font-bold text-gray-900 text-center sm:text-left">
-                      Total: ₱{calculateTotal().toLocaleString()}
-                    </div>
+                    <span className="text-2xl font-bold w-16 text-center text-gray-900">{orderQuantity}</span>
                     <button
-                      onClick={addToCart}
-                      className="w-full sm:w-auto bg-yellow-400 text-black px-6 sm:px-8 py-3 rounded-lg font-bold hover:bg-yellow-500 transition-colors duration-200 shadow-md"
+                      onClick={() => setOrderQuantity(orderQuantity + 1)}
+                      className="w-11 h-11 rounded-full border-2 border-gray-300 flex items-center justify-center hover:bg-gray-100 hover:border-gray-400 transition-all duration-200"
                     >
-                      Add To Cart
+                      <Plus className="h-4 w-4 text-gray-700" />
                     </button>
                   </div>
                 </div>
+              </div>
 
-                {/* Right side - Add-ons */}
-                <div className="w-full lg:w-80 bg-gray-50 p-4 sm:p-6 border-t lg:border-t-0 lg:border-l">
-                  <h3 className="text-base sm:text-lg font-semibold text-gray-800 mb-4">Add-ons:</h3>
-                  <div className="space-y-3">
-                    {addOnOptions.map((addOn) => (
-                      <div key={addOn.add_on} className="flex items-center justify-between">
-                        <div className="flex-1">
-                          <button className="bg-yellow-400 text-black px-3 py-1 rounded-full text-sm font-medium">
-                            {addOn.name}
-                          </button>
-                          <div className="text-xs text-gray-600 mt-1">
-                            ₱{Number(addOn.price).toLocaleString()}
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <button
-                            onClick={() => updateAddOnQuantity(addOn.add_on, (addOns[addOn.add_on] || 0) - 1)}
-                            className="w-8 h-8 rounded-full border-2 border-gray-300 flex items-center justify-center hover:bg-gray-100"
-                          >
-                            <Minus className="h-3 w-3" />
-                          </button>
-                          <span className="w-8 text-center text-sm">{addOns[addOn.add_on] || 0}</span>
-                          <button
-                            onClick={() => updateAddOnQuantity(addOn.add_on, (addOns[addOn.add_on] || 0) + 1)}
-                            className="w-8 h-8 rounded-full border-2 border-gray-300 flex items-center justify-center hover:bg-gray-100"
-                          >
-                            <Plus className="h-3 w-3" />
-                          </button>
-                        </div>
-                      </div>
-                    ))}
+              {/* Footer - sticky at bottom */}
+              <div className="sticky bottom-0 bg-white border-t border-gray-100 px-6 py-4 shadow-lg">
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+                  <div className="text-center sm:text-left">
+                    <p className="text-sm text-gray-500 mb-1">Total Price</p>
+                    <p className="text-3xl font-bold text-gray-900">
+                      ₱{calculateTotal().toLocaleString()}
+                    </p>
                   </div>
+                  <button
+                    onClick={addToCart}
+                    className="w-full sm:w-auto bg-yellow-400 text-black px-8 py-4 rounded-xl font-bold hover:bg-yellow-500 active:scale-95 transition-all duration-200 shadow-md hover:shadow-xl flex items-center justify-center gap-2"
+                  >
+                    <ShoppingCart className="h-5 w-5" />
+                    Add To Cart
+                  </button>
                 </div>
               </div>
             </div>

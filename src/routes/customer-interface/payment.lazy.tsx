@@ -1,11 +1,15 @@
 import { createLazyFileRoute, Link } from '@tanstack/react-router'
-import { ShoppingCart, Bell, ChevronDown, ArrowLeft, Edit2, X, Menu, Calendar, Heart, Star, MessageSquare } from 'lucide-react'
+import { ShoppingCart, Bell, ChevronDown, ArrowLeft, Edit2, X, Menu, Calendar, Heart, Star, MessageSquare, Upload, Check } from 'lucide-react'
 import { ProtectedRoute } from '@/components/ProtectedRoute'
 import { useState, useEffect } from 'react'
 import { useUser } from '@/context/UserContext'
 import { useNavigate } from '@tanstack/react-router'
 import { supabase } from '@/lib/supabaseClient'
 import { useSearch } from '@tanstack/react-router'
+import L from "leaflet";
+import { MapContainer, TileLayer, Marker, useMapEvents } from "react-leaflet";
+
+
 
 export const Route = createLazyFileRoute('/customer-interface/payment')({
     component: RouteComponent
@@ -97,6 +101,56 @@ function RouteComponent() {
     const [availableSchedules, setAvailableSchedules] = useState<any[]>([]);
     const [availableDates, setAvailableDates] = useState<Date[]>([]);
     const [availableTimes, setAvailableTimes] = useState<string[]>([]);
+    const [isUploadReceiptModalOpen, setIsUploadReceiptModalOpen] = useState(false);
+    const [receiptFile, setReceiptFile] = useState<File | null>(null);
+    const [receiptPreview, setReceiptPreview] = useState<string | null>(null);
+    const [proofOfPaymentFile, setProofOfPaymentFile] = useState<File | null>(null);
+    const [proofOfPaymentPreview, setProofOfPaymentPreview] = useState<string | null>(null);
+    const [selectedLocation, setSelectedLocation] = useState({
+        lat: 14.706297,
+        lng: 121.045708,
+    });
+
+    function LocationPicker() {
+        useMapEvents({
+            click(e) {
+                setSelectedLocation({
+                    lat: e.latlng.lat,
+                    lng: e.latlng.lng,
+                });
+                fetchAddressFromCoordinates(e.latlng.lat, e.latlng.lng);
+            },
+        });
+
+        return null;
+    }
+
+    const fetchAddressFromCoordinates = async (lat: number, lng: number) => {
+        try {
+            const response = await fetch(
+                `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&addressdetails=1`
+            );
+            const data = await response.json();
+
+            if (data && data.address) {
+                const addr = data.address;
+
+                // Map OSM address components to your form
+                setNewAddressForm({
+                    ...newAddressForm,
+                    address_line: `${addr.house_number || ''} ${addr.road || addr.street || ''}`.trim() ||
+                        addr.neighbourhood || addr.suburb || '',
+                    region: addr.region || addr.state || 'Metro Manila',
+                    city: addr.city || addr.town || addr.municipality || addr.county || '',
+                    barangay: addr.suburb || addr.village || addr.neighbourhood || '',
+                    postal_code: addr.postcode || '0000'
+                });
+            }
+        } catch (error) {
+            console.error('Error fetching address:', error);
+        }
+    };
+
 
     // Navigation items with their corresponding routes
     const navigationItems = [
@@ -106,6 +160,14 @@ function RouteComponent() {
         { name: 'FEEDBACK', route: '/customer-interface/feedback', active: false },
         { name: 'MY INFO', route: '/customer-interface/my-info', active: false },
     ];
+
+    const markerIcon = L.icon({
+        iconUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png",
+        shadowUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png",
+        iconSize: [25, 41],
+        iconAnchor: [12, 41],
+    });
+
 
     const [notifications, setNotifications] = useState<Notification[]>([
         {
@@ -455,7 +517,104 @@ function RouteComponent() {
         setSelectedDate(newDate);
     };
 
-    const handlePlaceOrder = async () => {
+    const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>, isReceipt: boolean = true) => {
+        const file = event.target.files?.[0];
+        if (file) {
+            if (!file.type.startsWith('image/')) {
+                alert('Please select an image file');
+                return;
+            }
+
+            if (file.size > 5 * 1024 * 1024) {
+                alert('File size must be less than 5MB');
+                return;
+            }
+
+            if (isReceipt) {
+                setReceiptFile(file);
+
+                const reader = new FileReader();
+                reader.onloadend = () => {
+                    setReceiptPreview(reader.result as string);
+                };
+                reader.readAsDataURL(file);
+            } else {
+                setProofOfPaymentFile(file);
+
+                const reader = new FileReader();
+                reader.onloadend = () => {
+                    setProofOfPaymentPreview(reader.result as string);
+                };
+                reader.readAsDataURL(file);
+            }
+        }
+    };
+
+    const handleUploadReceipt = async () => {
+        if (!receiptFile) {
+            alert('Please select a receipt image');
+            return;
+        }
+
+        try {
+            // Upload to Supabase storage
+            const fileExt = receiptFile.name.split('.').pop();
+            const fileName = `${user?.id}-${Date.now()}.${fileExt}`;
+            const filePath = `receipts/${fileName}`;
+
+            const { error: uploadError } = await supabase.storage
+                .from('payment-receipts')
+                .upload(filePath, receiptFile);
+
+            if (uploadError) throw uploadError;
+
+            // Get public URL
+            const { data: { publicUrl } } = supabase.storage
+                .from('payment-receipts')
+                .getPublicUrl(filePath);
+
+            // Close modal and proceed with order
+            setIsUploadReceiptModalOpen(false);
+            handlePlaceOrder(publicUrl);
+        } catch (error) {
+            console.error('Error uploading receipt:', error);
+            alert('Failed to upload receipt. Please try again.');
+        }
+    };
+
+    const handleUploadProofOfPayment = async () => {
+        if (!proofOfPaymentFile) {
+            alert('Please take a photo of your payment');
+            return;
+        }
+
+        try {
+            // Upload to Supabase storage
+            const fileExt = proofOfPaymentFile.name.split('.').pop();
+            const fileName = `${user?.id}-${Date.now()}.${fileExt}`;
+            const filePath = `proof-of-payment/${fileName}`;
+
+            const { error: uploadError } = await supabase.storage
+                .from('payment-receipts')
+                .upload(filePath, proofOfPaymentFile);
+
+            if (uploadError) throw uploadError;
+
+            // Get public URL
+            const { data: { publicUrl } } = supabase.storage
+                .from('payment-receipts')
+                .getPublicUrl(filePath);
+
+            // Close modal and proceed with order
+            setIsUploadReceiptModalOpen(false);
+            handlePlaceOrder(publicUrl);
+        } catch (error) {
+            console.error('Error uploading proof of payment:', error);
+            alert('Failed to upload photo. Please try again.');
+        }
+    };
+
+    const handlePlaceOrder = async (receiptUrl?: string) => {
         if (!user) {
             alert('Please log in to place an order');
             return;
@@ -463,6 +622,12 @@ function RouteComponent() {
 
         if (selectedCartItems.length === 0) {
             alert('No items in order');
+            return;
+        }
+
+        // Check if delivery address is required
+        if (deliveryOption === 'Delivery' && !selectedAddressId) {
+            alert('Please select a delivery address');
             return;
         }
 
@@ -500,7 +665,8 @@ function RouteComponent() {
                     payment_method: paymentMethod,
                     amount_paid: total,
                     payment_date: new Date().toISOString(),
-                    is_paid: false
+                    is_paid: false,
+                    proof_of_payment_url: receiptUrl || null
                 })
                 .select()
                 .single();
@@ -509,15 +675,7 @@ function RouteComponent() {
 
             // 3. Create delivery entry if delivery option is selected
             let deliveryId = null;
-            if (deliveryOption === 'delivery') {
-                if (!selectedAddressId) {
-                    alert('Please select a delivery address');
-                    return;
-                }
-
-                // Note: rider_id should be assigned by admin/system later
-                // For now, we'll need to handle this - you may want to make rider_id nullable
-                // or assign a default/placeholder rider
+            if (deliveryOption === 'Delivery') {
                 const { data: deliveryData, error: deliveryError } = await supabase
                     .from('delivery')
                     .insert({
@@ -639,7 +797,9 @@ function RouteComponent() {
                     region: newAddressForm.region || 'Metro Manila',
                     city: newAddressForm.city,
                     barangay: newAddressForm.barangay,
-                    postal_code: newAddressForm.postal_code || '0000'
+                    postal_code: newAddressForm.postal_code || '0000',
+                    latitude: selectedLocation.lat,
+                    longitude: selectedLocation.lng
                 })
                 .select()
                 .single();
@@ -653,7 +813,7 @@ function RouteComponent() {
 
             // Reset form and close modal
             setNewAddressForm({
-                address_type: 'Home',
+                address_type: 'Primary',
                 address_line: '',
                 region: '',
                 city: '',
@@ -668,6 +828,15 @@ function RouteComponent() {
             console.error('Error saving address:', error);
             alert('Failed to save address. Please try again.');
         }
+
+        const newAddress = {
+            lat: selectedLocation.lat,
+            lng: selectedLocation.lng,
+        };
+
+        setAutocompleteInput('');
+        setIsAddAddressModalOpen(false);
+
     };
 
     const getImageUrl = (imageUrl: string | null): string => {
@@ -928,9 +1097,9 @@ function RouteComponent() {
                                 {/* Address Section */}
                                 <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
                                     <h2 className="text-xl font-semibold text-gray-800 mb-4">
-                                        {deliveryOption === 'pickup' ? 'Pick-up Address' : 'Delivery Address'}
+                                        {deliveryOption === 'Pick-up' ? 'Pick-up Address' : 'Delivery Address'}
                                     </h2>
-                                    {deliveryOption === 'pickup' ? (
+                                    {deliveryOption === 'Pick-up' ? (
                                         <div className="text-gray-600">
                                             <p className="font-medium">Angieren's Lutong Bahay</p>
                                             <p>R395+F22, Kaypian Rd</p>
@@ -947,7 +1116,6 @@ function RouteComponent() {
                                     ) : selectedAddress ? (
                                         <div>
                                             <div className="text-gray-600 mb-3">
-                                                <p className="font-medium">{selectedAddress.address_type}</p>
                                                 <p>{selectedAddress.address_line}</p>
                                                 <p>{selectedAddress.barangay}, {selectedAddress.city}</p>
                                                 <p>{selectedAddress.region} {selectedAddress.postal_code}</p>
@@ -994,16 +1162,19 @@ function RouteComponent() {
                                     />
                                 </div>
 
-                                {/* Delivery Options */}
+                                {/* Combined Delivery Options, Date, and Time Selection */}
                                 <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                    <h2 className="text-xl font-semibold text-gray-800 mb-6">Order Schedule</h2>
+
+                                    <div className="space-y-6">
+                                        {/* Delivery Options */}
                                         <div>
-                                            <h2 className="text-xl font-semibold text-gray-800 mb-4">Delivery Options</h2>
+                                            <label className="block text-sm font-medium text-gray-700 mb-3">Delivery Options</label>
                                             <div className="flex gap-4">
                                                 <button
                                                     onClick={() => setDeliveryOption('Delivery')}
-                                                    className={`px-6 py-2 rounded-full font-medium transition-colors ${deliveryOption === 'Delivery'
-                                                        ? 'bg-yellow-400 text-black'
+                                                    className={`flex-1 px-6 py-3 rounded-lg font-medium transition-colors ${deliveryOption === 'Delivery'
+                                                        ? 'bg-yellow-400 text-black shadow-md'
                                                         : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
                                                         }`}
                                                 >
@@ -1011,8 +1182,8 @@ function RouteComponent() {
                                                 </button>
                                                 <button
                                                     onClick={() => setDeliveryOption('Pick-up')}
-                                                    className={`px-6 py-2 rounded-full font-medium transition-colors ${deliveryOption === 'Pick-up'
-                                                        ? 'bg-yellow-400 text-black'
+                                                    className={`flex-1 px-6 py-3 rounded-lg font-medium transition-colors ${deliveryOption === 'Pick-up'
+                                                        ? 'bg-yellow-400 text-black shadow-md'
                                                         : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
                                                         }`}
                                                 >
@@ -1021,29 +1192,30 @@ function RouteComponent() {
                                             </div>
                                         </div>
 
+                                        {/* Date Selection */}
                                         <div>
-                                            <h2 className="text-xl font-semibold text-gray-800 mb-4">Date Selection</h2>
+                                            <label className="block text-sm font-medium text-gray-700 mb-3">Select Date</label>
                                             <div className="relative">
                                                 <button
                                                     onClick={() => setIsCalendarDropdownOpen(!isCalendarDropdownOpen)}
-                                                    className="w-full px-4 py-3 bg-yellow-400 text-black rounded-lg font-medium flex items-center justify-between hover:bg-yellow-500 transition-colors"
+                                                    className="w-full px-4 py-3 bg-gray-50 border border-gray-300 text-gray-700 rounded-lg font-medium flex items-center justify-between hover:bg-gray-100 transition-colors"
                                                 >
                                                     <div className="flex items-center gap-2">
-                                                        <Calendar className="w-4 h-4" />
+                                                        <Calendar className="w-5 h-5 text-gray-600" />
                                                         {formatDate(selectedDate)}
                                                     </div>
-                                                    <ChevronDown className={`w-4 h-4 transition-transform ${isCalendarDropdownOpen ? 'rotate-180' : ''}`} />
+                                                    <ChevronDown className={`w-5 h-5 transition-transform ${isCalendarDropdownOpen ? 'rotate-180' : ''}`} />
                                                 </button>
 
                                                 {isCalendarDropdownOpen && (
-                                                    <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-300 rounded-lg shadow-lg z-20 p-4">
+                                                    <div className="absolute top-full left-0 right-0 mt-2 bg-white border border-gray-300 rounded-lg shadow-xl z-20 p-4">
                                                         {/* Calendar Header */}
                                                         <div className="flex items-center justify-between mb-4">
                                                             <button
                                                                 onClick={() => navigateMonth('prev')}
                                                                 className="p-2 hover:bg-gray-200 rounded-lg transition-colors"
                                                             >
-                                                                <ChevronDown className="w-4 h-4 rotate-90" />
+                                                                <ChevronDown className="w-5 h-5 rotate-90" />
                                                             </button>
                                                             <h3 className="font-semibold text-gray-800">
                                                                 {selectedDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
@@ -1052,7 +1224,7 @@ function RouteComponent() {
                                                                 onClick={() => navigateMonth('next')}
                                                                 className="p-2 hover:bg-gray-200 rounded-lg transition-colors"
                                                             >
-                                                                <ChevronDown className="w-4 h-4 -rotate-90" />
+                                                                <ChevronDown className="w-5 h-5 -rotate-90" />
                                                             </button>
                                                         </div>
 
@@ -1094,29 +1266,21 @@ function RouteComponent() {
                                                 )}
                                             </div>
                                         </div>
-                                    </div>
-                                </div>
 
-                                {/* Fulfillment and Time */}
-                                <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                        {/* Time Selection */}
                                         <div>
-                                            <h2 className="text-xl font-semibold text-gray-800 mb-4">Schedule</h2>
-                                            <p className="text-gray-600">Please select a date and time for your order</p>
-                                        </div>
-                                        <div>
-                                            <h2 className="text-xl font-semibold text-gray-800 mb-4">Pick Time</h2>
+                                            <label className="block text-sm font-medium text-gray-700 mb-3">Select Time</label>
                                             <div className="relative">
                                                 <button
                                                     onClick={() => setIsTimeDropdownOpen(!isTimeDropdownOpen)}
-                                                    className="w-full px-4 py-2 bg-yellow-400 text-black rounded-lg font-medium flex items-center justify-between hover:bg-yellow-500 transition-colors"
+                                                    className="w-full px-4 py-3 bg-gray-50 border border-gray-300 text-gray-700 rounded-lg font-medium flex items-center justify-between hover:bg-gray-100 transition-colors"
                                                 >
                                                     {selectedTime}
-                                                    <ChevronDown className={`w-4 h-4 transition-transform ${isTimeDropdownOpen ? 'rotate-180' : ''}`} />
+                                                    <ChevronDown className={`w-5 h-5 transition-transform ${isTimeDropdownOpen ? 'rotate-180' : ''}`} />
                                                 </button>
 
                                                 {isTimeDropdownOpen && (
-                                                    <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-300 rounded-lg shadow-lg z-10 max-h-48 overflow-y-auto">
+                                                    <div className="absolute top-full left-0 right-0 mt-2 bg-white border border-gray-300 rounded-lg shadow-xl z-10 max-h-48 overflow-y-auto">
                                                         {availableTimes.length > 0 ? (
                                                             availableTimes.map((time) => (
                                                                 <button
@@ -1125,7 +1289,7 @@ function RouteComponent() {
                                                                         setSelectedTime(time);
                                                                         setIsTimeDropdownOpen(false);
                                                                     }}
-                                                                    className="w-full px-4 py-2 text-left hover:bg-gray-100 transition-colors"
+                                                                    className="w-full px-4 py-3 text-left hover:bg-gray-100 transition-colors text-gray-700"
                                                                 >
                                                                     {time}
                                                                 </button>
@@ -1273,17 +1437,340 @@ function RouteComponent() {
                                     </div>
                                 </div>
 
-                                {/* Place Order Button */}
-                                <button
-                                    onClick={handlePlaceOrder}
-                                    className="w-full bg-yellow-400 hover:bg-yellow-500 text-black font-bold py-4 px-6 rounded-2xl transition-colors duration-200 shadow-md flex items-center justify-center gap-2"
-                                >
-                                    Place Order →
-                                </button>
+                                {/* Upload Receipt Button - Only show for GCash */}
+                                {paymentMethod === 'GCash' && (
+                                    <button
+                                        onClick={() => setIsUploadReceiptModalOpen(true)}
+                                        className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 px-6 rounded-2xl transition-colors duration-200 shadow-md flex items-center justify-center gap-2"
+                                    >
+                                        <Upload className="w-5 h-5" />
+                                        Upload Payment Receipt
+                                    </button>
+                                )}
+
+                                {/* Upload Proof of Payment Button - Only show for onsite payment */}
+                                {paymentMethod === 'onsite' && (
+                                    <button
+                                        onClick={() => setIsUploadReceiptModalOpen(true)}
+                                        className="w-full bg-orange-600 hover:bg-orange-700 text-white font-bold py-4 px-6 rounded-2xl transition-colors duration-200 shadow-md flex items-center justify-center gap-2"
+                                    >
+                                        <Upload className="w-5 h-5" />
+                                        Upload Proof of Payment
+                                    </button>
+                                )}
                             </div>
                         </div>
                     )}
                 </div>
+
+                {/* Upload Receipt Modal */}
+                {isUploadReceiptModalOpen && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+                        <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+                            <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between rounded-t-2xl">
+                                <h2 className="text-2xl font-bold text-gray-800">
+                                    {paymentMethod === 'GCash' ? 'Upload Payment Receipt' : 'Upload Proof of Payment'}
+                                </h2>
+                                <button
+                                    onClick={() => {
+                                        setIsUploadReceiptModalOpen(false);
+                                        setReceiptFile(null);
+                                        setReceiptPreview(null);
+                                        setProofOfPaymentFile(null);
+                                        setProofOfPaymentPreview(null);
+                                    }}
+                                    className="text-gray-500 hover:text-gray-700 p-2"
+                                >
+                                    <X className="w-6 h-6" />
+                                </button>
+                            </div>
+
+                            <div className="p-6 space-y-6">
+                                {paymentMethod === 'GCash' ? (
+                                    <>
+                                        {/* GCash Instructions */}
+                                        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                                            <h3 className="font-semibold text-blue-900 mb-3 flex items-center gap-2">
+                                                <span className="bg-blue-600 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm">i</span>
+                                                Payment Instructions
+                                            </h3>
+                                            <div className="space-y-4">
+                                                {/* Step 1: QR Code */}
+                                                <div>
+                                                    <p className="font-medium text-blue-900 mb-2">Step 1: Send payment to this GCash account</p>
+
+                                                    <div className="bg-white rounded-lg p-4 flex flex-col items-center">
+
+                                                        {/* QR Code */}
+                                                        <div className="w-48 h-48 bg-gray-200 rounded-lg flex items-center justify-center mb-3">
+                                                            <img
+                                                                src="/qr-code.png"
+                                                                alt="GCash QR Code"
+                                                                className="w-full h-full object-contain"
+                                                            />
+                                                        </div>
+
+                                                        {/* Download Button */}
+                                                        <a
+                                                            href="/qr-code.png"
+                                                            download="GCash-QR-Code.png"
+                                                            className="mt-3 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-semibold hover:bg-blue-700 transition-colors"
+                                                        >
+                                                            Download QR Code
+                                                        </a>
+
+                                                        <p className="text-sm text-gray-600 font-medium mt-3">
+                                                            Total Amount: {formatPrice(total)}
+                                                        </p>
+
+                                                    </div>
+                                                </div>
+
+
+                                                {/* Step 2: Receipt Example */}
+                                                <div>
+                                                    <p className="font-medium text-blue-900 mb-2">Step 2: Take a screenshot of your receipt</p>
+                                                    <p className="text-sm text-blue-800 mb-3">Your receipt should look like this for easy verification:</p>
+
+                                                    <div className="bg-white rounded-lg p-4 flex flex-col items-center border-2 border-dashed border-blue-300">
+
+                                                        {/* Receipt Example */}
+                                                        <div className="w-full max-w-xs h-64 bg-gray-200 rounded-lg flex items-center justify-center mb-3">
+                                                            <img
+                                                                src="/receipt-sample.jpg"
+                                                                alt="GCash Receipt Example"
+                                                                className="w-full h-full object-contain"
+                                                            />
+                                                        </div>
+
+                                                        {/* Download Button */}
+                                                        <a
+                                                            href="/receipt-sample.jpg"
+                                                            download="GCash-Receipt-Example.jpg"
+                                                            className="mt-2 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-semibold hover:bg-blue-700 transition-colors"
+                                                        >
+                                                            Download Receipt Example
+                                                        </a>
+                                                    </div>
+                                                </div>
+
+
+                                                {/* Step 3: Upload */}
+                                                <div>
+                                                    <p className="font-medium text-blue-900 mb-2">Step 3: Upload your receipt</p>
+                                                    <p className="text-sm text-blue-800">Please ensure the receipt is clear and all details are visible.</p>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* Upload Section for GCash */}
+                                        <div className="space-y-4">
+                                            <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-yellow-400 transition-colors">
+                                                <input
+                                                    type="file"
+                                                    id="receipt-upload"
+                                                    accept="image/*"
+                                                    onChange={(e) => handleFileSelect(e, true)}
+                                                    className="hidden"
+                                                />
+                                                <label
+                                                    htmlFor="receipt-upload"
+                                                    className="cursor-pointer flex flex-col items-center"
+                                                >
+                                                    {receiptPreview ? (
+                                                        <div className="relative">
+                                                            <img
+                                                                src={receiptPreview}
+                                                                alt="Receipt preview"
+                                                                className="max-h-64 rounded-lg"
+                                                            />
+                                                            <div className="absolute top-2 right-2 bg-green-500 text-white rounded-full p-2">
+                                                                <Check className="w-5 h-5" />
+                                                            </div>
+                                                        </div>
+                                                    ) : (
+                                                        <>
+                                                            <Upload className="w-12 h-12 text-gray-400 mb-3" />
+                                                            <p className="text-gray-600 font-medium mb-1">Click to upload receipt</p>
+                                                            <p className="text-sm text-gray-500">PNG, JPG up to 5MB</p>
+                                                        </>
+                                                    )}
+                                                </label>
+                                            </div>
+
+                                            {receiptFile && (
+                                                <div className="flex items-center justify-between bg-green-50 border border-green-200 rounded-lg p-3">
+                                                    <div className="flex items-center gap-2">
+                                                        <Check className="w-5 h-5 text-green-600" />
+                                                        <span className="text-sm text-green-800 font-medium">{receiptFile.name}</span>
+                                                    </div>
+                                                    <button
+                                                        onClick={() => {
+                                                            setReceiptFile(null);
+                                                            setReceiptPreview(null);
+                                                        }}
+                                                        className="text-red-600 hover:text-red-700 text-sm font-medium"
+                                                    >
+                                                        Remove
+                                                    </button>
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        {/* Action Buttons for GCash */}
+                                        <div className="flex gap-3 pt-4">
+                                            <button
+                                                onClick={() => {
+                                                    setIsUploadReceiptModalOpen(false);
+                                                    setReceiptFile(null);
+                                                    setReceiptPreview(null);
+                                                }}
+                                                className="flex-1 px-6 py-3 bg-gray-200 text-gray-700 font-semibold rounded-lg hover:bg-gray-300 transition-colors"
+                                            >
+                                                Cancel
+                                            </button>
+                                            <button
+                                                onClick={() => {
+                                                    if (deliveryOption === 'Delivery' && !selectedAddressId) {
+                                                        alert('Please select a delivery address');
+                                                        return;
+                                                    }
+                                                    handleUploadReceipt();
+                                                }}
+                                                disabled={!receiptFile}
+                                                className={`flex-1 px-6 py-3 font-semibold rounded-lg transition-colors ${receiptFile
+                                                    ? 'bg-yellow-400 text-black hover:bg-yellow-500'
+                                                    : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                                                    }`}
+                                            >
+                                                Submit & Place Order
+                                            </button>
+                                        </div>
+                                    </>
+                                ) : (
+                                    <>
+                                        {/* On-Site Payment Instructions */}
+                                        <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
+                                            <h3 className="font-semibold text-orange-900 mb-3 flex items-center gap-2">
+                                                <span className="bg-orange-600 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm">i</span>
+                                                Proof of Payment Instructions
+                                            </h3>
+                                            <div className="space-y-4">
+                                                <div>
+                                                    <p className="font-medium text-orange-900 mb-2">Step 1: Pay the staff member</p>
+                                                    <p className="text-sm text-orange-800">Hand over the payment amount to our staff during pickup or upon delivery.</p>
+                                                    <div className="bg-white rounded-lg p-4 mt-3 text-center">
+                                                        <p className="text-sm text-gray-600 font-medium">Total Amount: {formatPrice(total)}</p>
+                                                    </div>
+                                                </div>
+
+                                                <div>
+                                                    <p className="font-medium text-orange-900 mb-2">Step 2: Take a photo as proof</p>
+                                                    <p className="text-sm text-orange-800 mb-3">After paying, take a photo showing:</p>
+                                                    <ul className="text-sm text-orange-800 list-disc list-inside space-y-1 ml-2">
+                                                        <li>You handing over the money, or</li>
+                                                        <li>The receipt/acknowledgment from staff, or</li>
+                                                        <li>Any proof that payment was made</li>
+                                                    </ul>
+                                                </div>
+
+                                                <div>
+                                                    <p className="font-medium text-orange-900 mb-2">Step 3: Upload the photo</p>
+                                                    <p className="text-sm text-orange-800">This helps us verify and track your payment for record-keeping purposes.</p>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* Upload Section for On-Site Payment */}
+                                        <div className="space-y-4">
+                                            <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-orange-400 transition-colors">
+                                                <input
+                                                    type="file"
+                                                    id="proof-upload"
+                                                    accept="image/*"
+                                                    capture="environment"
+                                                    onChange={(e) => handleFileSelect(e, false)}
+                                                    className="hidden"
+                                                />
+                                                <label
+                                                    htmlFor="proof-upload"
+                                                    className="cursor-pointer flex flex-col items-center"
+                                                >
+                                                    {proofOfPaymentPreview ? (
+                                                        <div className="relative">
+                                                            <img
+                                                                src={proofOfPaymentPreview}
+                                                                alt="Proof of payment preview"
+                                                                className="max-h-64 rounded-lg"
+                                                            />
+                                                            <div className="absolute top-2 right-2 bg-green-500 text-white rounded-full p-2">
+                                                                <Check className="w-5 h-5" />
+                                                            </div>
+                                                        </div>
+                                                    ) : (
+                                                        <>
+                                                            <Upload className="w-12 h-12 text-gray-400 mb-3" />
+                                                            <p className="text-gray-600 font-medium mb-1">Click to take/upload photo</p>
+                                                            <p className="text-sm text-gray-500">PNG, JPG up to 5MB</p>
+                                                        </>
+                                                    )}
+                                                </label>
+                                            </div>
+
+                                            {proofOfPaymentFile && (
+                                                <div className="flex items-center justify-between bg-green-50 border border-green-200 rounded-lg p-3">
+                                                    <div className="flex items-center gap-2">
+                                                        <Check className="w-5 h-5 text-green-600" />
+                                                        <span className="text-sm text-green-800 font-medium">{proofOfPaymentFile.name}</span>
+                                                    </div>
+                                                    <button
+                                                        onClick={() => {
+                                                            setProofOfPaymentFile(null);
+                                                            setProofOfPaymentPreview(null);
+                                                        }}
+                                                        className="text-red-600 hover:text-red-700 text-sm font-medium"
+                                                    >
+                                                        Remove
+                                                    </button>
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        {/* Action Buttons for On-Site Payment */}
+                                        <div className="flex gap-3 pt-4">
+                                            <button
+                                                onClick={() => {
+                                                    setIsUploadReceiptModalOpen(false);
+                                                    setProofOfPaymentFile(null);
+                                                    setProofOfPaymentPreview(null);
+                                                }}
+                                                className="flex-1 px-6 py-3 bg-gray-200 text-gray-700 font-semibold rounded-lg hover:bg-gray-300 transition-colors"
+                                            >
+                                                Cancel
+                                            </button>
+                                            <button
+                                                onClick={() => {
+                                                    if (deliveryOption === 'Delivery' && !selectedAddressId) {
+                                                        alert('Please select a delivery address');
+                                                        return;
+                                                    }
+                                                    handleUploadProofOfPayment();
+                                                }}
+                                                disabled={!proofOfPaymentFile}
+                                                className={`flex-1 px-6 py-3 font-semibold rounded-lg transition-colors ${proofOfPaymentFile
+                                                    ? 'bg-yellow-400 text-black hover:bg-yellow-500'
+                                                    : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                                                    }`}
+                                            >
+                                                Submit & Place Order
+                                            </button>
+                                        </div>
+                                    </>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                )}
 
                 {/* Edit/Select Address Modal */}
                 {isEditAddressModalOpen && (
@@ -1340,7 +1827,7 @@ function RouteComponent() {
                     </div>
                 )}
 
-                {/* Add New Address Modal with Google Maps */}
+                {/* Add New Address Modal */}
                 {isAddAddressModalOpen && (
                     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
                         <div className="bg-white rounded-xl shadow-xl max-w-lg w-full p-6 relative mx-4 max-h-[90vh] overflow-y-auto">
@@ -1354,49 +1841,92 @@ function RouteComponent() {
                                 </button>
                             </div>
 
+                            {/* Instructions */}
+                            <p className="text-sm text-gray-600 mb-4">
+                                Click or drag the marker on the map to select your location. Address details will be automatically filled.
+                            </p>
+
+                            {/* Map Picker */}
+                            <div className="w-full h-64 rounded-lg overflow-hidden mb-4 border-2 border-gray-300">
+                                <MapContainer
+                                    center={[selectedLocation.lat, selectedLocation.lng]}
+                                    zoom={16}
+                                    style={{ height: "100%", width: "100%" }}
+                                >
+                                    <TileLayer
+                                        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                                        attribution="© OpenStreetMap"
+                                    />
+
+                                    <Marker
+                                        position={[selectedLocation.lat, selectedLocation.lng]}
+                                        icon={markerIcon}
+                                        draggable={true}
+                                        eventHandlers={{
+                                            dragend: (e) => {
+                                                const marker = e.target;
+                                                const { lat, lng } = marker.getLatLng();
+                                                setSelectedLocation({ lat, lng });
+                                                fetchAddressFromCoordinates(lat, lng);
+                                            },
+                                        }}
+                                    />
+
+                                    <LocationPicker />
+                                </MapContainer>
+                            </div>
+
+                            <p className="text-xs text-gray-500 mb-4">
+                                Selected Location: {selectedLocation.lat.toFixed(6)}, {selectedLocation.lng.toFixed(6)}
+                            </p>
+
+                            {/* Address Form Fields */}
                             <div className="space-y-4">
-                                {/* Manual Address Input */}
+                                {/* Street Address */}
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                                        Street Address / House No. <span className="text-red-500">*</span>
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                                        Street Address <span className="text-red-500">*</span>
                                     </label>
                                     <input
                                         type="text"
                                         value={newAddressForm.address_line}
                                         onChange={(e) => setNewAddressForm({ ...newAddressForm, address_line: e.target.value })}
-                                        placeholder="e.g., Blk 30, Lot 15, Queensville"
+                                        placeholder="e.g., 123 Main Street"
                                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-400 focus:border-transparent"
                                     />
                                 </div>
 
+                                {/* Barangay */}
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">
                                         Barangay <span className="text-red-500">*</span>
                                     </label>
                                     <input
                                         type="text"
                                         value={newAddressForm.barangay}
                                         onChange={(e) => setNewAddressForm({ ...newAddressForm, barangay: e.target.value })}
-                                        placeholder="e.g., Bagumbong"
+                                        placeholder="e.g., Barangay San Jose"
                                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-400 focus:border-transparent"
                                     />
                                 </div>
 
+                                {/* City */}
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                                        City <span className="text-red-500">*</span>
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                                        City/Municipality <span className="text-red-500">*</span>
                                     </label>
                                     <input
                                         type="text"
                                         value={newAddressForm.city}
                                         onChange={(e) => setNewAddressForm({ ...newAddressForm, city: e.target.value })}
-                                        placeholder="e.g., Caloocan City"
+                                        placeholder="e.g., San Jose del Monte"
                                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-400 focus:border-transparent"
                                     />
                                 </div>
 
+                                {/* Region */}
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">
                                         Region
                                     </label>
                                     <input
@@ -1408,8 +1938,9 @@ function RouteComponent() {
                                     />
                                 </div>
 
+                                {/* Postal Code */}
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">
                                         Postal Code
                                     </label>
                                     <input
@@ -1422,9 +1953,25 @@ function RouteComponent() {
                                 </div>
                             </div>
 
+                            {/* Action Buttons */}
                             <div className="mt-6 flex justify-end gap-3">
                                 <button
-                                    onClick={() => setIsAddAddressModalOpen(false)}
+                                    onClick={() => {
+                                        setIsAddAddressModalOpen(false);
+                                        // Reset form
+                                        setNewAddressForm({
+                                            address_type: 'Secondary',
+                                            address_line: '',
+                                            region: '',
+                                            city: '',
+                                            barangay: '',
+                                            postal_code: ''
+                                        });
+                                        setSelectedLocation({
+                                            lat: 14.706297,
+                                            lng: 121.045708,
+                                        });
+                                    }}
                                     className="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300"
                                 >
                                     Cancel

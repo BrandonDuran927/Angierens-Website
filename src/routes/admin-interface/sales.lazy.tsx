@@ -900,7 +900,7 @@ function RouteComponent() {
                                             <div className="flex items-center gap-3">
                                                 <span className="text-sm font-bold text-gray-500 w-6">#{item.rank}</span>
                                                 <div className="w-10 h-10 bg-amber-300 rounded-lg flex items-center justify-center text-xl overflow-hidden">
-                                                    // TODO: Add image rendering logic here
+                                                    // TODO: Add image rendering logic here; fix image in database name - make sure that it is all in a lowercase
                                                 </div>
                                                 <div>
                                                     <p className="font-medium text-gray-800">{item.name}</p>

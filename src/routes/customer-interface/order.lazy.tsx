@@ -19,7 +19,7 @@ interface Order {
     addOns: string
     price: number
     quantity: number
-    status: 'pending' | 'to-pay' | 'in-process' | 'completed' | 'cancelled' | 'refunded'
+    status: 'pending' | 'pending' | 'in-process' | 'completed' | 'cancelled' | 'refunded'
     image: string
     totalAmount: number
     deliveryStatus?: 'queueing' | 'on-delivery' | 'claim-order' | 'refunding'
@@ -173,7 +173,7 @@ function RouteComponent() {
                 let deliveryStatus: Order['deliveryStatus'] | undefined = undefined
 
                 if (order.order_status === 'Pending' && order.payment?.is_paid === false) {
-                    uiStatus = 'to-pay'
+                    uiStatus = 'pending'
                 } else if (order.order_status === 'Pending' && order.payment?.is_paid === true) {
                     uiStatus = 'pending'
                 } else if (order.order_status === 'Queueing') {
@@ -436,8 +436,6 @@ function RouteComponent() {
 
     const tabs = [
         { id: 'all', label: 'All' },
-        { id: 'to-pay', label: 'To Pay' },
-        { id: 'in-process', label: 'In Process' },
         { id: 'completed', label: 'Completed' },
         { id: 'cancelled', label: 'Cancelled' },
         { id: 'refunded', label: 'Refunded' },
@@ -1000,18 +998,6 @@ function RouteComponent() {
                                         {/* Buttons */}
                                         <div className="flex justify-end gap-2 mt-2 sm:mt-4">
                                             {order.status === 'pending' && (
-                                                <button
-                                                    onClick={(e) => {
-                                                        e.preventDefault();
-                                                        e.stopPropagation();
-                                                        handleOpenRefundModal(order.id);
-                                                    }}
-                                                    className="px-3 sm:px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 text-sm sm:text-base"
-                                                >
-                                                    Refund
-                                                </button>
-                                            )}
-                                            {order.status === 'to-pay' && (
                                                 <>
                                                     {order.proofOfPaymentUrl ? (
                                                         <>
