@@ -8,6 +8,7 @@ import { supabase } from '@/lib/supabaseClient'
 import { useSearch } from '@tanstack/react-router'
 import L from "leaflet";
 import { MapContainer, TileLayer, Marker, useMapEvents } from "react-leaflet";
+import { DirectionsModal } from '@/components/DirectionsModal'
 
 
 
@@ -106,10 +107,148 @@ function RouteComponent() {
     const [receiptPreview, setReceiptPreview] = useState<string | null>(null);
     const [proofOfPaymentFile, setProofOfPaymentFile] = useState<File | null>(null);
     const [proofOfPaymentPreview, setProofOfPaymentPreview] = useState<string | null>(null);
+    const [calculatedDeliveryFee, setCalculatedDeliveryFee] = useState(0);
     const [selectedLocation, setSelectedLocation] = useState({
         lat: 14.706297,
         lng: 121.045708,
     });
+    const pickupInfo = {
+        name: "Angieren's Lutong Bahay",
+        street: "R395+F22, Kaypian Rd",
+        city: "San Jose del Monte, Bulacan",
+        mapsLink: "https://maps.google.com/?q=R395+F22,+Kaypian+Rd,+SJDM,+Bulacan"
+    };
+    const [showDirectionsModal, setShowDirectionsModal] = useState(false);
+    const [totalDistance, setTotalDistance] = useState(0);
+    const [routeOrigin, setRouteOrigin] = useState<{ lat: number; lng: number } | null>(null);
+    const [routeDestination, setRouteDestination] = useState<{ lat: number; lng: number } | null>(null);
+
+    const handleShowDirections = (originLat: number, originLng: number, destLat: number, destLng: number) => {
+        setRouteOrigin({ lat: originLat, lng: originLng });
+        setRouteDestination({ lat: destLat, lng: destLng });
+        setShowDirectionsModal(true);
+    };
+
+    useEffect(() => {
+        async function updateDeliveryFee() {
+            if (deliveryOption === 'Delivery' && selectedAddress?.latitude && selectedAddress?.longitude) {
+                const roadDistance = await calculateRoadDistance(
+                    14.818589037203248,
+                    121.05753223366108,
+                    selectedAddress.latitude,
+                    selectedAddress.longitude
+                );
+                const fee = calculateDeliveryFee(roadDistance);
+                setTotalDistance(roadDistance)
+                setCalculatedDeliveryFee(fee);
+            } else {
+                setCalculatedDeliveryFee(0);
+            }
+        }
+
+        updateDeliveryFee();
+    }, [selectedAddress, deliveryOption]);
+
+    // Haversine formula to calculate distance between two coordinates in kilometers
+    const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
+        const R = 6371; // Radius of the Earth in kilometers
+        const dLat = (lat2 - lat1) * Math.PI / 180;
+        const dLon = (lon2 - lon1) * Math.PI / 180;
+        const a =
+            Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+            Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+            Math.sin(dLon / 2) * Math.sin(dLon / 2);
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        const distance = R * c;
+
+        return distance;
+    };
+
+    // Calculate delivery fee based on Lalamove pricing model
+    const calculateDeliveryFee = (distance: number): number => {
+
+        const baseFare = 49;
+        let deliveryFee = 0;
+
+        if (distance <= 5) {
+            deliveryFee = baseFare + (distance * 6);
+        } else {
+            // After 5 km: ₱49 base + (5km * ₱6) + remaining km * ₱5
+            const first5km = 5 * 6;
+            const remainingKm = (distance - 5) * 5;
+            deliveryFee = baseFare + first5km + remainingKm;
+        }
+
+        console.log(`Calculated delivery fee: ${deliveryFee}`)
+
+        return deliveryFee;
+    };
+
+    const calculateRoadDistance = async (
+        lat1: number,
+        lon1: number,
+        lat2: number,
+        lon2: number
+    ): Promise<number> => {
+        setIsLoading(true)
+
+        try {
+            const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001';
+
+            const response = await fetch(
+                `${backendUrl}/api/directions?origin=${lat1},${lon1}&destination=${lat2},${lon2}`
+            );
+
+            console.log(`origin=${lat1},${lon1} destination=${lat2},${lon2}`)
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                console.error('Backend error:', errorData);
+                throw new Error(`HTTP ${response.status}: ${errorData.message || 'Unknown error'}`);
+            }
+
+            const data = await response.json();
+
+            if (data.status === "OK" && data.routes?.length > 0) {
+                console.log("Available routes:");
+                data.routes.forEach((route: any, index: number) => {
+                    const distKm = route.legs[0].distance.value / 1000;
+                    const duration = route.legs[0].duration.text;
+                    console.log(`  Route ${index + 1}: ${distKm.toFixed(2)} km (${duration})`);
+                });
+
+                const distanceInMeters = data.routes[0].legs[0].distance.value;
+                const distanceInKm = distanceInMeters / 1000;
+                const duration = data.routes[0].legs[0].duration.text;
+
+                console.log(`Selected: ${distanceInKm.toFixed(2)} km (${duration})`);
+                console.log('============================');
+
+                setIsLoading(false)
+                return distanceInKm;
+            } else {
+                setIsLoading(false)
+
+                console.error("Directions API returned unexpected response:", data);
+                throw new Error(`Directions API error: ${data.status || 'Unknown error'}`);
+            }
+
+
+        } catch (error) {
+            console.error("Error calling backend API:", error);
+
+            // Fallback to estimation
+            const straightLine = calculateDistance(lat1, lon1, lat2, lon2);
+            const estimated = straightLine * 2.10;
+            console.log(`📏 Fallback estimation: ${estimated.toFixed(2)} km`);
+
+            setIsLoading(false)
+
+
+            return estimated;
+        }
+    };
+
 
     function LocationPicker() {
         useMapEvents({
@@ -444,7 +583,8 @@ function RouteComponent() {
         }
     }
 
-    const deliveryFee = deliveryOption === 'delivery' ? 75 : 0;
+    const deliveryFee = calculatedDeliveryFee;
+
     const subtotal = selectedCartItems.reduce((total, item) => {
         const itemTotal = item.price * item.quantity;
         const addOnsTotal = item.cart_item_add_on?.reduce((sum, addOn) => sum + (addOn.price * addOn.quantity), 0) || 0;
@@ -1083,8 +1223,11 @@ function RouteComponent() {
                     </div>
 
                     {isLoading ? (
-                        <div className="flex justify-center items-center h-64">
-                            <p className="text-xl text-gray-600">Loading...</p>
+                        <div className="fixed inset-0 bg-black/50 flex justify-center items-center z-[60]">
+                            <div className="bg-white rounded-xl shadow-lg p-6 flex flex-col items-center gap-4">
+                                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#964B00]"></div>
+                                <p className="text-gray-700 font-medium">Processing...</p>
+                            </div>
                         </div>
                     ) : selectedCartItems.length === 0 ? (
                         <div className="flex justify-center items-center h-64">
@@ -1101,11 +1244,11 @@ function RouteComponent() {
                                     </h2>
                                     {deliveryOption === 'Pick-up' ? (
                                         <div className="text-gray-600">
-                                            <p className="font-medium">Angieren's Lutong Bahay</p>
-                                            <p>R395+F22, Kaypian Rd</p>
-                                            <p>San Jose del Monte, Bulacan</p>
+                                            <p className="font-medium">{pickupInfo.name}</p>
+                                            <p>{pickupInfo.street}</p>
+                                            <p>{pickupInfo.city}</p>
                                             <a
-                                                href="https://maps.google.com/?q=R395+F22,+Kaypian+Rd,+SJDM,+Bulacan"
+                                                href={pickupInfo.mapsLink}
                                                 target="_blank"
                                                 rel="noopener noreferrer"
                                                 className="text-orange-600 hover:text-orange-700 text-sm font-medium inline-flex items-center gap-1 mt-2"
@@ -1119,6 +1262,10 @@ function RouteComponent() {
                                                 <p>{selectedAddress.address_line}</p>
                                                 <p>{selectedAddress.barangay}, {selectedAddress.city}</p>
                                                 <p>{selectedAddress.region} {selectedAddress.postal_code}</p>
+                                            </div>
+
+                                            <div className="mt-2 text-sm text-gray-500">
+                                                Distance: {totalDistance.toFixed(2)} km from Angieren's Lutong Bahay
                                             </div>
 
                                             <div className="flex gap-3 mt-3">
