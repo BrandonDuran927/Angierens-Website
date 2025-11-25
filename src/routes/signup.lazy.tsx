@@ -1,10 +1,11 @@
-import { Search, ShoppingCart, Bell, ChevronDown, X, Plus, Minus, Heart, MessageSquare, Star, Menu } from 'lucide-react'
+import { Search, ShoppingCart, Bell, ChevronDown, X, Plus, Minus, Heart, MessageSquare, Star, Menu, CheckCircle2, AlertCircle } from 'lucide-react'
 import { createLazyFileRoute } from '@tanstack/react-router'
 import { useState } from 'react'
 import { supabase } from '@/lib/supabaseClient'
 import { Link } from '@tanstack/react-router'
 import { useEffect } from 'react'
 import { useNavigate } from '@tanstack/react-router'
+import { useUser } from '@/context/UserContext'
 
 interface Notification {
   id: string
@@ -27,6 +28,9 @@ function Signup() {
   const [otpCode, setOtpCode] = useState('')
   const [sentCode, setSentCode] = useState('')
   const [isLoading, setIsLoading] = useState(false);
+  const [currentStep, setCurrentStep] = useState(1);
+  const { setUser, user } = useUser();
+
 
 
   const [form, setForm] = useState({
@@ -40,7 +44,7 @@ function Signup() {
     country: '',
     postalCode: '',
     province: '',
-    provinceCode: 'NCR',
+    provinceCode: '',
     city: '',
     cityCode: '',
     barangay: '',
@@ -62,6 +66,11 @@ function Signup() {
   const [provinces, setProvinces] = useState<any[]>([]);
   const [cities, setCities] = useState<any[]>([]);
   const [barangays, setBarangays] = useState<any[]>([]);
+  const ALLOWED_REGIONS = {
+    'NCR': '130000000',
+    'Region III': '030000000',
+    'Region IV-A': '040000000'
+  };
 
   const LoadingSpinner = () => (
     <div className="fixed inset-0 bg-black/50 flex justify-center items-center z-[60]">
@@ -73,26 +82,29 @@ function Signup() {
   );
 
 
-  // Fetch provinces on mount
   useEffect(() => {
     fetch('https://psgc.gitlab.io/api/regions/')
       .then(res => res.json())
       .then(data => {
-        setProvinces(data)
-        console.log(data)
+        const allowedRegions = data.filter((region: any) =>
+          Object.values(ALLOWED_REGIONS).includes(region.code)
+        );
+        setProvinces(allowedRegions);
       })
-      .catch(error => console.error('Error fetching provinces:', error));
+      .catch(error => console.error('Error fetching regions:', error));
   }, []);
 
-  // NCR code only - 130000000
   useEffect(() => {
-    fetch('https://psgc.gitlab.io/api/regions/130000000/cities-municipalities/')
-      .then(res => res.json())
-      .then(data => setCities(data))
-      .catch(error => console.error('Error fetching NCR cities:', error));
-  }, []);
+    if (form.provinceCode) {
+      fetch(`https://psgc.gitlab.io/api/regions/${form.provinceCode}/cities-municipalities/`)
+        .then(res => res.json())
+        .then(data => setCities(data))
+        .catch(error => console.error('Error fetching cities:', error));
+    } else {
+      setCities([]);
+    }
+  }, [form.provinceCode]);
 
-  // Fetch barangays dynamically when a city is selected
   useEffect(() => {
     if (form.cityCode) {
       fetch(`https://psgc.gitlab.io/api/cities-municipalities/${form.cityCode}/barangays`)
@@ -116,12 +128,12 @@ function Signup() {
   };
 
   const navigationItems = [
-    { name: 'HOME', route: '/customer-interface/home', active: false },
-    { name: 'MENU', route: '/customer-interface/', active: false },
-    { name: 'ORDER', route: '/customer-interface/order', active: false },
-    { name: 'REVIEW', route: '/customer-interface/feedback', active: false },
-    { name: 'MY INFO', route: '/customer-interface/my-info', active: false },
-  ];
+    { name: 'HOME', route: '/', active: false, showWhenLoggedOut: true },
+    { name: 'MENU', route: '/customer-interface/', active: false, showWhenLoggedOut: true },
+    { name: 'ORDER', route: '/customer-interface/order', active: false, showWhenLoggedOut: false },
+    { name: 'REVIEW', route: '/customer-interface/feedback', active: false, showWhenLoggedOut: false },
+    { name: 'MY INFO', route: '/customer-interface/my-info', active: false, showWhenLoggedOut: false }
+  ].filter(item => user || item.showWhenLoggedOut);
 
   const [notifications, setNotifications] = useState<Notification[]>([
     {
@@ -183,33 +195,71 @@ function Signup() {
     }
   }
 
+  useEffect(() => {
+    async function checkUserAndRedirect() {
+      if (user) {
+        // Fetch the user's role from your "users" table
+        const { data: userData, error: userError } = await supabase
+          .from("users")
+          .select("user_role")
+          .eq("user_uid", user.id)
+          .single();
+
+        if (userError || !userData) {
+          console.error("Error fetching user role:", userError);
+          return;
+        }
+
+        console.log("User role:", userData.user_role);
+
+        // Redirect based on role
+        switch (userData.user_role) {
+          case "owner":
+            navigate({ to: "/admin-interface" });
+            break;
+          case "staff":
+            navigate({ to: "/staff" });
+            break;
+          case "chef":
+            navigate({ to: "/chef-interface" });
+            break;
+          case "customer":
+          default:
+            navigate({ to: "/customer-interface/home" });
+            break;
+        }
+      }
+    }
+
+    checkUserAndRedirect();
+  }, [user, navigate]);
+
+
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const target = e.target
     const { name, value } = target
 
-    // Special handling for province selection to also store the name
     if (name === 'provinceCode') {
       const selectedProvince = provinces.find(p => p.code === value);
       setForm(prev => ({
         ...prev,
         provinceCode: value,
         province: selectedProvince?.name || '',
-        cityCode: '', // Reset city when province changes
+        cityCode: '',
         city: '',
         barangay: ''
       }));
       return;
     }
 
-    // Special handling for city selection to also store the name
     if (name === 'cityCode') {
       const selectedCity = cities.find(c => c.code === value);
       setForm(prev => ({
         ...prev,
         cityCode: value,
         city: selectedCity?.name || '',
-        barangay: '' // Reset barangay when city changes
+        barangay: ''
       }));
       return;
     }
@@ -240,7 +290,6 @@ function Signup() {
     return cleaned
   }
 
-  // Add this inside your component (above the return)
   const handleBirthChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     const updatedForm = { ...form, [name]: value };
@@ -273,27 +322,46 @@ function Signup() {
     }
   };
 
+  const validateForm = () => {
+    const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
+
+    if (!passwordRegex.test(form.password)) {
+      alert('Password must be at least 8 characters long and contain:\n- At least one uppercase letter\n- At least one lowercase letter\n- At least one number\n- At least one special character (@$!%*?&)');
+      return false;
+    }
+
+    if (form.password !== form.confirmPassword) {
+      alert('Passwords do not match!');
+      return false;
+    }
+
+    const phoneRegex = /^(09|\+639)\d{9}$/;
+    if (!phoneRegex.test(form.phone_number.replace(/\s+/g, ''))) {
+      alert('Please enter a valid Philippine mobile number (09xxxxxxxxx)');
+      return false;
+    }
+
+    if (!/^\d{4}$/.test(form.postalCode)) {
+      alert('Postal code must be exactly 4 digits');
+      return false;
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(form.email)) {
+      alert('Please enter a valid email address');
+      return false;
+    }
+
+    return true;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    // Actual implementation
-    // try {
-    //   const formattedNumber = formatPhoneNumber(form.mobile)
+    if (!validateForm()) {
+      return;
+    }
 
-    //   const { data, error } = await supabase.functions.invoke('send-otp', {
-    //     body: { phoneNumber: formattedNumber }
-    //   })
-
-    //   if (error) throw error
-    //   console.log("Data sent:", data)
-    //   setSentCode(data)
-
-    //   setShowOtpModal(true)
-    // } catch (error) {
-    //   console.error('Error sending OTP:', error)
-    // }
-
-    // Mock function
     setShowOtpModal(true)
   }
 
@@ -305,7 +373,6 @@ function Signup() {
 
   const verifyOtp = async () => {
     try {
-      // Temporary mock OTP verification (for testing only)
       alert('OTP verified successfully!')
 
       await signUpNewUser()
@@ -315,25 +382,6 @@ function Signup() {
     } catch (error) {
       console.error('Error verifying OTP or signing up:', error)
     }
-    // try {
-    //   const formattedNumber = formatPhoneNumber(form.mobile)
-
-    //   const { data, error } = await supabase.functions.invoke('verify-otp', {
-    //     body: { phoneNumber: formattedNumber, otpCode },
-    //   })
-
-    //   if (error) throw error
-
-    //   if (data.status === 'approved') {
-    //     alert('OTP verified successfully!')
-    //     closeOtpModal()
-    //     navigate({ to: "/login" })
-    //   } else {
-    //     alert('Invalid or expired OTP.')
-    //   }
-    // } catch (error) {
-    //   console.error('Error verifying OTP:', error)
-    // }
   }
 
   async function signUpNewUser() {
@@ -399,21 +447,26 @@ function Signup() {
     }
   }
 
+  const isStep1Complete = () => {
+    return form.firstName && form.lastName && form.birthMonth && form.birthDay && form.birthYear && form.gender;
+  };
+
+  const isStep2Complete = () => {
+    return form.postalCode && form.provinceCode && form.cityCode && form.barangayCode && form.address_line && form.phone_number;
+  };
+
 
   return (
     <div className="min-h-screen min-w-[320px] bg-gradient-to-br from-amber-50 to-orange-100 flex flex-col">
 
       <header className="w-auto mx-2 sm:mx-4 md:mx-10 my-3 border-b-8 border-amber-800">
         <div className="flex items-center justify-between p-2 sm:p-4 mb-5 relative">
-          {/* Logo */}
           <div
             className="flex-shrink-0 bg-cover bg-center dynamic-logo"
             style={logoStyle}
           />
 
-          {/* Main Content Container */}
           <div className="flex items-center justify-end w-full pl-[150px] sm:pl-[160px] lg:pl-[180px] gap-2 sm:gap-4">
-            {/* Desktop Navigation */}
             <nav className="hidden lg:flex xl:gap-10 bg-[#964B00] py-2 px-6 xl:px-10 rounded-lg">
               {navigationItems.map(item => (
                 <Link
@@ -429,7 +482,6 @@ function Signup() {
               ))}
             </nav>
 
-            {/* Hamburger Menu Button - Show on tablet and mobile */}
             <button
               onClick={() => setIsMobileMenuOpen(true)}
               className="lg:hidden p-2 text-[#964B00] hover:bg-amber-100 rounded-lg bg-yellow-400"
@@ -437,80 +489,91 @@ function Signup() {
               <Menu className="h-5 w-5 sm:h-6 sm:w-6" />
             </button>
 
-            {/* Right Side Controls */}
             <div className="flex items-center gap-1 sm:gap-2 md:gap-4 bg-[#964B00] py-2 px-2 sm:px-4 md:px-6 rounded-lg">
               {/* Cart Icon */}
-              <Link
-                to="/customer-interface/cart"
-                className="relative p-1 sm:p-2 text-yellow-400 hover:bg-[#7a3d00] rounded-full"
-              >
-                <ShoppingCart className="h-5 w-5 sm:h-6 sm:w-6" />
-                {cartCount > 0 && (
-                  <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-4 w-4 sm:h-5 sm:w-5 flex items-center justify-center text-[10px] sm:text-xs">
-                    {cartCount}
-                  </span>
-                )}
-              </Link>
-
-              {/* Notifications */}
-              <div className="relative">
-                <button
-                  onClick={() => setIsNotificationOpen(!isNotificationOpen)}
+              {user && (
+                <Link
+                  to="/login"
                   className="relative p-1 sm:p-2 text-yellow-400 hover:bg-[#7a3d00] rounded-full"
                 >
-                  <Bell className="h-5 w-5 sm:h-6 sm:w-6" />
-                  {notificationCount > 0 && (
+                  <ShoppingCart className="h-5 w-5 sm:h-6 sm:w-6" />
+                  {cartCount > 0 && (
                     <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-4 w-4 sm:h-5 sm:w-5 flex items-center justify-center text-[10px] sm:text-xs">
-                      {notificationCount}
+                      {cartCount}
                     </span>
                   )}
-                </button>
+                </Link>
+              )}
 
-                {/* Notification Dropdown */}
-                {isNotificationOpen && (
-                  <div className="absolute right-0 mt-2 w-72 sm:w-80 md:w-96 bg-white rounded-lg shadow-lg border border-gray-200 z-50 max-h-[70vh] overflow-hidden">
-                    <div className="p-3 sm:p-4 border-b border-gray-200">
-                      <h3 className="text-base sm:text-lg font-semibold text-gray-800">Notifications</h3>
-                    </div>
 
-                    <div className="max-h-60 sm:max-h-80 overflow-y-auto">
-                      {notifications.map((notification, index) => (
-                        <div
-                          key={notification.id}
-                          className={`p-3 sm:p-4 border-b border-gray-100 hover:bg-gray-50 cursor-pointer ${index === notifications.length - 1 ? 'border-b-0' : ''
-                            }`}
-                        >
-                          <div className="flex items-start gap-2 sm:gap-3">
-                            <div className="flex-shrink-0 w-8 h-8 sm:w-10 sm:h-10 bg-yellow-400 rounded-full flex items-center justify-center text-black">
-                              {getNotificationIcon(notification.icon)}
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <p className="text-xs sm:text-sm text-gray-800 leading-relaxed">
-                                {notification.title}
-                              </p>
-                              <p className="text-[10px] sm:text-xs text-gray-500 mt-1">
-                                {notification.time}
-                              </p>
-                            </div>
+              {/* Notifications */}
+              {user && (
+                <div className="relative">
+                  <button
+                    onClick={() => setIsNotificationOpen(!isNotificationOpen)}
+                    className="relative p-1 sm:p-2 text-yellow-400 hover:bg-[#7a3d00] rounded-full"
+                  >
+                    <Bell className="h-5 w-5 sm:h-6 sm:w-6" />
+                    {notificationCount > 0 && (
+                      <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-4 w-4 sm:h-5 sm:w-5 flex items-center justify-center text-[10px] sm:text-xs">
+                        {notificationCount}
+                      </span>
+                    )}
+                  </button>
+
+
+                  {/* Notification Dropdown */}
+                  {isNotificationOpen && (
+                    <div className="absolute right-0 mt-2 w-72 sm:w-80 md:w-96 bg-white rounded-lg shadow-lg border border-gray-200 z-50 max-h-[70vh] overflow-hidden">
+                      <div className="p-3 sm:p-4 border-b border-gray-200">
+                        <h3 className="text-base sm:text-lg font-semibold text-gray-800">Notifications</h3>
+                      </div>
+
+                      <div className="max-h-60 sm:max-h-80 overflow-y-auto">
+                        {notifications.length === 0 ? (
+                          <div className="p-8 text-center text-gray-500">
+                            <p>No notifications yet</p>
                           </div>
-                        </div>
-                      ))}
-                    </div>
+                        ) : (
+                          notifications.map((notification, index) => (
+                            <div
+                              key={notification.id}
+                              className={`p-3 sm:p-4 border-b border-gray-100 hover:bg-gray-50 cursor-pointer ${index === notifications.length - 1 ? 'border-b-0' : ''
+                                }`}
+                            >
+                              <div className="flex items-start gap-2 sm:gap-3">
+                                <div className="flex-shrink-0 w-8 h-8 sm:w-10 sm:h-10 bg-yellow-400 rounded-full flex items-center justify-center text-black">
+                                  {getNotificationIcon(notification.icon)}
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-xs sm:text-sm text-gray-800 leading-relaxed">
+                                    {notification.title}
+                                  </p>
+                                  <p className="text-[10px] sm:text-xs text-gray-500 mt-1">
+                                    {notification.time}
+                                  </p>
+                                </div>
+                              </div>
+                            </div>
+                          ))
+                        )}
+                      </div>
 
-                    <div className="p-3 sm:p-4 border-t border-gray-200">
-                      <button
-                        onClick={markAllAsRead}
-                        className="w-full bg-yellow-400 text-black py-2 px-4 rounded-lg font-medium hover:bg-yellow-500 transition-colors flex items-center justify-center gap-2 text-sm"
-                      >
-                        <Bell className="h-4 w-4" />
-                        Mark all as read
-                      </button>
+                      <div className="p-3 sm:p-4 border-t border-gray-200">
+                        <button
+                          onClick={markAllAsRead}
+                          className="w-full bg-yellow-400 text-black py-2 px-4 rounded-lg font-medium hover:bg-yellow-500 transition-colors flex items-center justify-center gap-2 text-sm"
+                        >
+                          <Bell className="h-4 w-4" />
+                          Mark all as read
+                        </button>
+                      </div>
                     </div>
-                  </div>
-                )}
-              </div>
+                  )}
+                </div>
 
-              {/* Sign In Button */}
+              )}
+
               <Link to="/login">
                 <button className="bg-[#964B00] text-yellow-400 font-semibold py-1 sm:py-2 px-2 sm:px-3 md:px-4 text-xs sm:text-sm md:text-base rounded-full shadow-md border-2 border-yellow-400 hover:bg-yellow-400 hover:text-[#964B00] transition-colors whitespace-nowrap">
                   SIGN IN
@@ -528,7 +591,6 @@ function Signup() {
         />
       )}
 
-      {/* Mobile/Tablet Drawer */}
       <div className={`fixed top-0 left-0 h-full w-72 sm:w-80 bg-[#964B00] transform transition-transform duration-300 ease-in-out z-50 lg:hidden ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'
         }`}>
         <div className="flex items-center justify-between p-4 border-b border-yellow-400/20">
@@ -558,7 +620,6 @@ function Signup() {
         </nav>
       </div>
 
-      {/* Overlay to close notification dropdown when clicking outside */}
       {isNotificationOpen && (
         <div
           className="fixed inset-0 z-40"
@@ -566,258 +627,455 @@ function Signup() {
         />
       )}
 
-      <div className="flex-grow">
-        <form onSubmit={handleSubmit} className="bg-white max-w-5xl mx-auto px-4 py-6 space-y-10 my-10">
-          <p className="text-m text-gray-600">
-            Please confirm that the information you input is correct. The Angieren's Team will not be liable if the information does not match.
-          </p>
-          <hr />
-          {/* FIRST STEP */}
-          <section>
-            <h2 className="text-xl font-bold pb-1 mb-4">FIRST STEP</h2>
-            <div className="grid md:grid-cols-3 gap-4">
-              <div>
-                <label className="block text-sm font-semibold">First Name *</label>
-                <input type="text" name="firstName" value={form.firstName} onChange={handleChange}
-                  className="w-full border rounded px-3 py-2" required />
+      <div className="flex-grow pb-16">
+        <div className="max-w-5xl mx-auto px-4 py-8">
+          {/* Header Section */}
+          <div className="bg-white rounded-2xl shadow-lg p-6 md:p-8 mb-8">
+            <div className="text-center mb-6">
+              <h1 className="text-3xl md:text-4xl font-bold text-[#964B00] mb-3">Create Your Account</h1>
+              <p className="text-gray-600 text-sm md:text-base max-w-2xl mx-auto">
+                Join Angieren's Lutong Bahay and enjoy authentic Filipino home-cooked meals delivered to your doorstep.
+              </p>
+            </div>
+
+            {/* Progress Indicator */}
+            <div className="flex items-center justify-between max-w-2xl mx-auto mb-8">
+              <div className="flex flex-col items-center flex-1">
+                <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold transition-all ${currentStep >= 1 ? 'bg-[#964B00] text-yellow-400' : 'bg-gray-200 text-gray-500'
+                  }`}>
+                  {isStep1Complete() ? <CheckCircle2 className="h-6 w-6" /> : '1'}
+                </div>
+                <span className="text-xs mt-2 font-medium text-gray-700">Personal Info</span>
               </div>
-              <div>
-                <label className="block text-sm font-semibold">Middle Name</label>
-                <input type="text" name="middleName" value={form.middleName} onChange={handleChange}
-                  className="w-full border rounded px-3 py-2" />
+              <div className={`h-1 flex-1 mx-2 transition-all ${isStep1Complete() ? 'bg-[#964B00]' : 'bg-gray-200'}`}></div>
+              <div className="flex flex-col items-center flex-1">
+                <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold transition-all ${currentStep >= 2 ? 'bg-[#964B00] text-yellow-400' : 'bg-gray-200 text-gray-500'
+                  }`}>
+                  {isStep2Complete() ? <CheckCircle2 className="h-6 w-6" /> : '2'}
+                </div>
+                <span className="text-xs mt-2 font-medium text-gray-700">Address</span>
               </div>
-              <div>
-                <label className="block text-sm font-semibold">Last Name *</label>
-                <input type="text" name="lastName" value={form.lastName} onChange={handleChange}
-                  className="w-full border rounded px-3 py-2" required />
+              <div className={`h-1 flex-1 mx-2 transition-all ${isStep2Complete() ? 'bg-[#964B00]' : 'bg-gray-200'}`}></div>
+              <div className="flex flex-col items-center flex-1">
+                <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold transition-all ${currentStep >= 3 ? 'bg-[#964B00] text-yellow-400' : 'bg-gray-200 text-gray-500'
+                  }`}>
+                  3
+                </div>
+                <span className="text-xs mt-2 font-medium text-gray-700">Account</span>
               </div>
             </div>
 
-            <div className="grid md:grid-cols-4 gap-4 mt-4">
-              <div>
-                <label className="block text-sm font-semibold">Month *</label>
-                <select
-                  name="birthMonth"
-                  value={form.birthMonth}
-                  onChange={handleBirthChange}
-                  className="w-full border rounded px-3 py-2"
-                  required
-                >
-                  <option value="">Select your month</option>
-                  {Array.from({ length: 12 }, (_, i) => (
-                    <option key={i} value={i + 1}>
-                      {new Date(0, i).toLocaleString('default', { month: 'long' })}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-semibold">Day *</label>
-                <input
-                  type="number"
-                  name="birthDay"
-                  value={form.birthDay}
-                  onChange={handleBirthChange}
-                  min="1"
-                  max="31"
-                  className="w-full border rounded px-3 py-2"
-                  required
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-semibold">Year *</label>
-                <select
-                  name="birthYear"
-                  value={form.birthYear}
-                  onChange={handleBirthChange}
-                  className="w-full border rounded px-3 py-2"
-                  required
-                >
-                  <option value="">Select your year</option>
-                  {Array.from({ length: 100 }, (_, i) => {
-                    const year = new Date().getFullYear() - i;
-                    return (
-                      <option key={year} value={year}>
-                        {year}
-                      </option>
-                    );
-                  })}
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-semibold">Gender *</label>
-                <select name="gender" value={form.gender} onChange={handleChange}
-                  className="w-full border rounded px-3 py-2" required>
-                  <option value="">Select your gender</option>
-                  <option value="Male">Male</option>
-                  <option value="Female">Female</option>
-                  <option value="Other">Other</option>
-                </select>
+            {/* Info Alert */}
+            <div className="bg-amber-50 border-l-4 border-amber-500 p-4 rounded-r-lg">
+              <div className="flex items-start">
+                <AlertCircle className="h-5 w-5 text-amber-500 mt-0.5 mr-3 flex-shrink-0" />
+                <p className="text-sm text-amber-800">
+                  Please ensure all information is accurate. Angieren's Team will not be liable for any errors in the information provided.
+                </p>
               </div>
             </div>
-          </section>
-
-          {/* SECOND STEP */}
-          <section>
-            <h2 className="text-xl font-bold pb-1 mb-4">SECOND STEP</h2>
-            <div className="grid md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-semibold">Country *</label>
-                <select name="country" value={form.country} onChange={handleChange}
-                  className="w-full border rounded px-3 py-2" required>
-                  <option value="">Select your country</option>
-                  <option value="Philippines">Philippines</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-semibold">Postal Code *</label>
-                <input type="text" name="postalCode" value={form.postalCode} onChange={handleChange}
-                  className="w-full border rounded px-3 py-2" required />
-              </div>
-
-              <div>
-                <label className="block text-sm font-semibold">Region *</label>
-                <select
-                  name="provinceCode"
-                  value="NCR"
-                  onChange={handleChange}
-                  className="w-full border rounded px-3 py-2 bg-gray-100 text-gray-600"
-                  disabled={true}
-                >
-                  <option value="NCR">NCR</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-semibold">City/Municipality *</label>
-                <select
-                  name="cityCode"
-                  value={form.cityCode}
-                  onChange={handleChange}
-                  required
-                  className="w-full border rounded px-3 py-2"
-                >
-                  <option value="">Select City/Municipality</option>
-                  {cities.map((city) => (
-                    <option key={city.code} value={city.code}>
-                      {city.name}
-                    </option>
-                  ))}
-                </select>
-
-              </div>
-
-              <div>
-                <label className="block text-sm font-semibold">Barangay *</label>
-                <select
-                  name="barangay"
-                  value={form.barangayCode}
-                  onChange={handleChange}
-                  className="w-full border rounded px-3 py-2"
-                  required
-                  disabled={!form.cityCode}
-                >
-                  <option value="">
-                    {form.cityCode ? 'Select your barangay' : 'Select city first'}
-                  </option>
-                  {barangays.map((barangay) => (
-                    <option key={barangay.code} value={barangay.code}>
-                      {barangay.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="md:col-span-2">
-                <label className="block text-sm font-semibold">Address *</label>
-                <input type="text" name="address_line" value={form.address_line} onChange={handleChange}
-                  placeholder="House/Unit/Floor No., Building Name, Street Name"
-                  className="w-full border rounded px-3 py-2" required />
-              </div>
-
-              <div>
-                <label className="block text-sm font-semibold">Mobile Number *</label>
-                <input type="text" name="phone_number" value={form.phone_number} onChange={handleChange}
-                  placeholder="ex. 09xxxxxxxxx"
-                  className="w-full border rounded px-3 py-2" required />
-              </div>
-              <div>
-                <label className="block text-sm font-semibold">Other Contact Number (Mobile/Landline)</label>
-                <input type="text" name="otherContact" value={form.otherContact} onChange={handleChange}
-                  placeholder="ex. 8-xxxxxxx"
-                  className="w-full border rounded px-3 py-2" />
-              </div>
-            </div>
-          </section>
-
-          {/* THIRD STEP */}
-          <section>
-            <h2 className="text-xl font-bold pb-1 mb-4">THIRD STEP</h2>
-            <div className="grid md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-semibold">Email Address *</label>
-                <input type="email" name="email" value={form.email} onChange={handleChange}
-                  className="w-full border rounded px-3 py-2" required />
-              </div>
-              <div></div>
-
-              <div>
-                <label className="block text-sm font-semibold">Password *</label>
-                <input type="password" name="password" value={form.password} onChange={handleChange}
-                  className="w-full border rounded px-3 py-2" required />
-              </div>
-              <div>
-                <label className="block text-sm font-semibold">Confirm Password *</label>
-                <input type="password" name="confirmPassword" value={form.confirmPassword} onChange={handleChange}
-                  className="w-full border rounded px-3 py-2" required />
-              </div>
-            </div>
-
-            <div className="mt-4">
-              <label className="inline-flex items-start space-x-2">
-                <input type="checkbox" name="agree" checked={form.agree} onChange={handleChange}
-                  className="mt-1" required />
-                <span className="text-sm text-gray-700">
-                  I am at least 18 years old and have read and agreed to the{' '}
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.preventDefault()
-                      setShowTCModal(true)
-                    }}
-                    className="text-blue-600 underline hover:text-blue-800"
-                  >
-                    Terms and Conditions
-                  </button>
-                  {' '}and{' '}
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.preventDefault()
-                      setShowPrivacyModal(true)
-                    }}
-                    className="text-blue-600 underline hover:text-blue-800"
-                  >
-                    Privacy Policy
-                  </button>
-                  {' '}of Angieren's Lutong Bahay.
-                </span>
-              </label>
-            </div>
-          </section>
-
-          {/* SUBMIT */}
-          <div className="pt-6">
-            <button
-              type="submit"
-              className="bg-amber-100 hover:bg-amber-200 border border-black px-6 py-2 rounded text-black font-semibold"
-            >
-              REGISTER
-            </button>
           </div>
-        </form>
+
+          <form onSubmit={handleSubmit} className="space-y-6">
+            {/* STEP 1: Personal Information */}
+            <div className="bg-white rounded-2xl shadow-lg p-6 md:p-8 hover:shadow-xl transition-shadow">
+              <div className="flex items-center gap-3 mb-6">
+                <div className="w-10 h-10 rounded-full bg-[#964B00] text-yellow-400 flex items-center justify-center font-bold text-lg">
+                  1
+                </div>
+                <h2 className="text-2xl font-bold text-gray-800">Personal Information</h2>
+              </div>
+
+              <div className="space-y-5">
+                <div className="grid md:grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                      First Name <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      name="firstName"
+                      value={form.firstName}
+                      onChange={handleChange}
+                      className="w-full border-2 border-gray-200 rounded-lg px-4 py-3 focus:border-[#964B00] focus:ring-2 focus:ring-amber-200 transition-all outline-none"
+                      placeholder='Juan'
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                      Middle Name
+                    </label>
+                    <input
+                      type="text"
+                      name="middleName"
+                      value={form.middleName}
+                      onChange={handleChange}
+                      className="w-full border-2 border-gray-200 rounded-lg px-4 py-3 focus:border-[#964B00] focus:ring-2 focus:ring-amber-200 transition-all outline-none"
+                      placeholder='Santos'
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                      Last Name <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      name="lastName"
+                      value={form.lastName}
+                      onChange={handleChange}
+                      className="w-full border-2 border-gray-200 rounded-lg px-4 py-3 focus:border-[#964B00] focus:ring-2 focus:ring-amber-200 transition-all outline-none"
+                      placeholder='Dela Cruz'
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div className="border-t pt-5">
+                  <h3 className="text-sm font-semibold text-gray-700 mb-3">Date of Birth <span className="text-red-500">*</span></h3>
+                  <div className="grid md:grid-cols-4 gap-4">
+                    <div>
+                      <select
+                        name="birthMonth"
+                        value={form.birthMonth}
+                        onChange={handleBirthChange}
+                        className="w-full border-2 border-gray-200 rounded-lg px-4 py-3 focus:border-[#964B00] focus:ring-2 focus:ring-amber-200 transition-all outline-none"
+                        required
+                      >
+                        <option value="">Month</option>
+                        {Array.from({ length: 12 }, (_, i) => (
+                          <option key={i} value={i + 1}>
+                            {new Date(0, i).toLocaleString('default', { month: 'long' })}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <input
+                        type="number"
+                        name="birthDay"
+                        value={form.birthDay}
+                        onChange={handleBirthChange}
+                        min="1"
+                        max="31"
+                        className="w-full border-2 border-gray-200 rounded-lg px-4 py-3 focus:border-[#964B00] focus:ring-2 focus:ring-amber-200 transition-all outline-none"
+                        placeholder='Day'
+                        required
+                      />
+                    </div>
+
+                    <div>
+                      <select
+                        name="birthYear"
+                        value={form.birthYear}
+                        onChange={handleBirthChange}
+                        className="w-full border-2 border-gray-200 rounded-lg px-4 py-3 focus:border-[#964B00] focus:ring-2 focus:ring-amber-200 transition-all outline-none"
+                        required>
+                        <option value="">Year</option>
+                        {Array.from({ length: 100 }, (_, i) => {
+                          const year = new Date().getFullYear() - i;
+                          return (
+                            <option key={year} value={year}>
+                              {year}
+                            </option>
+                          );
+                        })}
+                      </select>
+                    </div>
+                    <div>
+                      <select
+                        name="gender"
+                        value={form.gender}
+                        onChange={handleChange}
+                        className="w-full border-2 border-gray-200 rounded-lg px-4 py-3 focus:border-[#964B00] focus:ring-2 focus:ring-amber-200 transition-all outline-none"
+                        required
+                      >
+                        <option value="">Sex</option>
+                        <option value="Male">Male</option>
+                        <option value="Female">Female</option>
+                        <option value="Other">Other</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* STEP 2: Address Information */}
+            <div className="bg-white rounded-2xl shadow-lg p-6 md:p-8 hover:shadow-xl transition-shadow">
+              <div className="flex items-center gap-3 mb-6">
+                <div className="w-10 h-10 rounded-full bg-[#964B00] text-yellow-400 flex items-center justify-center font-bold text-lg">
+                  2
+                </div>
+                <h2 className="text-2xl font-bold text-gray-800">Delivery Address</h2>
+              </div>
+
+              <div className="space-y-5">
+                <div className="grid md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                      Country <span className="text-red-500">*</span>
+                    </label>
+                    <select
+                      name="country"
+                      value="Philippines"
+                      className="w-full border-2 border-gray-200 rounded-lg px-4 py-3 bg-gray-50 text-gray-600 cursor-not-allowed"
+                      disabled={true}
+                    >
+                      <option value="Philippines">Philippines</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                      Postal Code <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      name="postalCode"
+                      value={form.postalCode}
+                      onChange={handleChange}
+                      className="w-full border-2 border-gray-200 rounded-lg px-4 py-3 focus:border-[#964B00] focus:ring-2 focus:ring-amber-200 transition-all outline-none"
+                      placeholder='1234'
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                      Region <span className="text-red-500">*</span>
+                    </label>
+                    <select
+                      name="provinceCode"
+                      value={form.provinceCode}
+                      onChange={handleChange}
+                      required
+                      className="w-full border-2 border-gray-200 rounded-lg px-4 py-3 focus:border-[#964B00] focus:ring-2 focus:ring-amber-200 transition-all outline-none"
+                    >
+                      <option value="">Select Region</option>
+                      {provinces.map((region) => (
+                        <option key={region.code} value={region.code}>
+                          {region.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                      City/Municipality <span className="text-red-500">*</span>
+                    </label>
+                    <select
+                      name="cityCode"
+                      value={form.cityCode}
+                      onChange={handleChange}
+                      required
+                      className="w-full border-2 border-gray-200 rounded-lg px-4 py-3 focus:border-[#964B00] focus:ring-2 focus:ring-amber-200 transition-all outline-none disabled:bg-gray-50 disabled:cursor-not-allowed"
+                      disabled={!form.provinceCode}
+                    >
+                      <option value="">
+                        {form.provinceCode ? 'Select City/Municipality' : 'Select region first'}
+                      </option>
+                      {cities.map((city) => (
+                        <option key={city.code} value={city.code}>
+                          {city.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="md:col-span-2">
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                      Barangay <span className="text-red-500">*</span>
+                    </label>
+                    <select
+                      name="barangay"
+                      value={form.barangayCode}
+                      onChange={handleChange}
+                      className="w-full border-2 border-gray-200 rounded-lg px-4 py-3 focus:border-[#964B00] focus:ring-2 focus:ring-amber-200 transition-all outline-none disabled:bg-gray-50 disabled:cursor-not-allowed"
+                      required
+                      disabled={!form.cityCode}
+                    >
+                      <option value="">
+                        {form.cityCode ? 'Select your barangay' : 'Select city first'}
+                      </option>
+                      {barangays.map((barangay) => (
+                        <option key={barangay.code} value={barangay.code}>
+                          {barangay.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="md:col-span-2">
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                      Complete Address <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      name="address_line"
+                      value={form.address_line}
+                      onChange={handleChange}
+                      placeholder="House/Unit/Floor No., Building Name, Street Name"
+                      className="w-full border-2 border-gray-200 rounded-lg px-4 py-3 focus:border-[#964B00] focus:ring-2 focus:ring-amber-200 transition-all outline-none"
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div className="border-t pt-5">
+                  <h3 className="text-sm font-semibold text-gray-700 mb-3">Contact Information</h3>
+                  <div className="grid md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">
+                        Mobile Number <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        name="phone_number"
+                        value={form.phone_number}
+                        onChange={handleChange}
+                        placeholder="09xxxxxxxxx"
+                        className="w-full border-2 border-gray-200 rounded-lg px-4 py-3 focus:border-[#964B00] focus:ring-2 focus:ring-amber-200 transition-all outline-none"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">
+                        Alternate Contact
+                      </label>
+                      <input
+                        type="text"
+                        name="otherContact"
+                        value={form.otherContact}
+                        onChange={handleChange}
+                        placeholder="8-xxxxxxx (Optional)"
+                        className="w-full border-2 border-gray-200 rounded-lg px-4 py-3 focus:border-[#964B00] focus:ring-2 focus:ring-amber-200 transition-all outline-none"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* STEP 3: Account Setup */}
+            <div className="bg-white rounded-2xl shadow-lg p-6 md:p-8 hover:shadow-xl transition-shadow">
+              <div className="flex items-center gap-3 mb-6">
+                <div className="w-10 h-10 rounded-full bg-[#964B00] text-yellow-400 flex items-center justify-center font-bold text-lg">
+                  3
+                </div>
+                <h2 className="text-2xl font-bold text-gray-800">Account Setup</h2>
+              </div>
+
+              <div className="space-y-5">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Email Address <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="email"
+                    name="email"
+                    value={form.email}
+                    onChange={handleChange}
+                    className="w-full border-2 border-gray-200 rounded-lg px-4 py-3 focus:border-[#964B00] focus:ring-2 focus:ring-amber-200 transition-all outline-none"
+                    placeholder='your.email@example.com'
+                    required
+                  />
+                </div>
+
+                <div className="grid md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                      Password <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="password"
+                      name="password"
+                      value={form.password}
+                      onChange={handleChange}
+                      className="w-full border-2 border-gray-200 rounded-lg px-4 py-3 focus:border-[#964B00] focus:ring-2 focus:ring-amber-200 transition-all outline-none"
+                      placeholder='••••••••'
+                      required
+                    />
+                    <p className="text-xs text-gray-500 mt-2 leading-relaxed">
+                      Must include: 8+ characters, uppercase, lowercase, number, special character (@$!%*?&)
+                    </p>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                      Confirm Password <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="password"
+                      name="confirmPassword"
+                      value={form.confirmPassword}
+                      onChange={handleChange}
+                      className="w-full border-2 border-gray-200 rounded-lg px-4 py-3 focus:border-[#964B00] focus:ring-2 focus:ring-amber-200 transition-all outline-none"
+                      placeholder='••••••••'
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div className="border-t pt-5">
+                  <label className="flex items-start space-x-3 cursor-pointer group">
+                    <input
+                      type="checkbox"
+                      name="agree"
+                      checked={form.agree}
+                      onChange={handleChange}
+                      className="mt-1 w-5 h-5 rounded border-2 border-gray-300 text-[#964B00] focus:ring-2 focus:ring-amber-200 cursor-pointer"
+                      required
+                    />
+                    <span className="text-sm text-gray-700 leading-relaxed">
+                      I confirm that I am at least 18 years old and agree to the{' '}
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.preventDefault()
+                          setShowTCModal(true)
+                        }}
+                        className="text-[#964B00] font-semibold underline hover:text-amber-700 transition-colors"
+                      >
+                        Terms and Conditions
+                      </button>
+                      {' '}and{' '}
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.preventDefault()
+                          setShowPrivacyModal(true)
+                        }}
+                        className="text-[#964B00] font-semibold underline hover:text-amber-700 transition-colors"
+                      >
+                        Privacy Policy
+                      </button>
+                      {' '}of Angieren's Lutong Bahay.
+                    </span>
+                  </label>
+                </div>
+              </div>
+            </div>
+
+            {/* Submit Section */}
+            <div className="bg-white rounded-2xl shadow-lg p-6 md:p-8">
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+                <p className="text-sm text-gray-600">
+                  Already have an account?{' '}
+                  <Link to="/login" className="text-[#964B00] font-semibold hover:underline">
+                    Sign in here
+                  </Link>
+                </p>
+                <button
+                  type="submit"
+                  className="w-full sm:w-auto bg-gradient-to-r from-[#964B00] to-amber-700 hover:from-amber-700 hover:to-[#964B00] text-yellow-400 font-bold px-12 py-4 rounded-xl shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-200"
+                >
+                  CREATE ACCOUNT
+                </button>
+              </div>
+            </div>
+          </form>
+        </div>
       </div>
 
       {/* FOOTER */}
@@ -866,49 +1124,55 @@ function Signup() {
         </div>
       </footer>
 
-      {
-        showOtpModal && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4 shadow-xl">
-              <h2 className="text-xl font-semibold text-gray-800 mb-4">Enter OTP Code</h2>
-              <p className="text-gray-600 mb-4">
-                We've sent a verification code to your current mobile number. Please enter it below to continue.
+      {showOtpModal && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl p-8 max-w-md w-full mx-4 shadow-2xl transform transition-all">
+            <div className="text-center mb-6">
+              <div className="w-16 h-16 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Bell className="h-8 w-8 text-[#964B00]" />
+              </div>
+              <h2 className="text-2xl font-bold text-gray-800 mb-2">Verify Your Number</h2>
+              <p className="text-gray-600 text-sm">
+                We've sent a 6-digit code to your mobile number
               </p>
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-600 mb-2">OTP Code</label>
-                <input
-                  type="text"
-                  value={otpCode}
-                  onChange={(e) => setOtpCode(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent text-center text-lg tracking-widest"
-                  placeholder="123456"
-                  maxLength={6}
-                  onKeyDown={(e) => e.key === 'Enter' && verifyOtp()}
-                />
-              </div>
-              <div className="text-center mb-4">
-                <button className="text-[#964B00] text-sm hover:underline">
-                  Resend OTP
-                </button>
-              </div>
-              <div className="flex gap-3 justify-end">
-                <button
-                  onClick={closeOtpModal}
-                  className="px-4 py-2 text-gray-600 bg-gray-200 rounded-md hover:bg-gray-300 transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={verifyOtp}
-                  className="px-4 py-2 bg-[#964B00] text-yellow-400 rounded-md hover:bg-[#7a3d00] transition-colors"
-                >
-                  Verify OTP
-                </button>
-              </div>
+            </div>
+
+            <div className="mb-6">
+              <label className="block text-sm font-semibold text-gray-700 mb-3 text-center">Enter OTP Code</label>
+              <input
+                type="text"
+                value={otpCode}
+                onChange={(e) => setOtpCode(e.target.value)}
+                className="w-full px-4 py-4 border-2 border-gray-200 rounded-xl focus:border-[#964B00] focus:ring-2 focus:ring-amber-200 transition-all outline-none text-center text-2xl tracking-[0.5em] font-bold"
+                placeholder="000000"
+                maxLength={6}
+                onKeyDown={(e) => e.key === 'Enter' && verifyOtp()}
+              />
+            </div>
+
+            <div className="text-center mb-6">
+              <button className="text-[#964B00] text-sm font-semibold hover:underline transition-colors">
+                Didn't receive the code? Resend
+              </button>
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                onClick={closeOtpModal}
+                className="flex-1 px-6 py-3 text-gray-700 bg-gray-100 rounded-xl hover:bg-gray-200 transition-colors font-semibold"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={verifyOtp}
+                className="flex-1 px-6 py-3 bg-gradient-to-r from-[#964B00] to-amber-700 text-yellow-400 rounded-xl hover:from-amber-700 hover:to-[#964B00] transition-all font-semibold shadow-lg"
+              >
+                Verify
+              </button>
             </div>
           </div>
-        )
-      }
+        </div>
+      )}
 
       {/* Terms and Conditions Modal */}
       {showTCModal && (
@@ -1099,7 +1363,7 @@ function Signup() {
 
                 <section>
                   <h3 className="text-lg font-semibold mb-2">8. Children's Privacy</h3>
-                  <p>Our service is not intended for individuals under 18 years of age. We do not knowingly collect personal information from children.</p>
+                  <p>Our service is not intended for individuals under 18 years of age.</p>
                 </section>
 
                 <section>
@@ -1137,6 +1401,6 @@ function Signup() {
       )}
 
       {isLoading && <LoadingSpinner />}
-    </div >
+    </div>
   )
 }

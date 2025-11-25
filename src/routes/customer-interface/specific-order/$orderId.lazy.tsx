@@ -153,7 +153,8 @@ function SpecificOrder() {
               *,
               add_on (*)
             )
-          )
+          ),
+          delivery(*)
         `)
         .eq('order_id', orderId)
         .single()
@@ -208,7 +209,7 @@ function SpecificOrder() {
       }
 
       // Calculate delivery fee (you can adjust this logic)
-      const deliveryFee = orderDataRaw.delivery_option === 'Delivery' ? 75 : 0
+      const deliveryFee = orderDataRaw.delivery.delivery_fee
       const subtotal = Number(orderDataRaw.total_price) - deliveryFee
 
       const transformed: OrderData = {
@@ -217,9 +218,6 @@ function SpecificOrder() {
         status: orderDataRaw.order_status,
         orderPlacedDate: formatDate(orderDataRaw.created_at),
         paymentConfirmedDate: orderDataRaw.payment?.is_paid && orderDataRaw.payment?.payment_date ? formatDate(orderDataRaw.payment.payment_date) : '',
-        // queuingDate: ['Queueing'].includes(orderDataRaw.order_status) ? formatDate(orderDataRaw.created_at) : '',
-        // preparingDate: ['Preparing', 'Cooking', 'Ready', 'On Delivery'].includes(orderDataRaw.order_status) ? formatDate(orderDataRaw.status_updated_at) : '',
-        // readyDate: ['Ready', 'On Delivery', 'Claim Order'].includes(orderDataRaw.order_status) ? formatDate(orderDataRaw.status_updated_at) : '',
         status_updated_at: formatDate(orderDataRaw.status_updated_at),
         completedDate: orderDataRaw.order_status === 'Completed' ? formatDate(orderDataRaw.completed_date) : '',
         deliveryOption: orderDataRaw.order_type || 'Delivery',

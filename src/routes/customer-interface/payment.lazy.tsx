@@ -840,7 +840,7 @@ function RouteComponent() {
                     customer_uid: user.id,
                     order_status: 'Pending',
                     order_type: deliveryOption,
-                    total_price: total,
+                    total_price: total - deliveryFee,
                     additional_information: additionalInformation,
                     schedule_id: matchingSchedule.schedule_id,
                     payment_id: paymentData.payment_id,

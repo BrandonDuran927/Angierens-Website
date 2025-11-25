@@ -127,12 +127,12 @@ function App() {
   };
 
   const navigationItems = [
-    { name: 'HOME', route: '/', active: true },
-    { name: 'MENU', route: '/customer-interface/', active: false },
-    { name: 'ORDER', route: '/customer-interface/order', active: false },
-    { name: 'REVIEW', route: '/customer-interface/feedback', active: false },
-    { name: 'MY INFO', route: '/customer-interface/my-info', active: false }
-  ];
+    { name: 'HOME', route: '/', active: true, showWhenLoggedOut: true },
+    { name: 'MENU', route: '/customer-interface/', active: false, showWhenLoggedOut: true },
+    { name: 'ORDER', route: '/customer-interface/order', active: false, showWhenLoggedOut: false },
+    { name: 'REVIEW', route: '/customer-interface/feedback', active: false, showWhenLoggedOut: false },
+    { name: 'MY INFO', route: '/customer-interface/my-info', active: false, showWhenLoggedOut: false }
+  ].filter(item => user || item.showWhenLoggedOut);
 
   const logoStyle: React.CSSProperties = {
     width: '140px', // equivalent to w-35 (35 * 4px = 140px)
@@ -214,81 +214,88 @@ function App() {
             {/* Right Side Controls */}
             <div className="flex items-center gap-1 sm:gap-2 md:gap-4 bg-[#964B00] py-2 px-2 sm:px-4 md:px-6 rounded-lg">
               {/* Cart Icon */}
-              <Link
-                to="/login"
-                className="relative p-1 sm:p-2 text-yellow-400 hover:bg-[#7a3d00] rounded-full"
-              >
-                <ShoppingCart className="h-5 w-5 sm:h-6 sm:w-6" />
-                {cartCount > 0 && (
-                  <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-4 w-4 sm:h-5 sm:w-5 flex items-center justify-center text-[10px] sm:text-xs">
-                    {cartCount}
-                  </span>
-                )}
-              </Link>
-
-              {/* Notifications */}
-              <div className="relative">
-                <button
-                  onClick={() => setIsNotificationOpen(!isNotificationOpen)}
+              {user && (
+                <Link
+                  to="/login"
                   className="relative p-1 sm:p-2 text-yellow-400 hover:bg-[#7a3d00] rounded-full"
                 >
-                  <Bell className="h-5 w-5 sm:h-6 sm:w-6" />
-                  {notificationCount > 0 && (
+                  <ShoppingCart className="h-5 w-5 sm:h-6 sm:w-6" />
+                  {cartCount > 0 && (
                     <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-4 w-4 sm:h-5 sm:w-5 flex items-center justify-center text-[10px] sm:text-xs">
-                      {notificationCount}
+                      {cartCount}
                     </span>
                   )}
-                </button>
+                </Link>
+              )}
 
-                {/* Notification Dropdown */}
-                {isNotificationOpen && (
-                  <div className="absolute right-0 mt-2 w-72 sm:w-80 md:w-96 bg-white rounded-lg shadow-lg border border-gray-200 z-50 max-h-[70vh] overflow-hidden">
-                    <div className="p-3 sm:p-4 border-b border-gray-200">
-                      <h3 className="text-base sm:text-lg font-semibold text-gray-800">Notifications</h3>
-                    </div>
 
-                    <div className="max-h-60 sm:max-h-80 overflow-y-auto">
-                      {notifications.length === 0 ? (
-                        <div className="p-8 text-center text-gray-500">
-                          <p>No notifications yet</p>
-                        </div>
-                      ) : (
-                        notifications.map((notification, index) => (
-                          <div
-                            key={notification.id}
-                            className={`p-3 sm:p-4 border-b border-gray-100 hover:bg-gray-50 cursor-pointer ${index === notifications.length - 1 ? 'border-b-0' : ''
-                              }`}
-                          >
-                            <div className="flex items-start gap-2 sm:gap-3">
-                              <div className="flex-shrink-0 w-8 h-8 sm:w-10 sm:h-10 bg-yellow-400 rounded-full flex items-center justify-center text-black">
-                                {getNotificationIcon(notification.icon)}
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                <p className="text-xs sm:text-sm text-gray-800 leading-relaxed">
-                                  {notification.title}
-                                </p>
-                                <p className="text-[10px] sm:text-xs text-gray-500 mt-1">
-                                  {notification.time}
-                                </p>
+              {/* Notifications */}
+              {user && (
+                <div className="relative">
+                  <button
+                    onClick={() => setIsNotificationOpen(!isNotificationOpen)}
+                    className="relative p-1 sm:p-2 text-yellow-400 hover:bg-[#7a3d00] rounded-full"
+                  >
+                    <Bell className="h-5 w-5 sm:h-6 sm:w-6" />
+                    {notificationCount > 0 && (
+                      <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-4 w-4 sm:h-5 sm:w-5 flex items-center justify-center text-[10px] sm:text-xs">
+                        {notificationCount}
+                      </span>
+                    )}
+                  </button>
+
+
+                  {/* Notification Dropdown */}
+                  {isNotificationOpen && (
+                    <div className="absolute right-0 mt-2 w-72 sm:w-80 md:w-96 bg-white rounded-lg shadow-lg border border-gray-200 z-50 max-h-[70vh] overflow-hidden">
+                      <div className="p-3 sm:p-4 border-b border-gray-200">
+                        <h3 className="text-base sm:text-lg font-semibold text-gray-800">Notifications</h3>
+                      </div>
+
+                      <div className="max-h-60 sm:max-h-80 overflow-y-auto">
+                        {notifications.length === 0 ? (
+                          <div className="p-8 text-center text-gray-500">
+                            <p>No notifications yet</p>
+                          </div>
+                        ) : (
+                          notifications.map((notification, index) => (
+                            <div
+                              key={notification.id}
+                              className={`p-3 sm:p-4 border-b border-gray-100 hover:bg-gray-50 cursor-pointer ${index === notifications.length - 1 ? 'border-b-0' : ''
+                                }`}
+                            >
+                              <div className="flex items-start gap-2 sm:gap-3">
+                                <div className="flex-shrink-0 w-8 h-8 sm:w-10 sm:h-10 bg-yellow-400 rounded-full flex items-center justify-center text-black">
+                                  {getNotificationIcon(notification.icon)}
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-xs sm:text-sm text-gray-800 leading-relaxed">
+                                    {notification.title}
+                                  </p>
+                                  <p className="text-[10px] sm:text-xs text-gray-500 mt-1">
+                                    {notification.time}
+                                  </p>
+                                </div>
                               </div>
                             </div>
-                          </div>
-                        ))
-                      )}
-                    </div>
+                          ))
+                        )}
+                      </div>
 
-                    <div className="p-3 sm:p-4 border-t border-gray-200">
-                      <button
-                        onClick={markAllAsRead}
-                        className="w-full bg-yellow-400 text-black py-2 px-4 rounded-lg font-medium hover:bg-yellow-500 transition-colors flex items-center justify-center gap-2 text-sm"
-                      >
-                        <Bell className="h-4 w-4" />
-                        Mark all as read
-                      </button>
+                      <div className="p-3 sm:p-4 border-t border-gray-200">
+                        <button
+                          onClick={markAllAsRead}
+                          className="w-full bg-yellow-400 text-black py-2 px-4 rounded-lg font-medium hover:bg-yellow-500 transition-colors flex items-center justify-center gap-2 text-sm"
+                        >
+                          <Bell className="h-4 w-4" />
+                          Mark all as read
+                        </button>
+                      </div>
                     </div>
-                  </div>
-                )}
-              </div>
+                  )}
+                </div>
+
+              )}
 
               {/* Conditional Button */}
               {user ? (
