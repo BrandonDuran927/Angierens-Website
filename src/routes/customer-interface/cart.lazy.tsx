@@ -1,5 +1,5 @@
 import { createLazyFileRoute, Link } from '@tanstack/react-router'
-import { ShoppingCart, Plus, Minus, Edit2, Trash2, Bell, Heart, X, MessageSquare, Star, Menu } from 'lucide-react'
+import { ShoppingCart, Plus, Minus, Edit2, Trash2, Bell, Heart, X, MessageSquare, Star, Menu, Package, ArrowRight, Tag } from 'lucide-react'
 import { ProtectedRoute } from '@/components/ProtectedRoute'
 import { useState, useEffect } from 'react'
 import { useUser } from '@/context/UserContext'
@@ -328,6 +328,11 @@ function RouteComponent() {
             const updatedItems = cartItems.filter(item => item.cart_item_id !== cart_item_id);
             setCartItems(updatedItems);
             setCartCount(updatedItems.length);
+            setSelectedItems(prev => {
+                const newSet = new Set(prev);
+                newSet.delete(cart_item_id);
+                return newSet;
+            });
         } catch (error) {
             console.error('Error removing item:', error);
         }
@@ -342,7 +347,7 @@ function RouteComponent() {
     }
 
     const formatPrice = (price: number) => {
-        return `₱ ${price.toLocaleString()}`
+        return `₱${price.toLocaleString()}`
     }
 
     const toggleItemSelection = (cart_item_id: string) => {
@@ -523,6 +528,34 @@ function RouteComponent() {
         height: 140px !important;
       }
     }
+
+    @keyframes slideIn {
+      from {
+        opacity: 0;
+        transform: translateY(10px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .cart-item-animate {
+      animation: slideIn 0.3s ease-out;
+    }
+
+    @keyframes fadeIn {
+      from {
+        opacity: 0;
+      }
+      to {
+        opacity: 1;
+      }
+    }
+
+    .fade-in {
+      animation: fadeIn 0.3s ease-out;
+    }
   `;
 
     const formatAddOnsDisplay = (addOns: Array<{ name: string; quantity: number }>) => {
@@ -639,7 +672,7 @@ function RouteComponent() {
 
     return (
         <ProtectedRoute allowedRoles={['customer']}>
-            <div className="min-h-screen bg-gradient-to-br from-amber-50 to-orange-100">
+            <div className="min-h-screen bg-gradient-to-br from-amber-50 via-orange-50 to-yellow-50">
                 <style dangerouslySetInnerHTML={{ __html: customStyles }} />
 
                 {/* Customer Header */}
@@ -771,7 +804,6 @@ function RouteComponent() {
                         </div>
                     </div>
                 </header>
-
                 {isMobileMenuOpen && (
                     <div
                         className="fixed inset-0 bg-black/50 z-40 lg:hidden"
@@ -818,85 +850,153 @@ function RouteComponent() {
                 )}
 
                 {/* Main Content */}
-                <div className="max-w-4xl mx-auto p-4 sm:p-6">
-                    {/* Header */}
-                    <div className="flex items-center gap-3 mb-6 sm:mb-8">
-                        <ShoppingCart className="w-6 h-6 sm:w-8 sm:h-8 text-gray-800" />
-                        <h1 className="text-2xl sm:text-3xl font-bold text-gray-800">Your Cart</h1>
+                <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+                    {/* Header Section - Enhanced */}
+                    <div className="mb-8">
+                        <div className="flex items-center justify-between mb-6">
+                            <div className="flex items-center gap-4">
+                                <div className="bg-gradient-to-br from-yellow-400 to-orange-400 p-4 rounded-2xl shadow-lg">
+                                    <ShoppingCart className="w-8 h-8 text-white" />
+                                </div>
+                                <div>
+                                    <h1 className="text-3xl sm:text-4xl font-bold text-gray-900">Shopping Cart</h1>
+                                    <p className="text-gray-600 mt-1">{cartItems.length} {cartItems.length === 1 ? 'item' : 'items'} in your cart</p>
+                                </div>
+                            </div>
+
+                            {cartItems.length > 0 && (
+                                <button
+                                    onClick={toggleSelectAll}
+                                    className="hidden sm:flex items-center gap-2 px-5 py-2.5 bg-white border-2 border-yellow-400 text-gray-800 rounded-xl font-semibold hover:bg-yellow-50 transition-all shadow-sm"
+                                >
+                                    <input
+                                        type="checkbox"
+                                        checked={selectedItems.size === cartItems.length && cartItems.length > 0}
+                                        onChange={toggleSelectAll}
+                                        className="w-5 h-5 rounded border-2 border-yellow-400 text-yellow-400 focus:ring-2 focus:ring-yellow-400"
+                                    />
+                                    Select All
+                                </button>
+                            )}
+                        </div>
+
+                        {/* Mobile Select All */}
+                        {cartItems.length > 0 && (
+                            <button
+                                onClick={toggleSelectAll}
+                                className="sm:hidden w-full flex items-center justify-center gap-2 px-5 py-3 bg-white border-2 border-yellow-400 text-gray-800 rounded-xl font-semibold hover:bg-yellow-50 transition-all shadow-sm mb-4"
+                            >
+                                <input
+                                    type="checkbox"
+                                    checked={selectedItems.size === cartItems.length && cartItems.length > 0}
+                                    onChange={toggleSelectAll}
+                                    className="w-5 h-5 rounded border-2 border-yellow-400 text-yellow-400 focus:ring-2 focus:ring-yellow-400"
+                                />
+                                Select All Items
+                            </button>
+                        )}
                     </div>
 
                     {/* Loading State */}
                     {loading ? (
-                        <div className="fixed inset-0 bg-black/50 flex justify-center items-center z-[60]">
-                            <div className="bg-white rounded-xl shadow-lg p-6 flex flex-col items-center gap-4">
-                                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#964B00]"></div>
-                                <p className="text-gray-700 font-medium">Processing...</p>
+                        <div className="fixed inset-0 bg-black/50 flex justify-center items-center z-[60] backdrop-blur-sm">
+                            <div className="bg-white rounded-2xl shadow-2xl p-8 flex flex-col items-center gap-4">
+                                <div className="animate-spin rounded-full h-16 w-16 border-4 border-yellow-400 border-t-transparent"></div>
+                                <p className="text-gray-700 font-semibold text-lg">Loading...</p>
                             </div>
                         </div>
                     ) : (
                         <>
                             {/* Cart Items */}
-                            <div className="space-y-3 sm:space-y-4 mb-6 sm:mb-8">
+                            <div className="space-y-4 mb-8">
                                 {cartItems.length === 0 ? (
-                                    <div className="text-center py-12 sm:py-16">
-                                        <ShoppingCart className="w-12 h-12 sm:w-16 sm:h-16 text-gray-400 mx-auto mb-4" />
-                                        <p className="text-gray-500 text-base sm:text-lg">Your cart is empty</p>
+                                    <div className="text-center py-20 bg-white rounded-3xl shadow-lg border-2 border-dashed border-gray-300">
+                                        <div className="bg-gradient-to-br from-gray-100 to-gray-200 w-24 h-24 rounded-full flex items-center justify-center mx-auto mb-6">
+                                            <Package className="w-12 h-12 text-gray-400" />
+                                        </div>
+                                        <h3 className="text-2xl font-bold text-gray-800 mb-2">Your cart is empty</h3>
+                                        <p className="text-gray-500 mb-6">Add some delicious items to get started!</p>
+                                        <Link to="/customer-interface">
+                                            <button className="bg-gradient-to-r from-yellow-400 to-orange-400 text-white px-8 py-3 rounded-xl font-semibold hover:shadow-lg transition-all duration-300 transform hover:-translate-y-0.5">
+                                                Browse Menu
+                                            </button>
+                                        </Link>
                                     </div>
                                 ) : (
-                                    cartItems.map((item) => (
-                                        <div key={item.cart_item_id} className="bg-white rounded-xl sm:rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
-                                            <div className="p-4 sm:p-6">
+                                    cartItems.map((item, index) => (
+                                        <div
+                                            key={item.cart_item_id}
+                                            className="cart-item-animate bg-white rounded-2xl shadow-md hover:shadow-xl transition-all duration-300 border-2 border-transparent hover:border-yellow-400 overflow-hidden"
+                                            style={{ animationDelay: `${index * 0.05}s` }}
+                                        >
+                                            <div className="p-5 sm:p-6">
                                                 {/* Desktop Layout */}
                                                 <div className="hidden lg:flex items-center gap-6">
                                                     {/* Selection Checkbox */}
                                                     <div className="flex-shrink-0">
                                                         <button
                                                             onClick={() => toggleItemSelection(item.cart_item_id)}
-                                                            className="w-5 h-5 rounded-full border-2 border-yellow-400 flex items-center justify-center hover:bg-yellow-50 transition-colors"
+                                                            className={`w-6 h-6 rounded-lg border-2 flex items-center justify-center transition-all duration-200 ${selectedItems.has(item.cart_item_id)
+                                                                ? 'bg-yellow-400 border-yellow-400'
+                                                                : 'border-gray-300 hover:border-yellow-400 hover:bg-yellow-50'
+                                                                }`}
                                                         >
                                                             {selectedItems.has(item.cart_item_id) && (
-                                                                <div className="w-3 h-3 bg-yellow-400 rounded-full"></div>
+                                                                <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                                                                </svg>
                                                             )}
                                                         </button>
                                                     </div>
 
                                                     {/* Product Image */}
                                                     <div className="flex-shrink-0">
-                                                        <div className="relative">
+                                                        <div className="relative group">
+                                                            <div className="absolute inset-0 bg-gradient-to-br from-yellow-400/20 to-orange-400/20 rounded-2xl group-hover:scale-105 transition-transform duration-300"></div>
                                                             <img
                                                                 src={getImageUrl(item.image)}
                                                                 alt={item.name}
-                                                                className="w-24 h-24 object-cover rounded-full border-4 border-green-600"
+                                                                className="relative w-28 h-28 object-cover rounded-2xl border-4 border-white shadow-lg"
                                                             />
                                                         </div>
                                                     </div>
 
                                                     {/* Product Details */}
-                                                    <div className="flex-1">
-                                                        <h3 className="text-lg font-semibold text-gray-800 mb-1">
+                                                    <div className="flex-1 min-w-0">
+                                                        <h3 className="text-xl font-bold text-gray-900 mb-2 truncate">
                                                             {item.name}
                                                         </h3>
-                                                        <div className="text-xl font-bold text-gray-800">
+                                                        {item.addOns.length > 0 && (
+                                                            <div className="flex flex-wrap gap-2 mb-2">
+                                                                {item.addOns.map((addOn, idx) => (
+                                                                    <span key={idx} className="inline-flex items-center gap-1 bg-orange-100 text-orange-700 px-3 py-1 rounded-full text-xs font-medium">
+                                                                        <Tag className="w-3 h-3" />
+                                                                        {addOn.name} ({addOn.quantity}) - ₱{(addOn.price * addOn.quantity).toLocaleString()}
+                                                                    </span>
+                                                                ))}
+                                                            </div>
+                                                        )}
+                                                        <div className="text-2xl font-bold bg-gradient-to-r from-yellow-600 to-orange-600 bg-clip-text text-transparent">
                                                             {formatPrice(item.price)}
                                                         </div>
                                                     </div>
 
                                                     {/* Quantity Controls */}
-                                                    <div className="flex items-center gap-3">
+                                                    <div className="flex items-center gap-3 bg-gray-50 rounded-xl px-4 py-2">
                                                         <button
                                                             onClick={() => updateQuantity(item.cart_item_id, item.quantity - 1)}
-                                                            className="w-10 h-10 bg-yellow-400 hover:bg-yellow-500 rounded-full flex items-center justify-center transition-colors"
+                                                            className="w-10 h-10 bg-gradient-to-br from-yellow-400 to-orange-400 hover:from-yellow-500 hover:to-orange-500 rounded-xl flex items-center justify-center transition-all duration-200 shadow-md hover:shadow-lg transform hover:scale-105"
                                                         >
-                                                            <Minus className="w-5 h-5 text-gray-800" />
+                                                            <Minus className="w-5 h-5 text-white" />
                                                         </button>
-                                                        <span className="w-8 text-center font-semibold text-lg">
+                                                        <span className="w-12 text-center font-bold text-xl text-gray-800">
                                                             {item.quantity}
                                                         </span>
                                                         <button
                                                             onClick={() => updateQuantity(item.cart_item_id, item.quantity + 1)}
-                                                            className="w-10 h-10 bg-yellow-400 hover:bg-yellow-500 rounded-full flex items-center justify-center transition-colors"
+                                                            className="w-10 h-10 bg-gradient-to-br from-yellow-400 to-orange-400 hover:from-yellow-500 hover:to-orange-500 rounded-xl flex items-center justify-center transition-all duration-200 shadow-md hover:shadow-lg transform hover:scale-105"
                                                         >
-                                                            <Plus className="w-5 h-5 text-gray-800" />
+                                                            <Plus className="w-5 h-5 text-white" />
                                                         </button>
                                                     </div>
 
@@ -904,13 +1004,15 @@ function RouteComponent() {
                                                     <div className="flex flex-col gap-2">
                                                         <button
                                                             onClick={() => openEditModal(item)}
-                                                            className="p-2 text-orange-600 hover:text-orange-700 transition-colors"
+                                                            className="p-3 text-orange-600 hover:text-orange-700 bg-orange-50 hover:bg-orange-100 rounded-xl transition-all duration-200"
+                                                            title="Edit item"
                                                         >
                                                             <Edit2 className="w-5 h-5" />
                                                         </button>
                                                         <button
                                                             onClick={() => removeItem(item.cart_item_id)}
-                                                            className="p-2 text-red-600 hover:text-red-700 transition-colors"
+                                                            className="p-3 text-red-600 hover:text-red-700 bg-red-50 hover:bg-red-100 rounded-xl transition-all duration-200"
+                                                            title="Remove item"
                                                         >
                                                             <Trash2 className="w-5 h-5" />
                                                         </button>
@@ -919,76 +1021,94 @@ function RouteComponent() {
 
                                                 {/* Mobile/Tablet Layout */}
                                                 <div className="lg:hidden">
-                                                    {/* Top Row - Image, Details, and Actions */}
-                                                    <div className="flex items-start gap-4 mb-4">
-                                                        {/* Selection Checkbox - Mobile */}
-                                                        <div className="flex-shrink-0 mt-2">
+                                                    {/* Top Row */}
+                                                    <div className="flex items-start gap-3 mb-4">
+                                                        {/* Selection Checkbox */}
+                                                        <div className="flex-shrink-0 mt-1">
                                                             <button
                                                                 onClick={() => toggleItemSelection(item.cart_item_id)}
-                                                                className="w-4 h-4 sm:w-5 sm:h-5 rounded-full border-2 border-yellow-400 flex items-center justify-center hover:bg-yellow-50 transition-colors"
+                                                                className={`w-5 h-5 rounded-lg border-2 flex items-center justify-center transition-all duration-200 ${selectedItems.has(item.cart_item_id)
+                                                                    ? 'bg-yellow-400 border-yellow-400'
+                                                                    : 'border-gray-300 hover:border-yellow-400'
+                                                                    }`}
                                                             >
                                                                 {selectedItems.has(item.cart_item_id) && (
-                                                                    <div className="w-2 h-2 sm:w-3 sm:h-3 bg-yellow-400 rounded-full"></div>
+                                                                    <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                                                                    </svg>
                                                                 )}
                                                             </button>
                                                         </div>
 
-                                                        {/* Product Image - Mobile */}
+                                                        {/* Product Image */}
                                                         <div className="flex-shrink-0">
-                                                            <img
-                                                                src={item.image}
-                                                                alt={item.name}
-                                                                className="w-16 h-16 sm:w-20 sm:h-20 object-cover rounded-full border-2 sm:border-4 border-green-600"
-                                                            />
+                                                            <div className="relative">
+                                                                <div className="absolute inset-0 bg-gradient-to-br from-yellow-400/20 to-orange-400/20 rounded-xl"></div>
+                                                                <img
+                                                                    src={getImageUrl(item.image)}
+                                                                    alt={item.name}
+                                                                    className="relative w-20 h-20 sm:w-24 sm:h-24 object-cover rounded-xl border-3 border-white shadow-md"
+                                                                />
+                                                            </div>
                                                         </div>
 
-                                                        {/* Product Details - Mobile */}
+                                                        {/* Product Details */}
                                                         <div className="flex-1 min-w-0">
-                                                            <h3 className="text-base sm:text-lg font-semibold text-gray-800 mb-1 truncate">
+                                                            <h3 className="text-base sm:text-lg font-bold text-gray-900 mb-1 line-clamp-2">
                                                                 {item.name}
                                                             </h3>
-                                                            <p className="text-gray-600 text-xs sm:text-sm mb-2 truncate">
-                                                                add-ons: {formatAddOnsDisplay(item.addOns)}
-                                                            </p>
-                                                            <div className="text-lg sm:text-xl font-bold text-gray-800">
+                                                            {item.addOns.length > 0 && (
+                                                                <div className="flex flex-wrap gap-1 mb-2">
+                                                                    {item.addOns.slice(0, 2).map((addOn, idx) => (
+                                                                        <span key={idx} className="inline-flex items-center gap-1 bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full text-[10px] font-medium">
+                                                                            <Tag className="w-2.5 h-2.5" />
+                                                                            {addOn.name} - ₱{(addOn.price * addOn.quantity).toLocaleString()}
+                                                                        </span>
+                                                                    ))}
+                                                                    {item.addOns.length > 2 && (
+                                                                        <span className="text-[10px] text-gray-500">+{item.addOns.length - 2} more</span>
+                                                                    )}
+                                                                </div>
+                                                            )}
+                                                            <div className="text-lg sm:text-xl font-bold bg-gradient-to-r from-yellow-600 to-orange-600 bg-clip-text text-transparent">
                                                                 {formatPrice(item.price)}
                                                             </div>
                                                         </div>
 
                                                         {/* Action Buttons - Mobile */}
-                                                        <div className="flex sm:flex-col gap-1 sm:gap-2 flex-shrink-0">
+                                                        <div className="flex flex-col gap-1 flex-shrink-0">
                                                             <button
                                                                 onClick={() => openEditModal(item)}
-                                                                className="p-1.5 sm:p-2 text-orange-600 hover:text-orange-700 transition-colors"
+                                                                className="p-2 text-orange-600 hover:text-orange-700 bg-orange-50 hover:bg-orange-100 rounded-lg transition-colors"
                                                             >
-                                                                <Edit2 className="w-4 h-4 sm:w-5 sm:h-5" />
+                                                                <Edit2 className="w-4 h-4" />
                                                             </button>
                                                             <button
                                                                 onClick={() => removeItem(item.cart_item_id)}
-                                                                className="p-1.5 sm:p-2 text-red-600 hover:text-red-700 transition-colors"
+                                                                className="p-2 text-red-600 hover:text-red-700 bg-red-50 hover:bg-red-100 rounded-lg transition-colors"
                                                             >
-                                                                <Trash2 className="w-4 h-4 sm:w-5 sm:h-5" />
+                                                                <Trash2 className="w-4 h-4" />
                                                             </button>
                                                         </div>
                                                     </div>
 
-                                                    {/* Bottom Row - Quantity Controls (Mobile) */}
-                                                    <div className="flex items-center justify-center gap-3 pt-3 border-t border-gray-100">
-                                                        <span className="text-sm font-medium text-gray-600 mr-2">Qty:</span>
+                                                    {/* Bottom Row - Quantity Controls */}
+                                                    <div className="flex items-center justify-center gap-3 pt-3 border-t border-gray-100 bg-gray-50 rounded-xl p-3">
+                                                        <span className="text-sm font-semibold text-gray-600">Quantity:</span>
                                                         <button
                                                             onClick={() => updateQuantity(item.cart_item_id, item.quantity - 1)}
-                                                            className="w-8 h-8 sm:w-10 sm:h-10 bg-yellow-400 hover:bg-yellow-500 rounded-full flex items-center justify-center transition-colors"
+                                                            className="w-9 h-9 bg-gradient-to-br from-yellow-400 to-orange-400 hover:from-yellow-500 hover:to-orange-500 rounded-lg flex items-center justify-center transition-all shadow-md"
                                                         >
-                                                            <Minus className="w-4 h-4 sm:w-5 sm:h-5 text-gray-800" />
+                                                            <Minus className="w-4 h-4 text-white" />
                                                         </button>
-                                                        <span className="w-6 sm:w-8 text-center font-semibold text-base sm:text-lg">
+                                                        <span className="w-10 text-center font-bold text-lg text-gray-800">
                                                             {item.quantity}
                                                         </span>
                                                         <button
                                                             onClick={() => updateQuantity(item.cart_item_id, item.quantity + 1)}
-                                                            className="w-8 h-8 sm:w-10 sm:h-10 bg-yellow-400 hover:bg-yellow-500 rounded-full flex items-center justify-center transition-colors"
+                                                            className="w-9 h-9 bg-gradient-to-br from-yellow-400 to-orange-400 hover:from-yellow-500 hover:to-orange-500 rounded-lg flex items-center justify-center transition-all shadow-md"
                                                         >
-                                                            <Plus className="w-4 h-4 sm:w-5 sm:h-5 text-gray-800" />
+                                                            <Plus className="w-4 h-4 text-white" />
                                                         </button>
                                                     </div>
                                                 </div>
@@ -998,29 +1118,41 @@ function RouteComponent() {
                                 )}
                             </div>
 
-                            {/* Cart Summary */}
+                            {/* Cart Summary - Enhanced Sticky Bottom Bar */}
                             {cartItems.length > 0 && (
-                                <div className="border-t border-gray-300 pt-4 sm:pt-6">
-                                    <div className="flex flex-col sm:flex-row items-center gap-4 sm:justify-between">
-                                        <div className="bg-gray-100 px-4 py-2 sm:px-6 sm:py-3 rounded-full order-2 sm:order-1">
-                                            <span className="text-base sm:text-lg font-semibold text-gray-800">
-                                                Selected Total ({selectedItems.size} {selectedItems.size === 1 ? 'item' : 'items'}): {formatPrice(calculateSelectedTotal())}
-                                            </span>
+                                <div className="sticky bottom-0 left-0 right-0 bg-white border-t-4 border-yellow-400 shadow-2xl rounded-t-3xl p-6 mt-8 z-30">
+                                    <div className="max-w-6xl mx-auto">
+                                        <div className="flex flex-col lg:flex-row items-center gap-4 lg:justify-between">
+                                            {/* Total Section */}
+                                            <div className="flex flex-col sm:flex-row items-center gap-4 w-full lg:w-auto">
+                                                <div className="bg-gradient-to-br from-yellow-50 to-orange-50 px-6 py-4 rounded-2xl border-2 border-yellow-400 shadow-lg w-full sm:w-auto">
+                                                    <div className="text-sm text-gray-600 mb-1">Selected Items: {selectedItems.size}</div>
+                                                    <div className="flex items-baseline gap-2">
+                                                        <span className="text-sm font-semibold text-gray-700">Total:</span>
+                                                        <span className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-yellow-600 to-orange-600 bg-clip-text text-transparent">
+                                                            {formatPrice(calculateSelectedTotal())}
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            {/* Checkout Button */}
+                                            <button
+                                                disabled={selectedItems.size === 0}
+                                                onClick={() => {
+                                                    if (selectedItems.size > 0) {
+                                                        openCheckoutAddOnsModal();
+                                                    }
+                                                }}
+                                                className={`w-full lg:w-auto font-bold px-8 py-4 rounded-2xl transition-all duration-300 flex items-center justify-center gap-3 text-lg shadow-xl transform ${selectedItems.size === 0
+                                                    ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                                                    : 'bg-gradient-to-r from-yellow-400 to-orange-400 hover:from-yellow-500 hover:to-orange-500 text-white hover:shadow-2xl hover:scale-105'
+                                                    }`}
+                                            >
+                                                <span>Proceed to Checkout</span>
+                                                <ArrowRight className="w-6 h-6" />
+                                            </button>
                                         </div>
-                                        <button
-                                            disabled={selectedItems.size === 0}
-                                            onClick={() => {
-                                                if (selectedItems.size > 0) {
-                                                    openCheckoutAddOnsModal();
-                                                }
-                                            }}
-                                            className={`font-semibold px-6 py-2.5 sm:px-8 sm:py-3 rounded-full transition-colors flex items-center gap-2 order-1 sm:order-2 w-full sm:w-auto justify-center text-sm sm:text-base ${selectedItems.size === 0
-                                                ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                                                : 'bg-yellow-400 hover:bg-yellow-500 text-gray-800'
-                                                }`}
-                                        >
-                                            Proceed to Checkout ({selectedItems.size}) →
-                                        </button>
                                     </div>
                                 </div>
                             )}
@@ -1028,173 +1160,211 @@ function RouteComponent() {
                     )}
                 </div>
 
-                {/* Edit Modal */}
+                {/* Edit Modal - Enhanced */}
                 {isEditModalOpen && selectedItem && (
-                    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-                        <div className="bg-white rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+                    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-in fade-in duration-200">
+                        <div className="bg-white rounded-3xl max-w-5xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">
                             <div className="flex flex-col lg:flex-row">
                                 {/* Left side - Item details */}
-                                <div className="flex-1 p-6">
-                                    <div className="flex justify-between items-start mb-4">
-                                        <div>
-                                            <h2 className="text-2xl font-bold text-gray-900 mb-2">{selectedItem.name}</h2>
-                                            <p className="text-gray-600 mb-4">{selectedItem.description}</p>
+                                <div className="flex-1 p-6 lg:p-8">
+                                    <div className="flex justify-between items-start mb-6">
+                                        <div className="flex-1">
+                                            <div className="flex items-center gap-3 mb-3">
+                                                <div className="bg-gradient-to-br from-yellow-400 to-orange-400 p-2 rounded-xl">
+                                                    <Edit2 className="w-5 h-5 text-white" />
+                                                </div>
+                                                <h2 className="text-2xl lg:text-3xl font-bold text-gray-900">{selectedItem.name}</h2>
+                                            </div>
+                                            <p className="text-gray-600 leading-relaxed">{selectedItem.description}</p>
                                         </div>
                                         <button
                                             onClick={closeEditModal}
-                                            className="text-gray-400 hover:text-gray-600 p-2"
+                                            className="text-gray-400 hover:text-gray-600 p-2 hover:bg-gray-100 rounded-xl transition-all ml-4"
                                         >
                                             <X className="h-6 w-6" />
                                         </button>
                                     </div>
 
                                     {selectedItem.inclusions && selectedItem.inclusions.length > 0 && (
-                                        <div className="mb-6">
-                                            <h3 className="text-lg font-semibold text-gray-800 mb-3">Inclusion:</h3>
+                                        <div className="mb-6 bg-gradient-to-br from-yellow-50 to-orange-50 p-5 rounded-2xl border-2 border-yellow-200">
+                                            <h3 className="text-lg font-bold text-gray-800 mb-3 flex items-center gap-2">
+                                                <Package className="w-5 h-5 text-yellow-600" />
+                                                Inclusions:
+                                            </h3>
                                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                                                 {selectedItem.inclusions.map((inclusion: string, index: number) => (
-                                                    <p key={index} className="text-gray-600 text-sm">{inclusion}</p>
+                                                    <div key={index} className="flex items-center gap-2">
+                                                        <div className="w-2 h-2 bg-yellow-500 rounded-full"></div>
+                                                        <p className="text-gray-700 text-sm">{inclusion}</p>
+                                                    </div>
                                                 ))}
                                             </div>
                                         </div>
                                     )}
 
                                     {/* Quantity selector */}
-                                    <div className="flex items-center gap-4 mb-6">
-                                        <span className="text-gray-700 font-medium">Quantity:</span>
-                                        <div className="flex items-center gap-2">
+                                    <div className="flex items-center gap-4 mb-8 bg-gray-50 p-5 rounded-2xl">
+                                        <span className="text-gray-800 font-bold text-lg">Quantity:</span>
+                                        <div className="flex items-center gap-3">
                                             <button
                                                 onClick={() => setOrderQuantity(Math.max(1, orderQuantity - 1))}
-                                                className="w-10 h-10 rounded-full border-2 border-gray-300 flex items-center justify-center hover:bg-gray-100"
+                                                className="w-12 h-12 rounded-xl bg-gradient-to-br from-yellow-400 to-orange-400 hover:from-yellow-500 hover:to-orange-500 flex items-center justify-center shadow-md hover:shadow-lg transition-all"
                                             >
-                                                <Minus className="h-4 w-4" />
+                                                <Minus className="h-5 w-5 text-white" />
                                             </button>
-                                            <span className="text-xl font-semibold w-12 text-center">{orderQuantity}</span>
+                                            <span className="text-2xl font-bold w-16 text-center text-gray-900">{orderQuantity}</span>
                                             <button
                                                 onClick={() => setOrderQuantity(orderQuantity + 1)}
-                                                className="w-10 h-10 rounded-full border-2 border-gray-300 flex items-center justify-center hover:bg-gray-100"
+                                                className="w-12 h-12 rounded-xl bg-gradient-to-br from-yellow-400 to-orange-400 hover:from-yellow-500 hover:to-orange-500 flex items-center justify-center shadow-md hover:shadow-lg transition-all"
                                             >
-                                                <Plus className="h-4 w-4" />
+                                                <Plus className="h-5 w-5 text-white" />
                                             </button>
                                         </div>
                                     </div>
 
                                     {/* Total and Update Cart */}
-                                    <div className="flex items-center justify-between pt-4 border-t">
-                                        <div className="text-2xl font-bold text-gray-900">
-                                            Total: ₱{calculateEditTotal().toLocaleString()}
+                                    <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-6 border-t-2 border-gray-200">
+                                        <div>
+                                            <div className="text-sm text-gray-600 mb-1">Total Amount</div>
+                                            <div className="text-3xl font-bold bg-gradient-to-r from-yellow-600 to-orange-600 bg-clip-text text-transparent">
+                                                ₱{calculateEditTotal().toLocaleString()}
+                                            </div>
                                         </div>
                                         <button
                                             onClick={updateCartItem}
-                                            className="bg-yellow-400 text-black px-8 py-3 rounded-lg font-bold hover:bg-yellow-500 transition-colors duration-200 shadow-md"
+                                            className="w-full sm:w-auto bg-gradient-to-r from-yellow-400 to-orange-400 hover:from-yellow-500 hover:to-orange-500 text-white px-8 py-4 rounded-2xl font-bold transition-all duration-300 shadow-xl hover:shadow-2xl transform hover:scale-105 flex items-center justify-center gap-2"
                                         >
                                             Update Cart
+                                            <ArrowRight className="w-5 h-5" />
                                         </button>
                                     </div>
                                 </div>
 
                                 {/* Right side - Add-ons */}
-                                <div className="w-full lg:w-80 bg-gray-50 p-6 border-t lg:border-t-0 lg:border-l">
-                                    <h3 className="text-lg font-semibold text-gray-800 mb-4">Add-ons:</h3>
-                                    <div className="space-y-3">
-                                        {addOnOptions.map((addOn) => (
-                                            <div key={addOn.add_on} className="flex items-center justify-between">
-                                                <div className="flex-1">
-                                                    <button className="bg-yellow-400 text-black px-3 py-1 rounded-full text-sm font-medium">
-                                                        {addOn.name}
-                                                    </button>
-                                                    <p className="text-xs text-gray-600 mt-1">₱{Number(addOn.price).toLocaleString()}</p>
+                                <div className="w-full lg:w-96 bg-gradient-to-br from-gray-50 to-gray-100 p-6 lg:p-8 border-t lg:border-t-0 lg:border-l-2 border-gray-200">
+                                    <h3 className="text-xl font-bold text-gray-900 mb-6 flex items-center gap-2">
+                                        <Tag className="w-5 h-5 text-yellow-600" />
+                                        Available Add-ons
+                                    </h3>
+                                    <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2">
+                                        {addOnOptions.length === 0 ? (
+                                            <p className="text-gray-500 text-center py-8">No add-ons available</p>
+                                        ) : (
+                                            addOnOptions.map((addOn) => (
+                                                <div key={addOn.add_on} className="bg-white rounded-xl p-4 shadow-sm hover:shadow-md transition-all border-2 border-transparent hover:border-yellow-400">
+                                                    <div className="flex items-center justify-between mb-3">
+                                                        <div className="flex-1">
+                                                            <span className="inline-block bg-gradient-to-r from-yellow-400 to-orange-400 text-white px-3 py-1.5 rounded-lg text-sm font-bold mb-2">
+                                                                {addOn.name}
+                                                            </span>
+                                                            <p className="text-sm font-bold text-gray-900">₱{Number(addOn.price).toLocaleString()}</p>
+                                                        </div>
+                                                    </div>
+                                                    <div className="flex items-center justify-center gap-2">
+                                                        <button
+                                                            onClick={() => updateAddOnQuantity(addOn.add_on, (addOns[addOn.add_on] || 0) - 1)}
+                                                            className="w-9 h-9 rounded-lg bg-gray-200 hover:bg-gray-300 flex items-center justify-center transition-colors"
+                                                        >
+                                                            <Minus className="h-4 w-4 text-gray-700" />
+                                                        </button>
+                                                        <span className="w-12 text-center font-bold text-lg text-gray-900">{addOns[addOn.add_on] || 0}</span>
+                                                        <button
+                                                            onClick={() => updateAddOnQuantity(addOn.add_on, (addOns[addOn.add_on] || 0) + 1)}
+                                                            className="w-9 h-9 rounded-lg bg-gradient-to-br from-yellow-400 to-orange-400 hover:from-yellow-500 hover:to-orange-500 flex items-center justify-center transition-all shadow-sm"
+                                                        >
+                                                            <Plus className="h-4 w-4 text-white" />
+                                                        </button>
+                                                    </div>
                                                 </div>
-                                                <div className="flex items-center gap-2">
-                                                    <button
-                                                        onClick={() => updateAddOnQuantity(addOn.add_on, (addOns[addOn.add_on] || 0) - 1)}
-                                                        className="w-8 h-8 rounded-full border-2 border-gray-300 flex items-center justify-center hover:bg-gray-100"
-                                                    >
-                                                        <Minus className="h-3 w-3" />
-                                                    </button>
-                                                    <span className="w-8 text-center text-sm">{addOns[addOn.add_on] || 0}</span>
-                                                    <button
-                                                        onClick={() => updateAddOnQuantity(addOn.add_on, (addOns[addOn.add_on] || 0) + 1)}
-                                                        className="w-8 h-8 rounded-full border-2 border-gray-300 flex items-center justify-center hover:bg-gray-100"
-                                                    >
-                                                        <Plus className="h-3 w-3" />
-                                                    </button>
-                                                </div>
-                                            </div>
-                                        ))}
+                                            ))
+                                        )}
                                     </div>
                                 </div>
                             </div>
                         </div>
                     </div>
                 )}
-
-                {/* Checkout Add-ons Modal */}
+                {/* Checkout Add-ons Modal - Enhanced */}
                 {isCheckoutAddOnsModalOpen && (
-                    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-                        <div className="bg-white rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
-                            <div className="p-6">
-                                <div className="flex justify-between items-start mb-6">
+                    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-in fade-in duration-200">
+                        <div className="bg-white rounded-3xl max-w-5xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">
+                            <div className="p-6 lg:p-8">
+                                <div className="flex justify-between items-start mb-8">
                                     <div>
-                                        <h2 className="text-2xl font-bold text-gray-900 mb-2">Add-ons for Your Order</h2>
-                                        <p className="text-gray-600">Would you like to add any extras to your items?</p>
+                                        <h2 className="text-2xl lg:text-3xl font-bold text-gray-900 mb-2 flex items-center gap-3">
+                                            <div className="bg-gradient-to-br from-yellow-400 to-orange-400 p-2 rounded-xl">
+                                                <Tag className="w-6 h-6 text-white" />
+                                            </div>
+                                            Customize Your Order
+                                        </h2>
+                                        <p className="text-gray-600">Add some extras to make your meal even better!</p>
                                     </div>
                                     <button
                                         onClick={closeCheckoutAddOnsModal}
-                                        className="text-gray-400 hover:text-gray-600 p-2"
+                                        className="text-gray-400 hover:text-gray-600 p-2 hover:bg-gray-100 rounded-xl transition-all"
                                     >
                                         <X className="h-6 w-6" />
                                     </button>
                                 </div>
 
                                 {/* Selected Items with Add-ons */}
-                                <div className="space-y-6 mb-6">
+                                <div className="space-y-6 mb-8">
                                     {cartItems
                                         .filter(item => selectedItems.has(item.cart_item_id))
                                         .map((item) => (
-                                            <div key={item.cart_item_id} className="border border-gray-200 rounded-xl p-4 bg-gray-50">
-                                                <div className="flex items-center gap-4 mb-4 pb-4 border-b border-gray-200">
-                                                    <img
-                                                        src={getImageUrl(item.image)}
-                                                        alt={item.name}
-                                                        className="w-16 h-16 object-cover rounded-full border-2 border-green-600"
-                                                    />
+                                            <div key={item.cart_item_id} className="bg-gradient-to-br from-gray-50 to-gray-100 border-2 border-gray-200 rounded-2xl p-5 hover:border-yellow-400 transition-all">
+                                                <div className="flex items-center gap-4 mb-5 pb-4 border-b-2 border-gray-200">
+                                                    <div className="relative">
+                                                        <div className="absolute inset-0 bg-gradient-to-br from-yellow-400/20 to-orange-400/20 rounded-xl"></div>
+                                                        <img
+                                                            src={getImageUrl(item.image)}
+                                                            alt={item.name}
+                                                            className="relative w-20 h-20 object-cover rounded-xl border-3 border-white shadow-md"
+                                                        />
+                                                    </div>
                                                     <div className="flex-1">
-                                                        <h3 className="text-lg font-semibold text-gray-900">{item.name}</h3>
-                                                        <p className="text-sm text-gray-600">Quantity: {item.quantity}</p>
-                                                        <p className="text-base font-bold text-gray-900">{formatPrice(item.price)}</p>
+                                                        <h3 className="text-xl font-bold text-gray-900 mb-1">{item.name}</h3>
+                                                        <p className="text-sm text-gray-600 mb-1">Quantity: {item.quantity}</p>
+                                                        <p className="text-lg font-bold bg-gradient-to-r from-yellow-600 to-orange-600 bg-clip-text text-transparent">
+                                                            {formatPrice(item.price)}
+                                                        </p>
                                                     </div>
                                                 </div>
 
                                                 {/* Add-ons for this item */}
                                                 <div>
-                                                    <h4 className="text-sm font-semibold text-gray-700 mb-3">Available Add-ons:</h4>
+                                                    <h4 className="text-base font-bold text-gray-800 mb-4 flex items-center gap-2">
+                                                        <Tag className="w-4 h-4 text-yellow-600" />
+                                                        Available Add-ons
+                                                    </h4>
                                                     {addOnOptions.length === 0 ? (
-                                                        <p className="text-gray-500 text-sm text-center py-2">No add-ons available</p>
+                                                        <p className="text-gray-500 text-sm text-center py-4 bg-white rounded-xl">No add-ons available</p>
                                                     ) : (
                                                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                                             {addOnOptions.map((addOn) => (
-                                                                <div key={addOn.add_on} className="flex items-center justify-between p-3 bg-white rounded-lg border border-gray-200">
-                                                                    <div className="flex-1 min-w-0 mr-3">
-                                                                        <div className="flex items-center gap-2 mb-1">
-                                                                            <span className="bg-yellow-400 text-black px-2 py-1 rounded-full text-xs font-medium truncate">
-                                                                                {addOn.name}
-                                                                            </span>
+                                                                <div key={addOn.add_on} className="bg-white rounded-xl p-4 shadow-sm hover:shadow-md transition-all border-2 border-transparent hover:border-yellow-400">
+                                                                    <div className="flex items-center justify-between mb-3">
+                                                                        <div className="flex-1 min-w-0 mr-3">
+                                                                            <div className="flex items-center gap-2 mb-1">
+                                                                                <span className="bg-gradient-to-r from-yellow-400 to-orange-400 text-white px-2 py-1 rounded-lg text-xs font-bold truncate">
+                                                                                    {addOn.name}
+                                                                                </span>
+                                                                            </div>
+                                                                            <p className="text-xs font-bold text-gray-900">₱{Number(addOn.price).toLocaleString()}</p>
                                                                         </div>
-                                                                        <p className="text-xs text-gray-600">₱{Number(addOn.price).toLocaleString()}</p>
                                                                     </div>
-                                                                    <div className="flex items-center gap-2 flex-shrink-0">
+                                                                    <div className="flex items-center justify-center gap-2">
                                                                         <button
                                                                             onClick={() => updateCheckoutAddOnQuantity(
                                                                                 item.cart_item_id,
                                                                                 addOn.add_on,
                                                                                 ((checkoutAddOns[item.cart_item_id] || {})[addOn.add_on] || 0) - 1
                                                                             )}
-                                                                            className="w-7 h-7 rounded-full border border-gray-300 flex items-center justify-center hover:bg-gray-100 transition-colors"
+                                                                            className="w-8 h-8 rounded-lg bg-gray-200 hover:bg-gray-300 flex items-center justify-center transition-colors"
                                                                         >
-                                                                            <Minus className="h-3 w-3" />
+                                                                            <Minus className="h-4 w-4 text-gray-700" />
                                                                         </button>
-                                                                        <span className="w-6 text-center text-sm font-semibold">
+                                                                        <span className="w-10 text-center font-bold text-base text-gray-900">
                                                                             {(checkoutAddOns[item.cart_item_id] || {})[addOn.add_on] || 0}
                                                                         </span>
                                                                         <button
@@ -1203,9 +1373,9 @@ function RouteComponent() {
                                                                                 addOn.add_on,
                                                                                 ((checkoutAddOns[item.cart_item_id] || {})[addOn.add_on] || 0) + 1
                                                                             )}
-                                                                            className="w-7 h-7 rounded-full border border-gray-300 flex items-center justify-center hover:bg-gray-100 transition-colors"
+                                                                            className="w-8 h-8 rounded-lg bg-gradient-to-br from-yellow-400 to-orange-400 hover:from-yellow-500 hover:to-orange-500 flex items-center justify-center transition-all shadow-sm"
                                                                         >
-                                                                            <Plus className="h-3 w-3" />
+                                                                            <Plus className="h-4 w-4 text-white" />
                                                                         </button>
                                                                     </div>
                                                                 </div>
@@ -1218,22 +1388,26 @@ function RouteComponent() {
                                 </div>
 
                                 {/* Total and Buttons */}
-                                <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-4 border-t border-gray-300">
-                                    <div className="text-2xl font-bold text-gray-900">
-                                        Total: ₱{calculateCheckoutTotal().toLocaleString()}
+                                <div className="flex flex-col lg:flex-row items-center justify-between gap-4 pt-6 border-t-2 border-gray-300">
+                                    <div className="bg-gradient-to-br from-yellow-50 to-orange-50 px-6 py-4 rounded-2xl border-2 border-yellow-400 w-full lg:w-auto">
+                                        <div className="text-sm text-gray-600 mb-1">Grand Total</div>
+                                        <div className="text-3xl font-bold bg-gradient-to-r from-yellow-600 to-orange-600 bg-clip-text text-transparent">
+                                            ₱{calculateCheckoutTotal().toLocaleString()}
+                                        </div>
                                     </div>
-                                    <div className="flex gap-3 w-full sm:w-auto">
+                                    <div className="flex gap-3 w-full lg:w-auto">
                                         <button
                                             onClick={closeCheckoutAddOnsModal}
-                                            className="flex-1 sm:flex-none bg-gray-200 text-gray-800 px-6 py-3 rounded-lg font-semibold hover:bg-gray-300 transition-colors"
+                                            className="flex-1 lg:flex-none bg-gray-200 hover:bg-gray-300 text-gray-800 px-6 py-4 rounded-2xl font-bold transition-all"
                                         >
                                             Cancel
                                         </button>
                                         <button
                                             onClick={proceedToPayment}
-                                            className="flex-1 sm:flex-none bg-yellow-400 text-black px-8 py-3 rounded-lg font-bold hover:bg-yellow-500 transition-colors duration-200 shadow-md"
+                                            className="flex-1 lg:flex-none bg-gradient-to-r from-yellow-400 to-orange-400 hover:from-yellow-500 hover:to-orange-500 text-white px-8 py-4 rounded-2xl font-bold transition-all duration-300 shadow-xl hover:shadow-2xl transform hover:scale-105 flex items-center justify-center gap-2"
                                         >
-                                            Proceed to Payment →
+                                            Proceed to Payment
+                                            <ArrowRight className="w-5 h-5" />
                                         </button>
                                     </div>
                                 </div>

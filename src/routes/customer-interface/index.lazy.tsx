@@ -106,6 +106,89 @@ function RouteComponent() {
     }
   }
 
+  const orderNow = async () => {
+    if (!user?.id) {
+      alert('Please sign in to place an order')
+      navigate({ to: '/login' })
+      return
+    }
+
+    if (!selectedItem) return
+
+    try {
+      // Get or create cart for user
+      let { data: cartData, error: cartError } = await supabase
+        .from('cart')
+        .select('cart_id')
+        .eq('customer_uid', user.id)
+        .single()
+
+      if (cartError && cartError.code === 'PGRST116') {
+        // Cart doesn't exist, create one
+        const { data: newCart, error: createError } = await supabase
+          .from('cart')
+          .insert([{
+            customer_uid: user.id,
+            created_at: new Date().toISOString()
+          }])
+          .select()
+          .single()
+
+        if (createError) throw createError
+        cartData = newCart
+      } else if (cartError) {
+        throw cartError
+      }
+
+      if (!cartData) throw new Error('Failed to get or create cart')
+
+      // Add cart item
+      const { data: cartItem, error: itemError } = await supabase
+        .from('cart_item')
+        .insert([{
+          cart_id: cartData.cart_id,
+          menu_id: selectedItem.menu_id,
+          quantity: orderQuantity,
+          price: Number(selectedItem.price)
+        }])
+        .select()
+        .single()
+
+      if (itemError) throw itemError
+
+      // Add cart item add-ons if any
+      const addOnEntries = Object.entries(addOns).filter(([_, qty]) => qty > 0)
+
+      if (addOnEntries.length > 0) {
+        const addOnInserts = addOnEntries.map(([addOnId, quantity]) => {
+          const addOn = addOnOptions.find(ao => ao.add_on === addOnId)
+          return {
+            cart_item_id: cartItem.cart_item_id,
+            add_on_id: addOnId,
+            quantity: quantity,
+            price: addOn ? Number(addOn.price) : 0
+          }
+        })
+
+        const { error: addOnError } = await supabase
+          .from('cart_item_add_on')
+          .insert(addOnInserts)
+
+        if (addOnError) throw addOnError
+      }
+
+      // Navigate directly to payment with this cart item
+      closeModal()
+      navigate({
+        to: '/customer-interface/payment',
+        search: { items: cartItem.cart_item_id }
+      })
+    } catch (error) {
+      console.error('Error processing order:', error)
+      alert('Failed to process order. Please try again.')
+    }
+  }
+
   // const fetchAddOns = async () => {
   //   try {
   //     const { data, error } = await supabase
@@ -448,7 +531,7 @@ function RouteComponent() {
               {/* Cart Icon */}
               {user && (
                 <Link
-                  to="/login"
+                  to="/customer-interface/cart"
                   className="relative p-1 sm:p-2 text-yellow-400 hover:bg-[#7a3d00] rounded-full"
                 >
                   <ShoppingCart className="h-5 w-5 sm:h-6 sm:w-6" />
@@ -772,20 +855,29 @@ function RouteComponent() {
 
             {/* Footer - sticky at bottom */}
             <div className="sticky bottom-0 bg-white border-t border-gray-100 px-6 py-4 shadow-lg">
-              <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-                <div className="text-center sm:text-left">
+              <div className="flex flex-col gap-4">
+                <div className="text-center">
                   <p className="text-sm text-gray-500 mb-1">Total Price</p>
                   <p className="text-3xl font-bold text-gray-900">
                     ₱{calculateTotal().toLocaleString()}
                   </p>
                 </div>
-                <button
-                  onClick={addToCart}
-                  className="w-full sm:w-auto bg-yellow-400 text-black px-8 py-4 rounded-xl font-bold hover:bg-yellow-500 active:scale-95 transition-all duration-200 shadow-md hover:shadow-xl flex items-center justify-center gap-2"
-                >
-                  <ShoppingCart className="h-5 w-5" />
-                  Add To Cart
-                </button>
+                <div className="flex flex-col sm:flex-row gap-3">
+                  <button
+                    onClick={addToCart}
+                    className="flex-1 bg-white text-[#964B00] border-2 border-[#964B00] px-6 py-4 rounded-xl font-bold hover:bg-gray-50 active:scale-95 transition-all duration-200 shadow-md hover:shadow-xl flex items-center justify-center gap-2"
+                  >
+                    <ShoppingCart className="h-5 w-5" />
+                    Add To Cart
+                  </button>
+                  <button
+                    onClick={orderNow}
+                    className="flex-1 bg-yellow-400 text-black px-6 py-4 rounded-xl font-bold hover:bg-yellow-500 active:scale-95 transition-all duration-200 shadow-md hover:shadow-xl flex items-center justify-center gap-2"
+                  >
+                    <ShoppingCart className="h-5 w-5" />
+                    Order Now
+                  </button>
+                </div>
               </div>
             </div>
           </div>

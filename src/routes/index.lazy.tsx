@@ -216,7 +216,7 @@ function App() {
               {/* Cart Icon */}
               {user && (
                 <Link
-                  to="/login"
+                  to="/customer-interface/cart"
                   className="relative p-1 sm:p-2 text-yellow-400 hover:bg-[#7a3d00] rounded-full"
                 >
                   <ShoppingCart className="h-5 w-5 sm:h-6 sm:w-6" />
