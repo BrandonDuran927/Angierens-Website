@@ -43,7 +43,7 @@ interface CartItem {
         name: string
         description: string
         image_url: string
-        price: number
+        price: string
     }
     cart_item_add_on: Array<{
         add_on_id: string
@@ -149,9 +149,8 @@ function RouteComponent() {
         updateDeliveryFee();
     }, [selectedAddress, deliveryOption]);
 
-    // Haversine formula to calculate distance between two coordinates in kilometers
     const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
-        const R = 6371; // Radius of the Earth in kilometers
+        const R = 6371;
         const dLat = (lat2 - lat1) * Math.PI / 180;
         const dLon = (lon2 - lon1) * Math.PI / 180;
         const a =
@@ -164,7 +163,6 @@ function RouteComponent() {
         return distance;
     };
 
-    // Calculate delivery fee based on Lalamove pricing model
     const calculateDeliveryFee = (distance: number): number => {
 
         const baseFare = 49;
@@ -586,7 +584,9 @@ function RouteComponent() {
     const deliveryFee = calculatedDeliveryFee;
 
     const subtotal = selectedCartItems.reduce((total, item) => {
-        const itemTotal = item.price * item.quantity;
+        const itemUnitPrice = Number(item.price);
+        const itemTotal = itemUnitPrice * item.quantity;
+
         const addOnsTotal = item.cart_item_add_on?.reduce((sum, addOn) => sum + (addOn.price * addOn.quantity), 0) || 0;
         return total + itemTotal + addOnsTotal;
     }, 0);
@@ -851,9 +851,9 @@ function RouteComponent() {
 
             if (orderError) throw orderError;
 
-            // 5. Create order items - FIXED: Calculate price correctly
             for (const item of selectedCartItems) {
-                const itemSubtotal = item.price * item.quantity;
+                const itemUnitPrice = Number(item.price);
+                const itemSubtotal = itemUnitPrice * item.quantity;
 
                 const { data: orderItemData, error: orderItemError } = await supabase
                     .from('order_item')
@@ -861,7 +861,7 @@ function RouteComponent() {
                         order_id: orderData.order_id,
                         menu_id: item.menu_id,
                         quantity: item.quantity,
-                        subtotal_price: itemSubtotal // Changed from subtotal_price to price
+                        subtotal_price: itemSubtotal
                     })
                     .select()
                     .single();
@@ -1483,13 +1483,15 @@ function RouteComponent() {
                                                             <div className="flex-1">
                                                                 <p className="font-medium text-gray-800 line-clamp-2">{item.menu.name}</p>
                                                                 <p className="text-xs text-gray-500 mt-0.5">
-                                                                    {formatPrice(item.menu.price)} each
+                                                                    {/* FIX 1: Display item.price (size-adjusted price) */}
+                                                                    {formatPrice(Number(item.price))} each
                                                                 </p>
                                                             </div>
                                                             <div className="text-right flex-shrink-0">
                                                                 <p className="text-sm text-gray-600 mb-1">×{item.quantity}</p>
                                                                 <p className="font-semibold text-gray-800">
-                                                                    {formatPrice(item.menu.price * item.quantity)}
+                                                                    {/* FIX 2: Calculate total using item.price */}
+                                                                    {formatPrice(Number(item.price) * item.quantity)}
                                                                 </p>
                                                             </div>
                                                         </div>

@@ -39,7 +39,7 @@ interface MenuItem {
     menu_id: string
     name: string
     description: string
-    price: number
+    price: string
     inclusion: string | null
     is_available: boolean
     category: string | null
@@ -607,7 +607,11 @@ function RouteComponent() {
                                 <div>
                                     <label className="block text-sm font-semibold text-gray-700 mb-2">Price:</label>
                                     <div className="w-full px-4 py-3 bg-amber-50 border border-amber-200 rounded-lg text-amber-800 font-bold text-xl">
-                                        ₱{Number(selectedMenuItem.price).toFixed(2)}
+                                        {selectedMenuItem.price
+                                            .split(",")
+                                            .map((p: string) => `₱${p.trim()}`)
+                                            .join(", ")
+                                        }
                                     </div>
                                 </div>
 

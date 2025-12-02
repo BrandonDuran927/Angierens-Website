@@ -10,7 +10,7 @@ import { ProtectedRoute } from '@/components/ProtectedRoute'
 interface MenuItem {
   menu_id: string
   name: string
-  price: number
+  price: string
   image_url: string | null
   category: string | null
   description: string
@@ -71,6 +71,7 @@ function RouteComponent() {
   const [addOnOptions, setAddOnOptions] = useState<AddOnOption[]>([])
   const [loading, setLoading] = useState(true)
   const [categories, setCategories] = useState<string[]>(['All Categories'])
+  const [selectedSize, setSelectedSize] = useState<string>('')
 
   useEffect(() => {
     fetchMenuItems()
@@ -106,6 +107,50 @@ function RouteComponent() {
     }
   }
 
+  // Helper function to parse prices from string
+  const parsePrices = (priceString: string): number[] => {
+    if (!priceString) return []
+    return priceString.split(',').map(p => parseFloat(p.trim())).filter(p => !isNaN(p))
+  }
+
+  // Helper function to get available sizes
+  const getAvailableSizes = (item: MenuItem): string[] => {
+    const prices = parsePrices(item.price)
+
+    if (!item.size || item.size === 'NULL') {
+      // If no size specified, return array with empty string for single price items
+      return prices.length > 0 ? [''] : []
+    }
+
+    const sizes = item.size.split(',').map(s => s.trim())
+    // Return only as many sizes as there are prices
+    return sizes.slice(0, prices.length)
+  }
+
+  // Helper function to get price for selected size
+  const getPriceForSize = (item: MenuItem, size: string = ''): number => {
+    const prices = parsePrices(item.price)
+    const sizes = getAvailableSizes(item)
+
+    if (sizes.length === 0) return 0
+
+    const sizeIndex = size ? sizes.indexOf(size) : 0
+    return prices[sizeIndex >= 0 ? sizeIndex : 0] || prices[0] || 0
+  }
+
+  // Helper function to get display price (lowest price for items with multiple prices)
+  const getDisplayPrice = (item: MenuItem): string => {
+    const prices = parsePrices(item.price)
+
+    if (prices.length === 0) return '0'
+    if (prices.length === 1) return prices[0].toLocaleString()
+
+    // For multiple prices, show range
+    const minPrice = Math.min(...prices)
+    const maxPrice = Math.max(...prices)
+    return `${minPrice.toLocaleString()} - ${maxPrice.toLocaleString()}`
+  }
+
   const orderNow = async () => {
     if (!user?.id) {
       alert('Please sign in to place an order')
@@ -114,6 +159,8 @@ function RouteComponent() {
     }
 
     if (!selectedItem) return
+
+    const itemPrice = getPriceForSize(selectedItem, selectedSize)
 
     try {
       // Get or create cart for user
@@ -149,7 +196,7 @@ function RouteComponent() {
           cart_id: cartData.cart_id,
           menu_id: selectedItem.menu_id,
           quantity: orderQuantity,
-          price: Number(selectedItem.price)
+          price: itemPrice
         }])
         .select()
         .single()
@@ -308,6 +355,9 @@ function RouteComponent() {
     setIsModalOpen(true)
     setOrderQuantity(1)
     setAddOns({})
+    // Set default size to first available size
+    const sizes = getAvailableSizes(item)
+    setSelectedSize(sizes[0] || '')
   }
 
   const closeModal = () => {
@@ -315,6 +365,7 @@ function RouteComponent() {
     setSelectedItem(null)
     setOrderQuantity(1)
     setAddOns({})
+    setSelectedSize('')
   }
 
   const updateAddOnQuantity = (addOnId: string, quantity: number) => {
@@ -327,7 +378,9 @@ function RouteComponent() {
   const calculateTotal = () => {
     if (!selectedItem) return 0
 
-    const basePrice = Number(selectedItem.price) * orderQuantity
+    const itemPrice = getPriceForSize(selectedItem, selectedSize)
+    const basePrice = itemPrice * orderQuantity
+
     const addOnPrice = Object.entries(addOns).reduce((total, [addOnId, quantity]) => {
       const addOn = addOnOptions.find(ao => ao.add_on === addOnId)
       return total + (addOn ? Number(addOn.price) * (quantity as number) : 0)
@@ -344,6 +397,8 @@ function RouteComponent() {
     }
 
     if (!selectedItem) return
+
+    const itemPrice = getPriceForSize(selectedItem, selectedSize)
 
     try {
       // Get or create cart for user
@@ -379,7 +434,7 @@ function RouteComponent() {
           cart_id: cartData.cart_id,
           menu_id: selectedItem.menu_id,
           quantity: orderQuantity,
-          price: Number(selectedItem.price)
+          price: itemPrice
         }])
         .select()
         .single()
@@ -718,7 +773,6 @@ function RouteComponent() {
             <ChevronDown className="absolute right-2 sm:right-3 top-1/2 transform -translate-y-1/2 text-black h-4 w-4 sm:h-5 sm:w-5 pointer-events-none" />
           </div>
         </div>
-
         {/* Loading State */}
         {loading ? (
           <div className="fixed inset-0 bg-black/50 flex justify-center items-center z-[60]">
@@ -738,7 +792,7 @@ function RouteComponent() {
                     {/* Price Tag */}
                     <div className="relative">
                       <div className="absolute top-4 left-4 bg-yellow-400 text-black px-3 sm:px-4 py-1 sm:py-2 rounded-full font-bold text-base sm:text-lg z-10">
-                        ₱ {Number(item.price).toLocaleString()}
+                        ₱ {getDisplayPrice(item)}
                       </div>
 
                       {/* Food Image Container */}
@@ -827,6 +881,31 @@ function RouteComponent() {
                         <p className="text-gray-700 text-sm">{inclusion}</p>
                       </div>
                     ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Size selector - only show if there are multiple sizes */}
+              {getAvailableSizes(selectedItem).length > 1 && getAvailableSizes(selectedItem)[0] !== '' && (
+                <div className="mb-6">
+                  <label className="block text-sm font-semibold text-gray-700 mb-3">Select Size</label>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                    {getAvailableSizes(selectedItem).map((size, index) => {
+                      const price = getPriceForSize(selectedItem, size)
+                      return (
+                        <button
+                          key={size}
+                          onClick={() => setSelectedSize(size)}
+                          className={`p-3 rounded-lg border-2 transition-all duration-200 ${selectedSize === size
+                            ? 'border-yellow-400 bg-yellow-50 text-gray-900'
+                            : 'border-gray-300 hover:border-gray-400 text-gray-700'
+                            }`}
+                        >
+                          <div className="font-semibold">{size}</div>
+                          <div className="text-sm text-gray-600">₱{price.toLocaleString()}</div>
+                        </button>
+                      )
+                    })}
                   </div>
                 </div>
               )}

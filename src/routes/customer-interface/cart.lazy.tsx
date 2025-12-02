@@ -21,7 +21,6 @@ interface CartItem {
     description?: string
     inclusions?: string[]
 }
-
 interface AddOnOption {
     add_on: string
     name: string
@@ -248,14 +247,16 @@ function RouteComponent() {
                                 menu_id: item.menu_id,
                                 name: item.menu.name,
                                 addOns: addOnsFormatted,
-                                price: Number(item.menu.price),
-                                quantity: Number(item.quantity),
+                                price: parseFloat(item.price) || 0,
+                                quantity: parseInt(item.quantity) || 1,
                                 image: item.menu.image_url || '/public/menu-page img/pancit malabonbon.png',
                                 description: item.menu.description,
                                 inclusions: inclusions
                             };
                         })
                     );
+
+                    console.log('Fetched cart items:', itemsWithAddOns);
 
                     setCartItems(itemsWithAddOns);
                     setCartCount(itemsWithAddOns.length);
@@ -340,9 +341,13 @@ function RouteComponent() {
 
     const calculateTotal = () => {
         return cartItems.reduce((total, item) => {
-            const itemTotal = item.price * item.quantity;
-            const addOnsTotal = item.addOns.reduce((sum, addOn) => sum + (addOn.price * addOn.quantity), 0);
-            return total + itemTotal + addOnsTotal;
+            const itemUnitPrice = item.price || 0;
+            const addOnsTotal = item.addOns.reduce((addOnSum, addOn) => {
+                const addOnPrice = addOn.price || 0;
+                return addOnSum + (addOnPrice * addOn.quantity);
+            }, 0);
+
+            return total + (itemUnitPrice * item.quantity) + addOnsTotal;
         }, 0);
     }
 
@@ -371,15 +376,18 @@ function RouteComponent() {
     };
 
     const calculateSelectedTotal = () => {
-        return cartItems
-            .filter(item => selectedItems.has(item.cart_item_id))
-            .reduce((total, item) => {
-                const itemTotal = item.price * item.quantity;
-                const addOnsTotal = item.addOns.reduce((sum, addOn) => sum + (addOn.price * addOn.quantity), 0);
-                return total + itemTotal + addOnsTotal;
-            }, 0);
-    };
+        return cartItems.reduce((total, item) => {
+            if (!selectedItems.has(item.cart_item_id)) return total;
 
+            const itemUnitPrice = item.price || 0;
+            const addOnsTotal = item.addOns.reduce((addOnSum, addOn) => {
+                const addOnPrice = addOn.price || 0;
+                return addOnSum + (addOnPrice * addOn.quantity);
+            }, 0);
+
+            return total + (itemUnitPrice * item.quantity) + addOnsTotal;
+        }, 0);
+    };
     const openEditModal = (item: CartItem) => {
         setSelectedItem(item);
         setOrderQuantity(item.quantity);
@@ -412,11 +420,13 @@ function RouteComponent() {
 
     const calculateEditTotal = () => {
         if (!selectedItem) return 0;
+        const numericPrice = parseFloat(String(selectedItem.price)) || 0;
+        const baseTotal = numericPrice * orderQuantity;
 
-        const baseTotal = selectedItem.price * orderQuantity;
         const addOnTotal = Object.entries(addOns).reduce((total, [addOnId, quantity]) => {
             const addOn = addOnOptions.find(option => option.add_on === addOnId);
-            return total + (addOn ? Number(addOn.price) * quantity : 0);
+            const addOnPrice = addOn ? (parseFloat(String(addOn.price)) || 0) : 0;
+            return total + (addOnPrice * quantity);
         }, 0);
 
         return baseTotal + addOnTotal;
@@ -600,16 +610,17 @@ function RouteComponent() {
     };
 
     const calculateCheckoutTotal = () => {
-        return cartItems
-            .filter(item => selectedItems.has(item.cart_item_id))
-            .reduce((total, item) => {
-                const itemTotal = item.price * item.quantity;
-                const addOnsTotal = Object.entries(checkoutAddOns[item.cart_item_id] || {}).reduce((sum, [addOnId, quantity]) => {
-                    const addOn = addOnOptions.find(option => option.add_on === addOnId);
-                    return sum + (addOn ? Number(addOn.price) * quantity : 0);
-                }, 0);
-                return total + itemTotal + addOnsTotal;
+        return cartItems.reduce((total, item) => {
+            if (!selectedItems.has(item.cart_item_id)) return total;
+
+            const itemUnitPrice = item.price || 0;
+            const addOnsTotal = item.addOns.reduce((addOnSum, addOn) => {
+                const addOnPrice = addOn.price || 0;
+                return addOnSum + (addOnPrice * addOn.quantity);
             }, 0);
+
+            return total + (itemUnitPrice * item.quantity) + addOnsTotal;
+        }, 0);
     };
 
     const proceedToPayment = async () => {
@@ -977,7 +988,7 @@ function RouteComponent() {
                                                             </div>
                                                         )}
                                                         <div className="text-2xl font-bold bg-gradient-to-r from-yellow-600 to-orange-600 bg-clip-text text-transparent">
-                                                            {formatPrice(item.price)}
+                                                            {formatPrice(Number(item.price))}
                                                         </div>
                                                     </div>
 
@@ -1071,7 +1082,7 @@ function RouteComponent() {
                                                                 </div>
                                                             )}
                                                             <div className="text-lg sm:text-xl font-bold bg-gradient-to-r from-yellow-600 to-orange-600 bg-clip-text text-transparent">
-                                                                {formatPrice(item.price)}
+                                                                {formatPrice(Number(item.price))}
                                                             </div>
                                                         </div>
 
@@ -1326,7 +1337,7 @@ function RouteComponent() {
                                                         <h3 className="text-xl font-bold text-gray-900 mb-1">{item.name}</h3>
                                                         <p className="text-sm text-gray-600 mb-1">Quantity: {item.quantity}</p>
                                                         <p className="text-lg font-bold bg-gradient-to-r from-yellow-600 to-orange-600 bg-clip-text text-transparent">
-                                                            {formatPrice(item.price)}
+                                                            {formatPrice(Number(item.price))}
                                                         </p>
                                                     </div>
                                                 </div>

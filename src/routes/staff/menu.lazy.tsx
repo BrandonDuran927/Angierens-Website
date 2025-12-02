@@ -51,12 +51,11 @@ interface MenuItem {
     menu_id: string
     name: string
     description: string
-    price: number
+    price: string
     inclusion: string | null
     is_available: boolean
     category: string | null
     size: string | null
-    quantity_description: string | null
     image_url: string | null
 }
 
@@ -191,7 +190,6 @@ function RouteComponent() {
         price: '',
         category: '',
         size: '',
-        quantity_description: '',
         inclusion: '',
         is_available: true
     })
@@ -269,10 +267,9 @@ function RouteComponent() {
         setFormData({
             name: item.name,
             description: item.description,
-            price: item.price.toString(),
+            price: item.price,
             category: item.category || '',
             size: item.size || '',
-            quantity_description: item.quantity_description || '',
             inclusion: '',
             is_available: item.is_available
         })
@@ -302,7 +299,6 @@ function RouteComponent() {
             price: '',
             category: '',
             size: '',
-            quantity_description: '',
             inclusion: '',
             is_available: true
         })
@@ -328,10 +324,9 @@ function RouteComponent() {
             const menuData = {
                 name: formData.name,
                 description: formData.description,
-                price: parseFloat(formData.price),
+                price: formData.price,
                 category: formData.category || null,
                 size: formData.size || null,
-                // quantity_description: formData.quantity_description || null,
                 inclusion: inclusionsList.length > 0 ? JSON.stringify(inclusionsList) : null,
                 is_available: formData.is_available
             }
@@ -779,7 +774,7 @@ function RouteComponent() {
 
                                                     <td className="px-6 py-4 whitespace-nowrap">
                                                         <div className="text-sm font-bold text-amber-600">
-                                                            ₱{Number(item.price).toFixed(2)}
+                                                            ₱{item.price}
                                                         </div>
                                                     </td>
 
@@ -905,7 +900,7 @@ function RouteComponent() {
                                         />
                                     ) : (
                                         <div className="w-full px-4 py-3 bg-amber-50 border border-amber-200 rounded-lg text-amber-800 font-bold text-xl">
-                                            ₱{Number(selectedMenuItem?.price).toFixed(2)}
+                                            ₱{selectedMenuItem?.price}
                                         </div>
                                     )}
                                 </div>
@@ -915,7 +910,7 @@ function RouteComponent() {
                                     <div>
                                         <label className="block text-sm font-semibold text-gray-700 mb-2">Category:</label>
                                         {isEditMode || isAddMode ? (
-                                            <input
+                                            < input
                                                 type="text"
                                                 value={formData.category}
                                                 onChange={(e) => setFormData({ ...formData, category: e.target.value })}
@@ -944,22 +939,7 @@ function RouteComponent() {
                                             </div>
                                         )}
                                     </div>
-                                    <div>
-                                        <label className="block text-sm font-semibold text-gray-700 mb-2">Quantity:</label>
-                                        {isEditMode || isAddMode ? (
-                                            <input
-                                                type="text"
-                                                value={formData.quantity_description}
-                                                onChange={(e) => setFormData({ ...formData, quantity_description: e.target.value })}
-                                                className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-amber-500 transition-all"
-                                                placeholder="Quantity"
-                                            />
-                                        ) : (
-                                            <div className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg text-gray-800">
-                                                {selectedMenuItem?.quantity_description || '-'}
-                                            </div>
-                                        )}
-                                    </div>
+
                                 </div>
 
                                 {/* Inclusions */}
@@ -1081,7 +1061,6 @@ function RouteComponent() {
                                                             price: selectedMenuItem?.price.toString() || '',
                                                             category: selectedMenuItem?.category || '',
                                                             size: selectedMenuItem?.size || '',
-                                                            quantity_description: selectedMenuItem?.quantity_description || '',
                                                             inclusion: '',
                                                             is_available: selectedMenuItem?.is_available || true
                                                         })
