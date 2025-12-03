@@ -88,8 +88,6 @@ function RouteComponent() {
         navigate({ to: "/login" });
     }
 
-
-
     // Fetch orders from Supabase
     const fetchOrders = async () => {
         try {

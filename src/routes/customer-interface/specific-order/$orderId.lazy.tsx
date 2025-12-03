@@ -43,9 +43,6 @@ interface OrderData {
   status: string
   orderPlacedDate: string
   paymentConfirmedDate: string
-  // queuingDate: string
-  // preparingDate: string
-  // readyDate: string
   status_updated_at: string
   completedDate: string
   deliveryOption: string
@@ -188,7 +185,7 @@ function SpecificOrder() {
           name: item.menu?.name || 'Unknown Item',
           image: item.menu?.image_url || '/placeholder.png',
           quantity: Number(item.quantity),
-          price: Number(item.menu?.price || 0),
+          price: item?.price || 0,
           inclusions: inclusions,
           addOns: addOns.length > 0 ? addOns.join(', ') : 'None'
         }
@@ -210,7 +207,8 @@ function SpecificOrder() {
 
       // Calculate delivery fee (you can adjust this logic)
       const deliveryFee = orderDataRaw.delivery.delivery_fee
-      const subtotal = Number(orderDataRaw.total_price) - deliveryFee
+      const subtotal = Number(orderDataRaw.total_price)
+      const totalPrice = subtotal + deliveryFee
 
       const transformed: OrderData = {
         orderId: orderDataRaw.order_id,
@@ -237,7 +235,7 @@ function SpecificOrder() {
         pricing: {
           subtotal: subtotal,
           deliveryFee: deliveryFee,
-          total: Number(orderDataRaw.total_price)
+          total: totalPrice
         },
         specialInstructions: orderDataRaw.special_instructions || 'None',
         proofOfPaymentUrl: orderDataRaw.payment?.proof_of_payment_url || null

@@ -52,7 +52,6 @@ function RouteComponent() {
   // Track which fields are currently being edited
   const [editingFields, setEditingFields] = useState({
     phoneNumber: false,
-    email: false,
     password: false
   })
 
@@ -149,7 +148,7 @@ function RouteComponent() {
 
   const startEditing = (field: string) => {
     // Show password verification modal for sensitive fields
-    if (field === 'phoneNumber' || field === 'email' || field === 'password') {
+    if (field === 'phoneNumber' || field === 'password') {
       setPendingEdit(field)
       setShowPasswordModal(true)
     } else {
@@ -167,7 +166,7 @@ function RouteComponent() {
     }))
 
     // Restore original values
-    if (field === 'phoneNumber' || field === 'email') {
+    if (field === 'phoneNumber') {
       setEditableData(prev => ({
         ...prev,
         [field]: originalValues[field as keyof typeof originalValues]
@@ -208,6 +207,8 @@ function RouteComponent() {
       if (pendingEdit === 'phoneNumber') {
         setShowPasswordModal(false)
         setShowOtpModal(true)
+
+        handleSubmit(new Event('submit') as unknown as React.FormEvent)
       } else {
         setShowPasswordModal(false)
         setEditingFields(prev => ({
@@ -235,14 +236,9 @@ function RouteComponent() {
       return
     }
 
-    if (field === 'phoneNumber' || field === 'email') {
+    if (field === 'phoneNumber') {  // Only phoneNumber now
       // Basic validation
-      if (field === 'email' && !editableData.email.includes('@')) {
-        alert('Please enter a valid email address!')
-        return
-      }
-
-      if (field === 'phoneNumber' && editableData.phoneNumber.trim().length === 0) {
+      if (editableData.phoneNumber.trim().length === 0) {
         alert('Please enter a phone number!')
         return
       }
@@ -251,13 +247,9 @@ function RouteComponent() {
         setLoading(true)
 
         // Update in users table
-        const updateData = field === 'phoneNumber'
-          ? { phone_number: editableData.phoneNumber }
-          : { email: editableData.email }
-
         const { error: updateError } = await supabase
           .from('users')
-          .update(updateData)
+          .update({ phone_number: editableData.phoneNumber })
           .eq('user_uid', currentUserId)
 
         if (updateError) {
@@ -266,30 +258,18 @@ function RouteComponent() {
           return
         }
 
-        // If updating email, also update auth email
-        if (field === 'email') {
-          const { error: authError } = await supabase.auth.updateUser({
-            email: editableData.email
-          })
-
-          if (authError) {
-            console.error('Error updating auth email:', authError)
-            alert('Profile updated but email verification may be required. Please check your inbox.')
-          }
-        }
-
         // Update original value
         setOriginalValues(prev => ({
           ...prev,
-          [field]: editableData[field as keyof typeof editableData] as string
+          phoneNumber: editableData.phoneNumber
         }))
 
         setEditingFields(prev => ({
           ...prev,
-          [field]: false
+          phoneNumber: false
         }))
 
-        alert(`${field === 'phoneNumber' ? 'Phone number' : 'Email address'} updated successfully!`)
+        alert('Phone number updated successfully!')
       } catch (error) {
         console.error('Error saving field:', error)
         alert('An error occurred while saving your changes')
@@ -488,28 +468,46 @@ function RouteComponent() {
   }
 
   const verifyOtp = async () => {
-    try {
-      const formattedNumber = formatPhoneNumber(editableData.phoneNumber)
-
-      const { data, error } = await supabase.functions.invoke('verify-otp', {
-        body: { phoneNumber: formattedNumber, otpCode },
-      })
-
-      if (error) throw error
-
-      if (data.status === 'approved') {
-        alert('OTP verified successfully!')
-        closeOtpModal()
-
-        // Save the phone number after OTP verification
-        await saveField('phoneNumber')
-      } else {
-        alert('Invalid or expired OTP.')
-      }
-    } catch (error) {
-      console.error('Error verifying OTP:', error)
-      alert('Failed to verify OTP. Please try again.')
+    if (otpCode.trim() === '') {
+      alert('Please enter the OTP code!')
+      return
     }
+
+    // Mock OTP verification - in reality, verify against backend
+    if (otpCode !== '123456') {
+      alert('Invalid OTP code!')
+      return
+    }
+
+    // OTP verified, allow phone number editing
+    setShowOtpModal(false)
+    setEditingFields(prev => ({
+      ...prev,
+      phoneNumber: true
+    }))
+    setOtpCode('')
+    // try {
+    //   const formattedNumber = formatPhoneNumber(editableData.phoneNumber)
+
+    //   const { data, error } = await supabase.functions.invoke('verify-otp', {
+    //     body: { phoneNumber: formattedNumber, otpCode },
+    //   })
+
+    //   if (error) throw error
+
+    //   if (data.status === 'approved') {
+    //     alert('OTP verified successfully!')
+    //     closeOtpModal()
+
+    //     // Save the phone number after OTP verification
+    //     await saveField('phoneNumber')
+    //   } else {
+    //     alert('Invalid or expired OTP.')
+    //   }
+    // } catch (error) {
+    //   console.error('Error verifying OTP:', error)
+    //   alert('Failed to verify OTP. Please try again.')
+    // }
   }
 
   const LoadingSpinner = () => (
@@ -839,7 +837,7 @@ function RouteComponent() {
                         />
                         <div className="flex gap-2">
                           <button
-                            onClick={handleSubmit}
+                            onClick={() => saveField('phoneNumber')}
                             className="p-2 bg-green-600 hover:bg-green-700 text-white rounded-lg"
                           >
                             <Save className="h-5 w-5" />
@@ -871,51 +869,21 @@ function RouteComponent() {
                   </div>
                 </div>
 
-                {/* Email */}
+                {/* Email - Non-editable */}
                 <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
                   <label className="text-sm sm:text-base lg:text-lg font-medium text-gray-700 sm:w-48 sm:text-right">
                     Email Address:
                   </label>
-                  <div className="flex-1 flex flex-col sm:flex-row sm:items-center gap-2">
-                    {editingFields.email ? (
-                      <>
-                        <input
-                          type="email"
-                          value={editableData.email}
-                          onChange={(e) => handleInputChange('email', e.target.value)}
-                          className="flex-1 px-3 py-2 sm:px-4 sm:py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 text-sm sm:text-base"
-                        />
-                        <div className="flex gap-2">
-                          <button
-                            onClick={() => saveField('email')}
-                            className="p-2 bg-green-600 hover:bg-green-700 text-white rounded-lg"
-                          >
-                            <Save className="h-5 w-5" />
-                          </button>
-                          <button
-                            onClick={() => cancelEditing('email')}
-                            className="p-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg"
-                          >
-                            <X className="h-5 w-5" />
-                          </button>
-                        </div>
-                      </>
-                    ) : (
-                      <>
-                        <input
-                          type="email"
-                          value={editableData.email}
-                          className="flex-1 px-3 py-2 sm:px-4 sm:py-3 border-2 border-gray-300 rounded-lg bg-gray-100 text-gray-600 cursor-not-allowed text-sm sm:text-base"
-                          disabled
-                        />
-                        <button
-                          onClick={() => startEditing('email')}
-                          className="p-2 bg-gray-400 hover:bg-gray-500 text-white rounded-lg"
-                        >
-                          <Edit className="h-5 w-5" />
-                        </button>
-                      </>
-                    )}
+                  <div className="flex-1">
+                    <input
+                      type="email"
+                      value={editableData.email}
+                      className="w-full px-3 py-2 sm:px-4 sm:py-3 border-2 border-gray-300 rounded-lg bg-gray-100 text-gray-500 cursor-not-allowed text-sm sm:text-base"
+                      disabled
+                    />
+                    <p className="text-xs text-gray-500 mt-1 ml-1">
+                      Email cannot be changed as it is your login username
+                    </p>
                   </div>
                 </div>
 

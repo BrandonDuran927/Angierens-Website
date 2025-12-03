@@ -12,25 +12,43 @@ import {
     Star
 } from 'lucide-react'
 import { ProtectedRoute } from '@/components/ProtectedRoute'
+import { supabase } from '@/lib/supabaseClient'
+import { useNavigate } from '@tanstack/react-router'
+import { useUser } from '@/context/UserContext'
+import { useEffect } from 'react'
+
+
 
 export const Route = createLazyFileRoute('/chef-interface/my-info')({
     component: RouteComponent,
 })
 
 function RouteComponent() {
-    // Only editable fields are in state
-    const [editableData, setEditableData] = useState({
-        phoneNumber: '+63 912 212 1209',
-        email: 'jennyfrenzzy@gmail.com',
-        newPassword: '',
-        retypePassword: ''
-    })
+    const navigate = useNavigate()
+    const { user, signOut } = useUser()
+
+    async function handleLogout() {
+        await signOut();
+        navigate({ to: "/login" });
+    }
 
     // Track which fields are currently being edited
     const [editingFields, setEditingFields] = useState({
         phoneNumber: false,
-        email: false,
         password: false
+    })
+
+    const [editableData, setEditableData] = useState({
+        phoneNumber: '',
+        email: '',
+        newPassword: '',
+        retypePassword: ''
+    })
+
+    const [staticData, setStaticData] = useState({
+        firstName: '',
+        middleName: '',
+        lastName: ''
     })
 
     // Modal states
@@ -39,18 +57,73 @@ function RouteComponent() {
     const [currentPassword, setCurrentPassword] = useState('')
     const [otpCode, setOtpCode] = useState('')
     const [pendingEdit, setPendingEdit] = useState('')
+    const [currentUserId, setCurrentUserId] = useState<string | null>(null)
+    const [loading, setLoading] = useState(true)
+
 
     // Store original values for cancel functionality
     const [originalValues, setOriginalValues] = useState({
-        phoneNumber: '+63 912 212 1209',
-        email: 'jennyfrenzzy@gmail.com'
+        phoneNumber: '',
+        email: ''
     })
+    useEffect(() => {
+        fetchCurrentUser()
+    }, [])
 
-    // Static user data (non-editable)
-    const staticData = {
-        firstName: 'Jenny',
-        middleName: '',
-        lastName: 'Frenzzy'
+    const fetchCurrentUser = async () => {
+        try {
+            setLoading(true)
+
+            const { data: { user }, error: authError } = await supabase.auth.getUser()
+
+            if (authError || !user) {
+                console.error('Error getting authenticated user:', authError)
+                alert('Please log in to view your information')
+                navigate({ to: '/login' })
+                return
+            }
+
+            setCurrentUserId(user.id)
+
+            const { data: userData, error: userError } = await supabase
+                .from('users')
+                .select('user_uid, first_name, middle_name, last_name, email, phone_number')
+                .eq('user_uid', user.id)
+                .single()
+
+            if (userError) {
+                console.error('Error fetching user data:', userError)
+                alert('Failed to load user information')
+                return
+            }
+
+            if (userData) {
+                // Set static (non-editable) data
+                setStaticData({
+                    firstName: userData.first_name || '',
+                    middleName: userData.middle_name || '',
+                    lastName: userData.last_name || ''
+                })
+
+                // Set editable data
+                setEditableData(prev => ({
+                    ...prev,
+                    phoneNumber: userData.phone_number || '',
+                    email: userData.email || ''
+                }))
+
+                // Set original values
+                setOriginalValues({
+                    phoneNumber: userData.phone_number || '',
+                    email: userData.email || ''
+                })
+            }
+        } catch (error) {
+            console.error('Error in fetchCurrentUser:', error)
+            alert('An error occurred while loading your information')
+        } finally {
+            setLoading(false)
+        }
     }
 
     const handleInputChange = (field: string, value: string) => {
@@ -62,7 +135,7 @@ function RouteComponent() {
 
     const startEditing = (field: string) => {
         // Show password verification modal for sensitive fields
-        if (field === 'phoneNumber' || field === 'email' || field === 'password') {
+        if (field === 'phoneNumber' || field === 'password') {
             setPendingEdit(field)
             setShowPasswordModal(true)
         } else {
@@ -80,7 +153,7 @@ function RouteComponent() {
         }))
 
         // Restore original values
-        if (field === 'phoneNumber' || field === 'email') {
+        if (field === 'phoneNumber') {
             setEditableData(prev => ({
                 ...prev,
                 [field]: originalValues[field as keyof typeof originalValues]
@@ -94,37 +167,62 @@ function RouteComponent() {
         }
     }
 
-    const verifyPassword = () => {
+    const verifyPassword = async () => {
         // Simulate password verification (replace with actual API call)
         if (currentPassword.trim() === '') {
             alert('Please enter your current password!')
             return
         }
 
-        // Mock password verification - in reality, verify against backend
-        if (currentPassword !== 'password123') {
-            alert('Incorrect password!')
-            return
-        }
+        try {
+            const { data: { user }, error: authError } = await supabase.auth.getUser()
 
-        // Password verified, proceed based on the field being edited
-        if (pendingEdit === 'phoneNumber') {
-            // For phone number, show OTP modal
-            setShowPasswordModal(false)
-            setShowOtpModal(true)
-        } else {
-            // For email or password change, directly allow editing
-            setShowPasswordModal(false)
-            setEditingFields(prev => ({
-                ...prev,
-                [pendingEdit]: true
-            }))
-        }
+            if (authError || !user) {
+                alert('Session expired. Please log in again.')
+                return
+            }
 
-        setCurrentPassword('')
+            const { error } = await supabase.auth.signInWithPassword({
+                email: originalValues.email,
+                password: currentPassword
+            })
+
+            if (error) {
+                alert('Incorrect password!: ' + error.message + currentPassword + originalValues.email)
+                return
+            }
+
+            // Password verified, proceed based on the field being edited
+            if (pendingEdit === 'phoneNumber') {
+                // For phone number, show OTP modal
+                setShowPasswordModal(false)
+                setShowOtpModal(true)
+            } else {
+                setShowPasswordModal(false)
+                setEditingFields(prev => ({
+                    ...prev,
+                    [pendingEdit]: true
+                }))
+            }
+
+            setCurrentPassword('')
+        } catch (error) {
+            console.error('Error verifying password:', error)
+            alert('An error occurred while verifying your password')
+        }
     }
 
-    const verifyOtp = () => {
+    const formatPhoneNumber = (number: string): string => {
+        const cleaned = number.replace(/\s+/g, '')
+
+        if (cleaned.startsWith('0')) {
+            return '+63' + cleaned.substring(1)
+        }
+
+        return cleaned
+    }
+
+    const verifyOtp = async () => {
         if (otpCode.trim() === '') {
             alert('Please enter the OTP code!')
             return
@@ -143,6 +241,28 @@ function RouteComponent() {
             phoneNumber: true
         }))
         setOtpCode('')
+
+        // try {
+        //     const formattedNumber = formatPhoneNumber(editableData.phoneNumber)
+
+        //     const { data, error } = await supabase.functions.invoke('verify-otp', {
+        //         body: { phoneNumber: formattedNumber, otpCode },
+        //     })
+
+        //     if (error) throw error
+
+        //     if (data.status === 'approved') {
+        //         alert('OTP verified successfully!')
+        //         closeOtpModal()
+
+        //         await saveField('phoneNumber')
+        //     } else {
+        //         alert('Invalid or expired OTP.')
+        //     }
+        // } catch (error) {
+        //     console.error('Error verifying OTP:', error)
+        //     alert('Failed to verify OTP. Please try again.')
+        // }
     }
 
     const closePasswordModal = () => {
@@ -157,35 +277,53 @@ function RouteComponent() {
         setPendingEdit('')
     }
 
-    const saveField = (field: string) => {
-        if (field === 'phoneNumber' || field === 'email') {
+    const saveField = async (field: string) => {
+        if (field === 'phoneNumber') {
             // Basic validation
-            if (field === 'email' && !editableData.email.includes('@')) {
-                alert('Please enter a valid email address!')
-                return
-            }
-
-            if (field === 'phoneNumber' && editableData.phoneNumber.trim().length === 0) {
+            if (editableData.phoneNumber.trim().length === 0) {
                 alert('Please enter a phone number!')
                 return
             }
 
-            // Update original value
-            setOriginalValues(prev => ({
-                ...prev,
-                [field]: editableData[field as keyof typeof editableData]
-            }))
+            try {
+                setLoading(true)
 
-            setEditingFields(prev => ({
-                ...prev,
-                [field]: false
-            }))
+                // Update in Supabase users table
+                const { error: updateError } = await supabase
+                    .from('users')
+                    .update({
+                        phone_number: editableData.phoneNumber
+                    })
+                    .eq('user_uid', currentUserId)
 
-            alert(`${field === 'phoneNumber' ? 'Phone number' : 'Email address'} updated successfully!`)
+                if (updateError) {
+                    console.error('Error updating user data:', updateError)
+                    alert('Failed to update. Please try again.')
+                    return
+                }
+
+                // Update original value
+                setOriginalValues(prev => ({
+                    ...prev,
+                    phoneNumber: editableData.phoneNumber
+                }))
+
+                setEditingFields(prev => ({
+                    ...prev,
+                    phoneNumber: false
+                }))
+
+                alert('Phone number updated successfully!')
+            } catch (error) {
+                console.error('Error saving field:', error)
+                alert('An error occurred while saving')
+            } finally {
+                setLoading(false)
+            }
         }
     }
 
-    const handleChangePassword = () => {
+    const handleChangePassword = async () => {
         if (editableData.newPassword !== editableData.retypePassword) {
             alert('Passwords do not match!')
             return
@@ -199,18 +337,35 @@ function RouteComponent() {
             return
         }
 
-        // Handle password change logic here
-        console.log('Password changed successfully')
-        setEditableData(prev => ({
-            ...prev,
-            newPassword: '',
-            retypePassword: ''
-        }))
-        setEditingFields(prev => ({
-            ...prev,
-            password: false
-        }))
-        alert('Password changed successfully!')
+        try {
+            setLoading(true)
+
+            const { error } = await supabase.auth.updateUser({
+                password: editableData.newPassword
+            })
+
+            if (error) {
+                console.error('Error changing password:', error)
+                alert('Failed to change password: ' + error.message)
+                return
+            }
+
+            setEditableData(prev => ({
+                ...prev,
+                newPassword: '',
+                retypePassword: ''
+            }))
+            setEditingFields(prev => ({
+                ...prev,
+                password: false
+            }))
+            alert('Password changed successfully!')
+        } catch (error) {
+            console.error('Error in handleChangePassword:', error)
+            alert('An error occurred while changing password')
+        } finally {
+            setLoading(false)
+        }
     }
 
     const [isSidebarOpen, setIsSidebarOpen] = useState(false)
@@ -289,6 +444,15 @@ function RouteComponent() {
             active: location.pathname === '/chef-interface/my-info'
         },
     ]
+
+    const LoadingSpinner = () => (
+        <div className="fixed inset-0 bg-black/50 flex justify-center items-center z-[60]">
+            <div className="bg-white rounded-xl shadow-lg p-6 flex flex-col items-center gap-4">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#964B00]"></div>
+                <p className="text-gray-700 font-medium">Loading...</p>
+            </div>
+        </div>
+    )
 
     return (
         <ProtectedRoute allowedRoles={['chef']}>
@@ -412,9 +576,11 @@ function RouteComponent() {
 
                     {/* User Info */}
                     <div className="px-6 py-4 border-b-2 border-amber-600">
-                        <h3 className="font-bold text-lg text-amber-900">Jenny Frenzzy</h3>
-                        <p className="text-sm text-amber-800">+63 912 212 1209</p>
-                        <p className="text-sm text-amber-800">jennyfrenzzy@gmail.com</p>
+                        <h3 className="font-bold text-lg text-amber-900">
+                            {staticData.firstName} {staticData.lastName}
+                        </h3>
+                        <p className="text-sm text-amber-800">{editableData.phoneNumber}</p>
+                        <p className="text-sm text-amber-800">{editableData.email}</p>
                     </div>
 
                     {/* Navigation Menu */}
@@ -436,12 +602,17 @@ function RouteComponent() {
                         ))}
                     </nav>
 
-                    {/* Logout Button */}
-                    <div className="px-4 pb-6">
-                        <button className="flex items-center gap-3 px-4 py-3 text-amber-900 hover:bg-red-100 hover:text-red-600 rounded-lg w-full transition-colors">
-                            <LogOut className="h-5 w-5" />
-                            Logout
-                        </button>
+                    {/* Logout */}
+                    <div className='border-t border-amber-600'>
+                        <div className='w-auto mx-4'>
+                            <button
+                                className="w-full flex items-center gap-3 px-4 py-3 mt-5 bg-gray-200 opacity-75 text-gray-950 rounded-lg hover:bg-amber-700 hover:text-white transition-colors cursor-pointer"
+                                onClick={handleLogout}
+                            >
+                                <LogOut className="h-5 w-5" />
+                                <span className="font-medium">Logout</span>
+                            </button>
+                        </div>
                     </div>
                 </div>
 
@@ -633,51 +804,21 @@ function RouteComponent() {
                                     </div>
                                 </div>
 
-                                {/* Email */}
+                                {/* Email - Non-editable */}
                                 <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
                                     <label className="text-sm sm:text-base lg:text-lg font-medium text-gray-700 sm:w-48 sm:text-right">
                                         Email Address:
                                     </label>
-                                    <div className="flex-1 flex flex-col sm:flex-row sm:items-center gap-2">
-                                        {editingFields.email ? (
-                                            <>
-                                                <input
-                                                    type="email"
-                                                    value={editableData.email}
-                                                    onChange={(e) => handleInputChange('email', e.target.value)}
-                                                    className="flex-1 px-3 py-2 sm:px-4 sm:py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 text-sm sm:text-base"
-                                                />
-                                                <div className="flex gap-2">
-                                                    <button
-                                                        onClick={() => saveField('email')}
-                                                        className="p-2 bg-green-600 hover:bg-green-700 text-white rounded-lg"
-                                                    >
-                                                        <Save className="h-5 w-5" />
-                                                    </button>
-                                                    <button
-                                                        onClick={() => cancelEditing('email')}
-                                                        className="p-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg"
-                                                    >
-                                                        <X className="h-5 w-5" />
-                                                    </button>
-                                                </div>
-                                            </>
-                                        ) : (
-                                            <>
-                                                <input
-                                                    type="email"
-                                                    value={editableData.email}
-                                                    className="flex-1 px-3 py-2 sm:px-4 sm:py-3 border-2 border-gray-300 rounded-lg bg-gray-100 text-gray-600 cursor-not-allowed text-sm sm:text-base"
-                                                    disabled
-                                                />
-                                                <button
-                                                    onClick={() => startEditing('email')}
-                                                    className="p-2 bg-gray-400 hover:bg-gray-500 text-white rounded-lg"
-                                                >
-                                                    <Edit className="h-5 w-5" />
-                                                </button>
-                                            </>
-                                        )}
+                                    <div className="flex-1">
+                                        <input
+                                            type="email"
+                                            value={editableData.email}
+                                            className="w-full px-3 py-2 sm:px-4 sm:py-3 border-2 border-gray-300 rounded-lg bg-gray-100 text-gray-500 cursor-not-allowed text-sm sm:text-base"
+                                            disabled
+                                        />
+                                        <p className="text-xs text-gray-500 mt-1 ml-1">
+                                            Email cannot be changed as it is your login username
+                                        </p>
                                     </div>
                                 </div>
 
@@ -742,6 +883,8 @@ function RouteComponent() {
                         </div>
                     </div>
                 </div>
+                {loading && <LoadingSpinner />}
+
             </div>
         </ProtectedRoute>
     )
