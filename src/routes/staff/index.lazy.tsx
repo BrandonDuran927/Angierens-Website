@@ -635,7 +635,7 @@ function RouteComponent() {
 
             // Create payment
             const { data: payment, error: paymentError } = await supabase
-                .from('payment')  // TODO: Add payment order id FK, maybe create order first then use the id of it for FK
+                .from('payment')
                 .insert({
                     payment_method: 'On-Site Payment',
                     payment_date: new Date().toISOString(),

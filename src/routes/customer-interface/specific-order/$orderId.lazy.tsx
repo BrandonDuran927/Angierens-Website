@@ -206,7 +206,7 @@ function SpecificOrder() {
       }
 
       // Calculate delivery fee (you can adjust this logic)
-      const deliveryFee = orderDataRaw.delivery.delivery_fee
+      const deliveryFee = orderDataRaw.order_type === "Delivery" ? orderDataRaw.delivery.delivery_fee || 0 : 0;
       const subtotal = Number(orderDataRaw.total_price)
       const totalPrice = subtotal + deliveryFee
 
