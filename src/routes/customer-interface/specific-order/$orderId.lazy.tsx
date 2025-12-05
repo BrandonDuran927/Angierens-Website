@@ -33,6 +33,7 @@ interface OrderItem {
   image: string
   quantity: number
   price: number
+  unitPrice: number
   inclusions: string[]
   addOns: string
 }
@@ -64,6 +65,11 @@ interface OrderData {
   }
   specialInstructions: string
   proofOfPaymentUrl: string | null
+  refundData: {
+    response: string | null
+    proofOfRefundUrl: string | null
+    status: string | null
+  } | null
 }
 
 function SpecificOrder() {
@@ -78,6 +84,7 @@ function SpecificOrder() {
   const [orderData, setOrderData] = useState<OrderData | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [showViewReceiptModal, setShowViewReceiptModal] = useState(false)
+  const [showRefundDetailsModal, setShowRefundDetailsModal] = useState(false)
 
   const { orderId } = Route.useParams()
 
@@ -151,7 +158,11 @@ function SpecificOrder() {
               add_on (*)
             )
           ),
-          delivery(*)
+          delivery(
+            *,
+            address (*)
+          ),
+          refund (*)
         `)
         .eq('order_id', orderId)
         .single()
@@ -174,18 +185,27 @@ function SpecificOrder() {
           : []
 
         const addOns: string[] = []
+        let addOnsTotal = 0
         item.order_item_add_on?.forEach((addOn: any) => {
           if (addOn.add_on?.name) {
             addOns.push(`${addOn.add_on.name} (${addOn.quantity})`)
+            addOnsTotal += Number(addOn.subtotal_price) || 0
           }
         })
+
+        // Use subtotal_price from order_item (this is the actual price paid for this item)
+        const itemSubtotal = Number(item.subtotal_price) || 0
+        const quantity = Number(item.quantity) || 1
+        // Calculate unit price (price per item before add-ons)
+        const unitPrice = itemSubtotal / quantity
 
         return {
           id: item.order_item_id,
           name: item.menu?.name || 'Unknown Item',
           image: item.menu?.image_url || '/placeholder.png',
-          quantity: Number(item.quantity),
-          price: item?.price || 0,
+          quantity: quantity,
+          price: itemSubtotal + addOnsTotal, // Total price for this item including add-ons
+          unitPrice: unitPrice, // Original unit price of the menu item
           inclusions: inclusions,
           addOns: addOns.length > 0 ? addOns.join(', ') : 'None'
         }
@@ -206,9 +226,23 @@ function SpecificOrder() {
       }
 
       // Calculate delivery fee (you can adjust this logic)
-      const deliveryFee = orderDataRaw.order_type === "Delivery" ? orderDataRaw.delivery.delivery_fee || 0 : 0;
+      const deliveryFee = orderDataRaw.order_type === "Delivery" ? orderDataRaw.delivery?.delivery_fee || 0 : 0;
       const subtotal = Number(orderDataRaw.total_price)
       const totalPrice = subtotal + deliveryFee
+
+      // Build address string from delivery.address if order type is Delivery
+      let customerAddress = ''
+      if (orderDataRaw.order_type === 'Delivery' && orderDataRaw.delivery?.address) {
+        const addr = orderDataRaw.delivery.address
+        const addressParts = [
+          addr.address_line,
+          addr.barangay,
+          addr.city,
+          addr.region,
+          addr.postal_code
+        ].filter(Boolean)
+        customerAddress = addressParts.join(', ')
+      }
 
       const transformed: OrderData = {
         orderId: orderDataRaw.order_id,
@@ -229,7 +263,7 @@ function SpecificOrder() {
         customer: {
           name: `${userData.first_name} ${userData.middle_name ? userData.middle_name + ' ' : ''}${userData.last_name}`,
           phone: userData.phone_number || 'N/A',
-          address: orderDataRaw.delivery_address || 'N/A'
+          address: customerAddress
         },
         items: items,
         pricing: {
@@ -238,7 +272,12 @@ function SpecificOrder() {
           total: totalPrice
         },
         specialInstructions: orderDataRaw.special_instructions || 'None',
-        proofOfPaymentUrl: orderDataRaw.payment?.proof_of_payment_url || null
+        proofOfPaymentUrl: orderDataRaw.payment?.proof_of_payment_url || null,
+        refundData: orderDataRaw.refund && orderDataRaw.refund.length > 0 ? {
+          response: orderDataRaw.refund[0].response || null,
+          proofOfRefundUrl: orderDataRaw.refund[0].proof_of_refund_url || null,
+          status: orderDataRaw.refund[0].status || null
+        } : null
       }
 
       console.log('Transformed Order Data:', transformed)
@@ -342,6 +381,14 @@ function SpecificOrder() {
         label: orderData.status === 'Refund' ? 'Refunded' : 'Refunding',
         date: orderData.status_updated_at,
         icon: ShoppingBag,
+        completed: true
+      })
+    } else if (orderData.status === 'Rejected') {
+      steps.push({
+        key: 'rejected',
+        label: 'Rejected',
+        date: orderData.status_updated_at,
+        icon: X,
         completed: true
       })
     } else if (orderData.deliveryOption === 'Delivery') {
@@ -456,6 +503,14 @@ function SpecificOrder() {
 
   const handleCloseViewReceipt = () => {
     setShowViewReceiptModal(false)
+  }
+
+  const handleOpenRefundDetails = () => {
+    setShowRefundDetailsModal(true)
+  }
+
+  const handleCloseRefundDetails = () => {
+    setShowRefundDetailsModal(false)
   }
 
   const handleConfirmPickup = async () => {
@@ -723,14 +778,24 @@ function SpecificOrder() {
                     </h2>
                   </div>
 
-                  {orderData.proofOfPaymentUrl && (
-                    <button
-                      onClick={handleOpenViewReceipt}
-                      className="bg-amber-600 hover:bg-amber-700 text-white px-4 py-2 rounded-lg text-sm sm:text-base font-medium transition-colors"
-                    >
-                      View Proof of Payment
-                    </button>
-                  )}
+                  <div className="flex gap-2 flex-wrap">
+                    {orderData.proofOfPaymentUrl && (
+                      <button
+                        onClick={handleOpenViewReceipt}
+                        className="bg-amber-600 hover:bg-amber-700 text-white px-4 py-2 rounded-lg text-sm sm:text-base font-medium transition-colors"
+                      >
+                        View Proof of Payment
+                      </button>
+                    )}
+                    {(orderData.status === 'Refund' || orderData.status === 'Rejected') && orderData.refundData?.response && (
+                      <button
+                        onClick={handleOpenRefundDetails}
+                        className={`${orderData.status === 'Refund' ? 'bg-green-600 hover:bg-green-700' : 'bg-red-600 hover:bg-red-700'} text-white px-4 py-2 rounded-lg text-sm sm:text-base font-medium transition-colors`}
+                      >
+                        View {orderData.status === 'Refund' ? 'Refund' : 'Rejection'} Details
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
 
@@ -837,7 +902,7 @@ function SpecificOrder() {
                   {/* Delivery Address */}
                   <div className="lg:col-span-1">
                     <h3 className="text-lg sm:text-xl font-bold text-black mb-3 sm:mb-4">
-                      Delivery Address
+                      Other Details
                     </h3>
                     <div className="space-y-2 text-gray-600">
                       <div className="font-semibold text-black text-base sm:text-lg">
@@ -846,9 +911,11 @@ function SpecificOrder() {
                       <div className="text-gray-500 text-sm sm:text-base">
                         {orderData.customer.phone}
                       </div>
-                      <div className="text-gray-500 text-sm sm:text-base">
-                        {orderData.customer.address}
-                      </div>
+                      {orderData.deliveryOption === 'Delivery' && orderData.customer.address && (
+                        <div className="text-gray-500 text-sm sm:text-base">
+                          {orderData.customer.address}
+                        </div>
+                      )}
                     </div>
                   </div>
 
@@ -891,8 +958,11 @@ function SpecificOrder() {
                           </div>
                           {/* Price */}
                           <div className="text-right text-sm flex-shrink-0">
+                            <div className="text-gray-500 text-sm">
+                              {formatPrice(item.unitPrice)} each
+                            </div>
                             <div className="font-bold text-black text-lg">
-                              {formatPrice(item.price * item.quantity)}
+                              {formatPrice(item.price)}
                             </div>
                           </div>
                         </div>
@@ -1204,6 +1274,60 @@ function SpecificOrder() {
               <div className="p-4 border-t border-gray-200 flex justify-end">
                 <button
                   onClick={handleCloseViewReceipt}
+                  className="bg-gray-300 hover:bg-gray-400 text-gray-800 font-medium py-2 px-6 rounded-lg transition-colors"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* View Refund Details Modal */}
+        {showRefundDetailsModal && orderData && orderData.refundData && (
+          <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-hidden">
+              <div className={`p-4 border-b ${orderData.status === 'Refund' ? 'border-green-400 bg-green-50' : 'border-red-400 bg-red-50'} flex items-center justify-between`}>
+                <h2 className={`text-xl font-bold ${orderData.status === 'Refund' ? 'text-green-800' : 'text-red-800'}`}>
+                  {orderData.status === 'Refund' ? 'Refund Approved' : 'Refund Rejected'}
+                </h2>
+                <button
+                  onClick={handleCloseRefundDetails}
+                  className="text-gray-500 hover:text-gray-700 text-2xl font-bold"
+                >
+                  ×
+                </button>
+              </div>
+
+              <div className="p-6 overflow-auto max-h-[calc(90vh-180px)]">
+                {/* Response Section */}
+                <div className="mb-6">
+                  <h3 className="font-semibold text-gray-800 mb-2">Staff Response</h3>
+                  <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                    <p className="text-gray-700 whitespace-pre-wrap">{orderData.refundData.response}</p>
+                  </div>
+                </div>
+
+                {/* Proof of Refund Image - Only show for approved refunds */}
+                {orderData.status === 'Refund' && orderData.refundData.proofOfRefundUrl && (
+                  <div>
+                    <h3 className="font-semibold text-gray-800 mb-2">Proof of Refund</h3>
+                    <div className="border border-gray-200 rounded-lg overflow-hidden">
+                      <img
+                        src={orderData.refundData.proofOfRefundUrl}
+                        alt="Proof of Refund"
+                        className="w-full h-auto cursor-pointer hover:opacity-90 transition-opacity"
+                        onClick={() => window.open(orderData.refundData!.proofOfRefundUrl!, '_blank')}
+                      />
+                      <p className="text-xs text-gray-500 text-center py-2 bg-gray-50">Click image to view full size</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="p-4 border-t border-gray-200 flex justify-end">
+                <button
+                  onClick={handleCloseRefundDetails}
                   className="bg-gray-300 hover:bg-gray-400 text-gray-800 font-medium py-2 px-6 rounded-lg transition-colors"
                 >
                   Close

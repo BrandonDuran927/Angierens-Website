@@ -85,6 +85,33 @@ function RouteComponent() {
     const [leastSalesItems, setLeastSalesItems] = useState<MenuItem[]>([])
     const [loading, setLoading] = useState(true)
 
+    const getCurrentDate = () => {
+        const now = new Date()
+        return now.toLocaleDateString('en-US', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric'
+        })
+    }
+
+    const getCurrentTime = () => {
+        const now = new Date()
+        return now.toLocaleTimeString('en-US', {
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: true
+        })
+    }
+
+    const getImageUrl = (imageUrl: string | null): string => {
+        if (!imageUrl) return '/api/placeholder/40/40'
+        if (imageUrl.startsWith('http://') || imageUrl.startsWith('https://')) {
+            return imageUrl
+        }
+        const encodedFileName = encodeURIComponent(imageUrl)
+        return `https://tvuawpgcpmqhsmwbwypy.supabase.co/storage/v1/object/public/menu-images/${encodedFileName}`
+    }
+
     useEffect(() => {
         fetchSalesData()
         fetchTotalRevenueData()
@@ -122,21 +149,13 @@ function RouteComponent() {
             setLoading(true)
             const { startDate, endDate } = getDateRange()
 
-            // First, let's check all orders to see what statuses exist
-            const { data: allOrders, error: allError } = await supabase
-                .from('order')
-                .select('order_status, status_updated_at, total_price')
-                .order('status_updated_at', { ascending: false })
-                .limit(10)
-
-            console.log('Sample orders from database:', allOrders)
-            console.log('Date range:', { startDate, endDate })
-
-            // Now fetch with filters
+            // Fetch completed orders within date range
             const { data: orders, error } = await supabase
                 .from('order')
-                .select('status_updated_at, total_price, order_status')
+                .select('status_updated_at, total_price, order_status, created_at')
                 .eq('order_status', 'Completed')
+                .gte('status_updated_at', startDate)
+                .lte('status_updated_at', endDate)
                 .order('status_updated_at', { ascending: true })
 
             if (error) {
@@ -162,12 +181,12 @@ function RouteComponent() {
         const grouped: { [key: string]: { revenue: number; orders: number } } = {}
 
         orders.forEach(order => {
-            const date = new Date(order.created_at)
+            const date = new Date(order.status_updated_at)
             let period = ''
 
             switch (timeFilter) {
                 case 'daily':
-                    period = `${date.getHours()}:00`
+                    period = `${date.getHours().toString().padStart(2, '0')}:00`
                     break
                 case 'weekly':
                     const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
@@ -185,11 +204,26 @@ function RouteComponent() {
             if (!grouped[period]) {
                 grouped[period] = { revenue: 0, orders: 0 }
             }
-            grouped[period].revenue += order.total_price || 0
+            grouped[period].revenue += Number(order.total_price) || 0
             grouped[period].orders += 1
         })
 
-        return Object.entries(grouped).map(([period, data]) => ({
+        // Sort the results based on time filter
+        const sortedEntries = Object.entries(grouped).sort((a, b) => {
+            if (timeFilter === 'daily') {
+                return parseInt(a[0]) - parseInt(b[0])
+            } else if (timeFilter === 'weekly') {
+                const dayOrder = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+                return dayOrder.indexOf(a[0]) - dayOrder.indexOf(b[0])
+            } else if (timeFilter === 'monthly') {
+                return parseInt(a[0].replace('Week ', '')) - parseInt(b[0].replace('Week ', ''))
+            } else {
+                const monthOrder = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+                return monthOrder.indexOf(a[0]) - monthOrder.indexOf(b[0])
+            }
+        })
+
+        return sortedEntries.map(([period, data]) => ({
             period,
             revenue: data.revenue,
             orders: data.orders
@@ -620,8 +654,8 @@ function RouteComponent() {
                                 </div>
                             </div>
                             <div className="flex items-center gap-2 lg:gap-4">
-                                <span className="text-amber-200 text-xs lg:text-sm hidden sm:inline">Date: May 16, 2025</span>
-                                <span className="text-amber-200 text-xs lg:text-sm hidden sm:inline">Time: 11:00 AM</span>
+                                <span className="text-amber-200 text-xs lg:text-sm hidden sm:inline">Date: {getCurrentDate()}</span>
+                                <span className="text-amber-200 text-xs lg:text-sm hidden sm:inline">Time: {getCurrentTime()}</span>
                                 <div className="w-10 h-10 bg-yellow-400 rounded-full flex items-center justify-center">
                                     <div className='relative'>
                                         <button
@@ -900,7 +934,14 @@ function RouteComponent() {
                                             <div className="flex items-center gap-3">
                                                 <span className="text-sm font-bold text-gray-500 w-6">#{item.rank}</span>
                                                 <div className="w-10 h-10 bg-amber-300 rounded-lg flex items-center justify-center text-xl overflow-hidden">
-                                                    // TODO: Add image rendering logic here; fix image in database name - make sure that it is all in a lowercase
+                                                    <img 
+                                                        src={getImageUrl(item.image_url)} 
+                                                        alt={item.name} 
+                                                        className="w-full h-full object-cover"
+                                                        onError={(e) => {
+                                                            (e.target as HTMLImageElement).src = '/api/placeholder/40/40'
+                                                        }}
+                                                    />
                                                 </div>
                                                 <div>
                                                     <p className="font-medium text-gray-800">{item.name}</p>
@@ -937,11 +978,14 @@ function RouteComponent() {
                                             <div className="flex items-center gap-3">
                                                 <span className="text-sm font-bold text-gray-500 w-6">#{item.rank}</span>
                                                 <div className="w-10 h-10 bg-amber-100 rounded-lg flex items-center justify-center text-xl overflow-hidden">
-                                                    {/* {item.image.startsWith('http') ? (
-                                                            <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
-                                                        ) : (
-                                                            <span>{item.image}</span>
-                                                        )} */}
+                                                    <img 
+                                                        src={getImageUrl(item.image_url)} 
+                                                        alt={item.name} 
+                                                        className="w-full h-full object-cover"
+                                                        onError={(e) => {
+                                                            (e.target as HTMLImageElement).src = '/api/placeholder/40/40'
+                                                        }}
+                                                    />
                                                 </div>
                                                 <div>
                                                     <p className="font-medium text-gray-800">{item.name}</p>

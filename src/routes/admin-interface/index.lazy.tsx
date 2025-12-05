@@ -85,7 +85,8 @@ function RouteComponent() {
         setIsOrderDetailsModalOpen(true)
     }
 
-    const formatScheduleTime = (dateStr: string, timeStr: string): string => {
+    const formatScheduleTime = (dateStr: string, timeStr: string, orderType?: string): string => {
+        // Convert to Date object for formatting
         const date = new Date(`${dateStr}T${timeStr}`);
 
         const formattedTime = date.toLocaleTimeString('en-US', {
@@ -99,8 +100,10 @@ function RouteComponent() {
             year: 'numeric',
         });
 
-        return `${formattedTime} to be delivered on ${formattedDate}`;
+        const actionText = orderType === 'Pick-up' ? 'for pick-up on' : 'to be delivered on';
+        return `${formattedTime} ${actionText} ${formattedDate}`;
     }
+
 
     useEffect(() => {
         console.log("Navigated to /customer-interface")
@@ -876,12 +879,26 @@ function RouteComponent() {
                     <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto">
                         {/* Modal Header */}
                         <div className="flex items-center justify-between p-6 border-b border-gray-200">
-                            <div className="flex items-center gap-4">
-                                <span className="text-gray-600 font-medium">FRONT</span>
-                                <span className="text-xl font-bold text-gray-800">Order #: {selectedOrder.order_number}</span>
-                                <span className="bg-black text-white px-4 py-1 rounded-full text-sm font-medium">
-                                    {selectedOrder.order_status}
-                                </span>
+                            <div className="flex flex-col gap-2">
+                                <div className="flex items-center gap-4">
+                                    <span className="text-gray-600 font-medium">FRONT</span>
+                                    <span className="text-xl font-bold text-gray-800">Order ID: {selectedOrder.order_number}</span>
+                                    <span className="bg-black text-white px-4 py-1 rounded-full text-sm font-medium">
+                                        {selectedOrder.order_status}
+                                    </span>
+                                </div>
+                                {selectedOrder.status_updated_at && (
+                                    <p className="text-sm text-gray-500">
+                                        Status updated: {new Date(selectedOrder.status_updated_at).toLocaleString('en-US', {
+                                            year: 'numeric',
+                                            month: 'long',
+                                            day: 'numeric',
+                                            hour: '2-digit',
+                                            minute: '2-digit',
+                                            hour12: true
+                                        })}
+                                    </p>
+                                )}
                             </div>
                             <button
                                 onClick={closeOrderDetails}
@@ -896,7 +913,7 @@ function RouteComponent() {
                             {/* Customer Info */}
                             <div>
                                 <h3 className="text-2xl font-bold text-gray-800 mb-2">{selectedOrder.user.customer_name}</h3>
-                                <p className="text-gray-600 text-lg">{formatScheduleTime(selectedOrder.schedule.schedule_date, selectedOrder.schedule.schedule_time)}</p>
+                                <p className="text-gray-600 text-lg">{formatScheduleTime(selectedOrder.schedule.schedule_date, selectedOrder.schedule.schedule_time, selectedOrder.order_type)}</p>
                             </div>
 
                             {/* Date and Time */}
@@ -956,12 +973,12 @@ function RouteComponent() {
                                 {selectedOrder.delivery && (
                                     <div className="flex justify-between items-center">
                                         <span className="text-lg font-medium">Delivery fee</span>
-                                        <span className="text-lg font-bold">₱ {selectedOrder.delivery.delivery_fee}</span>
+                                        <span className="text-lg font-bold">₱ {Number(selectedOrder.delivery.delivery_fee).toFixed(2)}</span>
                                     </div>
                                 )}
                                 <div className="flex justify-between items-center text-xl font-bold border-t border-gray-200 pt-3">
                                     <span>Total</span>
-                                    <span>₱ {orderPrice + selectedOrder.delivery.delivery_fee}</span>
+                                    <span>₱ {Number(orderPrice + selectedOrder.delivery.delivery_fee).toFixed(2)}</span>
                                 </div>
                             </div>
                         </div>

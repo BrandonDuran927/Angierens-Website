@@ -43,6 +43,7 @@ interface OrderDisplay {
     fulfillmentType: string
     paymentMethod: string
     order_status: string
+    statusUpdatedAt: string | null
     orderData?: Order
     proofOfPaymentUrl?: string | null
 }
@@ -58,6 +59,14 @@ interface OrderForm {
     addOns: {
         [key: string]: number
     }
+    // Add delivery fields
+    deliveryAddress: {
+        addressLine: string
+        region: string
+        city: string
+        barangay: string
+        postalCode: string
+    }
 }
 
 interface SelectedMenuItem {
@@ -66,14 +75,20 @@ interface SelectedMenuItem {
     price: number
     quantity: number
     inclusion: string
+    size: string | null
+    selectedPriceIndex: number
 }
 
 interface MenuItem {
     menu_id: string
     name: string
-    price: number
+    price: string
     inclusion: string
     is_available: boolean
+    category: string
+    size: string | null
+    description: string
+    image_url: string | null
 }
 
 interface AddOn {
@@ -103,8 +118,8 @@ interface Filters {
 
 function RouteComponent() {
     const navigate = useNavigate();
-    type TabType = 'New Orders' | 'In Process' | 'Completed'
-    const tabs: TabType[] = ['New Orders', 'In Process', 'Completed']
+    type TabType = 'New Orders' | 'In Process' | 'Completed' | 'Refund' | 'Cancelled'
+    const tabs: TabType[] = ['New Orders', 'In Process', 'Completed', 'Refund', 'Cancelled']
     const [activeTab, setActiveTab] = useState<TabType>('New Orders')
     const [searchQuery, setSearchQuery] = useState('')
     const [currentPage, setCurrentPage] = useState(1)
@@ -124,12 +139,16 @@ function RouteComponent() {
     const [menuSearchQuery, setMenuSearchQuery] = useState('')
     const [showViewReceiptModal, setShowViewReceiptModal] = useState(false)
     const [viewReceiptUrl, setViewReceiptUrl] = useState<string>('')
+    const [availableSchedules, setAvailableSchedules] = useState<any[]>([])
+    const [selectedScheduleId, setSelectedScheduleId] = useState<string>('')
 
 
     const statusGroups = {
         'New Orders': ['Pending'],
-        'In Process': ['Queueing', 'Preparing', 'Cooking', 'Ready', 'Refunding', 'On Delivery', 'Claim Order'],
-        'Completed': ['Completed', 'Cancelled', 'Refund']
+        'In Process': ['Queueing', 'Preparing', 'Cooking', 'Ready', 'On Delivery', 'Claim Order'],
+        'Completed': ['Completed', 'Refund'],
+        'Refund': ['Refunding', 'Refund'],
+        'Cancelled': ['Cancelled']
     }
 
     const handleReturnPaymentProofUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -214,7 +233,14 @@ function RouteComponent() {
         pickDate: '',
         pickTime: '',
         selectedMenuItems: [],
-        addOns: {}
+        addOns: {},
+        deliveryAddress: {
+            addressLine: '',
+            region: '',
+            city: '',
+            barangay: '',
+            postalCode: '',
+        }
     })
 
     const loadOrders = async () => {
@@ -241,6 +267,7 @@ function RouteComponent() {
                 fulfillmentType: order.order_type,
                 paymentMethod: order.payment.paymentMethod || 'On-Site Payment',
                 order_status: order.order_status,
+                statusUpdatedAt: order.status_updated_at || null,
                 orderData: order,
                 proofOfPaymentUrl: order.payment.proof_of_payment_url || null
             }))
@@ -252,6 +279,16 @@ function RouteComponent() {
         } finally {
             setLoading(false)
         }
+    }
+
+    const parsePrices = (priceString: string): number[] => {
+        if (!priceString) return []
+        return priceString.split(',').map(p => parseFloat(p.trim())).filter(p => !isNaN(p))
+    }
+
+    const parseSizes = (sizeString: string | null): string[] => {
+        if (!sizeString) return []
+        return sizeString.split(',').map(s => s.trim()).filter(s => s)
     }
 
     // Load menu items
@@ -298,6 +335,7 @@ function RouteComponent() {
         loadOrders()
         loadMenuItems()
         loadAddOns()
+        loadAvailableSchedules()
     }, [])
 
     const itemsPerPage = 10
@@ -479,37 +517,6 @@ function RouteComponent() {
         fetchUserProfile();
     }, [user]);
 
-    // Add menu item to order
-    const addMenuItemToOrder = (menuItem: MenuItem) => {
-        setOrderForm(prev => {
-            const existing = prev.selectedMenuItems.find(item => item.menu_id === menuItem.menu_id)
-            if (existing) {
-                return {
-                    ...prev,
-                    selectedMenuItems: prev.selectedMenuItems.map(item =>
-                        item.menu_id === menuItem.menu_id
-                            ? { ...item, quantity: item.quantity + 1 }
-                            : item
-                    )
-                }
-            } else {
-                return {
-                    ...prev,
-                    selectedMenuItems: [
-                        ...prev.selectedMenuItems,
-                        {
-                            menu_id: menuItem.menu_id,
-                            name: menuItem.name,
-                            price: Number(menuItem.price),
-                            quantity: 1,
-                            inclusion: menuItem.inclusion || ''
-                        }
-                    ]
-                }
-            }
-        })
-    }
-
     // Remove menu item from order
     const removeMenuItemFromOrder = (menuId: string) => {
         setOrderForm(prev => {
@@ -574,24 +581,33 @@ function RouteComponent() {
 
     // Submit manual order
     const handleSubmitOrder = async () => {
+        setLoading(true)
         try {
             if (!orderForm.fullName || !orderForm.email || !orderForm.phone || !orderForm.fulfillmentType) {
                 alert('Please fill in all customer information fields')
+                setLoading(false)
                 return
             }
 
             if (orderForm.selectedMenuItems.length === 0) {
                 alert('Please add at least one menu item to the order')
+                setLoading(false)
                 return
             }
 
             // Create or get user
             let userId = ''
-            const { data: existingUser } = await supabase
+            // Use .limit(1) instead of .single() to handle cases where multiple users have the same email
+            const { data: existingUsers } = await supabase
                 .from('users')
                 .select('user_uid')
                 .eq('email', orderForm.email)
-                .single()
+                .limit(1)
+
+            const existingUser = existingUsers && existingUsers.length > 0 ? existingUsers[0] : null
+
+            console.log('Existing user lookup response:', existingUser)
+            console.log('Order form email:', orderForm.email)
 
             if (existingUser) {
                 userId = existingUser.user_uid
@@ -601,9 +617,14 @@ function RouteComponent() {
                 const lastName = nameParts[nameParts.length - 1] || ''
                 const middleName = nameParts.length > 2 ? nameParts.slice(1, -1).join(' ') : null
 
+                const newUserId = crypto.randomUUID()
+
+                console.log('Creating new user with ID:', newUserId)
+
                 const { data: newUser, error: userError } = await supabase
                     .from('users')
                     .insert({
+                        user_uid: newUserId,
                         first_name: firstName,
                         middle_name: middleName,
                         last_name: lastName,
@@ -616,22 +637,26 @@ function RouteComponent() {
                     .select()
                     .single()
 
+                console.log('New user creation response:', newUser, userError)
+
                 if (userError) throw userError
                 userId = newUser.user_uid
+
             }
 
-            // Create schedule 
-            const { data: schedule, error: scheduleError } = await supabase
-                .from('schedule')
-                .insert({
-                    schedule_date: orderForm.pickDate,
-                    schedule_time: orderForm.pickTime,
-                    is_available: false
-                })
-                .select()
-                .single()
+            if (!selectedScheduleId) {
+                alert('Please select a schedule')
+                setLoading(false)
+                return
+            }
 
-            if (scheduleError) throw scheduleError
+            // Use the selected schedule
+            const schedule = availableSchedules.find(s => s.schedule_id === selectedScheduleId)
+            if (!schedule) {
+                alert('Invalid schedule selected')
+                setLoading(false)
+                return
+            }
 
             // Create payment
             const { data: payment, error: paymentError } = await supabase
@@ -665,7 +690,58 @@ function RouteComponent() {
 
             if (orderError) throw orderError
 
-            // Create order items
+            if (orderForm.fulfillmentType === 'delivery') {
+                // Validate delivery address
+                if (!orderForm.deliveryAddress.addressLine ||
+                    !orderForm.deliveryAddress.barangay ||
+                    !orderForm.deliveryAddress.city ||
+                    !orderForm.deliveryAddress.region ||
+                    !orderForm.deliveryAddress.postalCode) {
+                    alert('Please fill in all delivery address fields')
+                    setLoading(false)
+                    return
+                }
+
+                // Create address
+                const { data: address, error: addressError } = await supabase
+                    .from('address')
+                    .insert({
+                        address_type: 'Secondary',
+                        address_line: orderForm.deliveryAddress.addressLine,
+                        region: orderForm.deliveryAddress.region,
+                        city: orderForm.deliveryAddress.city,
+                        barangay: orderForm.deliveryAddress.barangay,
+                        postal_code: orderForm.deliveryAddress.postalCode,
+                        customer_id: userId
+                    })
+                    .select()
+                    .single()
+
+                if (addressError) throw addressError
+
+                // Create delivery record
+                const { data: delivery, error: deliveryError } = await supabase
+                    .from('delivery')
+                    .insert({
+                        address_id: address.address_id,
+                        delivery_fee: 50,
+                        delivery_status: null,
+                        rider_id: null
+                    })
+                    .select()
+                    .single()
+
+                if (deliveryError) throw deliveryError
+
+                // Update order with delivery_id
+                const { error: orderUpdateError } = await supabase
+                    .from('order')
+                    .update({ delivery_id: delivery.delivery_id })
+                    .eq('order_id', order.order_id)
+
+                if (orderUpdateError) throw orderUpdateError
+            }
+
             for (const item of orderForm.selectedMenuItems) {
                 const { error: itemError } = await supabase
                     .from('order_item')
@@ -720,20 +796,71 @@ function RouteComponent() {
                 pickDate: '',
                 pickTime: '',
                 selectedMenuItems: [],
-                addOns: {}
+                addOns: {},
+                // Reset delivery address
+                deliveryAddress: {
+                    addressLine: '',
+                    region: '',
+                    city: '',
+                    barangay: '',
+                    postalCode: ''
+                }
             })
             loadOrders()
+            setLoading(false)
         } catch (error) {
+            setLoading(false)
             console.error('Error creating order:', error)
             alert('Failed to create order')
+        }
+    }
+
+    // Add near loadMenuItems and loadAddOns functions
+    const loadAvailableSchedules = async () => {
+        try {
+            const now = new Date()
+            const today = now.toISOString().split('T')[0]
+            const { data, error } = await supabase
+                .from('schedule')
+                .select('*')
+                .eq('is_available', true)
+                .gte('schedule_date', today)
+                .order('schedule_date')
+                .order('schedule_time')
+
+            if (error) throw error
+
+            // Filter out schedules that have already passed for today
+            const filteredSchedules = (data || []).filter(schedule => {
+                // If it's not today, keep the schedule
+                if (schedule.schedule_date !== today) return true
+
+                // If it's today, check if the time has passed
+                const [hours, minutes] = schedule.schedule_time.split(':')
+                const scheduleHour = parseInt(hours)
+                const scheduleMinute = parseInt(minutes)
+
+                const currentHour = now.getHours()
+                const currentMinute = now.getMinutes()
+
+                // Filter out if schedule time is before or equal to current time
+                if (scheduleHour < currentHour) return false
+                if (scheduleHour === currentHour && scheduleMinute <= currentMinute) return false
+
+                return true
+            })
+
+            setAvailableSchedules(filteredSchedules)
+        } catch (error) {
+            console.error('Error loading schedules:', error)
         }
     }
 
     const filteredMenuItems = menuItems.filter(item =>
         item.name.toLowerCase().includes(menuSearchQuery.toLowerCase())
     )
-    // Add this function near the top of your component (after the interfaces)
-    const formatScheduleTime = (dateStr: string, timeStr: string): string => {
+
+    const formatScheduleTime = (dateStr: string, timeStr: string, orderType?: string): string => {
         // Convert to Date object for formatting
         const date = new Date(`${dateStr}T${timeStr}`);
 
@@ -748,7 +875,8 @@ function RouteComponent() {
             year: 'numeric',
         });
 
-        return `${formattedTime} to be delivered on ${formattedDate}`;
+        const actionText = orderType === 'Pick-up' ? 'for pick-up on' : 'to be delivered on';
+        return `${formattedTime} ${actionText} ${formattedDate}`;
     }
 
     const orderPrice = selectedOrder?.orderData?.order_item.reduce((sum, item) => {
@@ -1142,6 +1270,42 @@ function RouteComponent() {
                                         )}
                                     </div>
                                 </div>
+
+                                {/* Pagination */}
+                                {totalPages > 1 && (
+                                    <div className="flex justify-center items-center gap-2 mt-6 pb-6">
+                                        <button
+                                            onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                                            disabled={currentPage === 1}
+                                            className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                        >
+                                            Previous
+                                        </button>
+
+                                        <div className="flex gap-2">
+                                            {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                                                <button
+                                                    key={page}
+                                                    onClick={() => setCurrentPage(page)}
+                                                    className={`px-4 py-2 rounded-lg transition-colors ${currentPage === page
+                                                        ? 'bg-amber-500 text-white'
+                                                        : 'border border-gray-300 hover:bg-gray-50'
+                                                        }`}
+                                                >
+                                                    {page}
+                                                </button>
+                                            ))}
+                                        </div>
+
+                                        <button
+                                            onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                                            disabled={currentPage === totalPages}
+                                            className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                        >
+                                            Next
+                                        </button>
+                                    </div>
+                                )}
                             </>
                         )}
                     </main>
@@ -1207,33 +1371,122 @@ function RouteComponent() {
                                             </select>
                                         </div>
 
-                                        {/* NEW: Pick Date */}
+                                        {orderForm.fulfillmentType === 'delivery' && (
+                                            <div className="bg-yellow-50 p-4 rounded-lg border-2 border-yellow-400 space-y-3">
+                                                <h4 className="font-semibold text-gray-800 flex items-center gap-2">
+                                                    <Truck className="h-5 w-5" />
+                                                    Delivery Address
+                                                </h4>
+
+                                                <div>
+                                                    <label className="block text-sm font-medium text-gray-700 mb-1">Street Address:</label>
+                                                    <input
+                                                        type="text"
+                                                        placeholder="House/Building No., Street Name"
+                                                        value={orderForm.deliveryAddress.addressLine}
+                                                        onChange={(e) => setOrderForm(prev => ({
+                                                            ...prev,
+                                                            deliveryAddress: { ...prev.deliveryAddress, addressLine: e.target.value }
+                                                        }))}
+                                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500"
+                                                    />
+                                                </div>
+
+                                                <div className="grid grid-cols-2 gap-3">
+                                                    <div>
+                                                        <label className="block text-sm font-medium text-gray-700 mb-1">Barangay:</label>
+                                                        <input
+                                                            type="text"
+                                                            placeholder="Barangay"
+                                                            value={orderForm.deliveryAddress.barangay}
+                                                            onChange={(e) => setOrderForm(prev => ({
+                                                                ...prev,
+                                                                deliveryAddress: { ...prev.deliveryAddress, barangay: e.target.value }
+                                                            }))}
+                                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500"
+                                                        />
+                                                    </div>
+
+                                                    <div>
+                                                        <label className="block text-sm font-medium text-gray-700 mb-1">City:</label>
+                                                        <input
+                                                            type="text"
+                                                            placeholder="City"
+                                                            value={orderForm.deliveryAddress.city}
+                                                            onChange={(e) => setOrderForm(prev => ({
+                                                                ...prev,
+                                                                deliveryAddress: { ...prev.deliveryAddress, city: e.target.value }
+                                                            }))}
+                                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500"
+                                                        />
+                                                    </div>
+                                                </div>
+
+                                                <div className="grid grid-cols-2 gap-3">
+                                                    <div>
+                                                        <label className="block text-sm font-medium text-gray-700 mb-1">Region:</label>
+                                                        <input
+                                                            type="text"
+                                                            placeholder="Region"
+                                                            value={orderForm.deliveryAddress.region}
+                                                            onChange={(e) => setOrderForm(prev => ({
+                                                                ...prev,
+                                                                deliveryAddress: { ...prev.deliveryAddress, region: e.target.value }
+                                                            }))}
+                                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500"
+                                                        />
+                                                    </div>
+
+                                                    <div>
+                                                        <label className="block text-sm font-medium text-gray-700 mb-1">Postal Code:</label>
+                                                        <input
+                                                            type="text"
+                                                            placeholder="Postal Code"
+                                                            value={orderForm.deliveryAddress.postalCode}
+                                                            onChange={(e) => setOrderForm(prev => ({
+                                                                ...prev,
+                                                                deliveryAddress: { ...prev.deliveryAddress, postalCode: e.target.value }
+                                                            }))}
+                                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500"
+                                                        />
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {/* Schedule Selection */}
                                         <div>
                                             <label className="block text-sm font-semibold text-gray-700 mb-2">
                                                 <Calendar className="inline h-4 w-4 mr-1" />
-                                                Pick Date:
+                                                Select Schedule:
                                             </label>
-                                            <input
-                                                type="date"
-                                                value={orderForm.pickDate}
-                                                onChange={(e) => setOrderForm(prev => ({ ...prev, pickDate: e.target.value }))}
-                                                min={new Date().toISOString().split('T')[0]}
+                                            <select
+                                                value={selectedScheduleId}
+                                                onChange={(e) => {
+                                                    const scheduleId = e.target.value
+                                                    setSelectedScheduleId(scheduleId)
+                                                    const selected = availableSchedules.find(s => s.schedule_id === scheduleId)
+                                                    if (selected) {
+                                                        setOrderForm(prev => ({
+                                                            ...prev,
+                                                            pickDate: selected.schedule_date,
+                                                            pickTime: selected.schedule_time
+                                                        }))
+                                                    }
+                                                }}
                                                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500"
-                                            />
-                                        </div>
-
-                                        {/* NEW: Pick Time */}
-                                        <div>
-                                            <label className="block text-sm font-semibold text-gray-700 mb-2">
-                                                <Clock className="inline h-4 w-4 mr-1" />
-                                                Pick Time:
-                                            </label>
-                                            <input
-                                                type="time"
-                                                value={orderForm.pickTime}
-                                                onChange={(e) => setOrderForm(prev => ({ ...prev, pickTime: e.target.value }))}
-                                                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500"
-                                            />
+                                            >
+                                                <option value="">Select a schedule</option>
+                                                {availableSchedules.map((schedule) => (
+                                                    <option key={schedule.schedule_id} value={schedule.schedule_id}>
+                                                        {new Date(schedule.schedule_date).toLocaleDateString('en-US', {
+                                                            year: 'numeric',
+                                                            month: 'long',
+                                                            day: 'numeric'
+                                                        })} at {schedule.schedule_time}
+                                                    </option>
+                                                ))}
+                                            </select>
                                         </div>
 
                                         {/* Add orders section */}
@@ -1256,8 +1509,10 @@ function RouteComponent() {
                                                     <h4 className="text-sm font-semibold text-gray-700">Current Orders:</h4>
                                                     <div className="space-y-2">
                                                         {orderForm.selectedMenuItems.map((item) => (
-                                                            <div key={item.menu_id} className="flex justify-between items-center text-sm">
-                                                                <span>• {item.name} (x{item.quantity})</span>
+                                                            <div key={`${item.menu_id}-${item.selectedPriceIndex}`} className="flex justify-between items-center text-sm">
+                                                                <span>
+                                                                    • {item.name} {item.size && `(${item.size})`} (x{item.quantity})
+                                                                </span>
                                                                 <span className="font-semibold">₱ {(item.price * item.quantity).toLocaleString()}</span>
                                                             </div>
                                                         ))}
@@ -1282,36 +1537,142 @@ function RouteComponent() {
                                                             const selectedItem = orderForm.selectedMenuItems.find(
                                                                 item => item.menu_id === menuItem.menu_id
                                                             )
-                                                            const quantity = selectedItem?.quantity || 0
+                                                            const prices = parsePrices(menuItem.price)
+                                                            const sizes = parseSizes(menuItem.size)
+                                                            const hasVariants = prices.length > 1 || sizes.length > 1
 
                                                             return (
                                                                 <div key={menuItem.menu_id} className="bg-amber-600 text-white p-3 rounded-lg">
                                                                     <div className="flex justify-between items-start gap-3">
                                                                         <div className="flex-1">
                                                                             <h4 className="font-semibold">{menuItem.name}</h4>
-                                                                            <p className="text-sm opacity-90 mt-1">₱ {Number(menuItem.price).toLocaleString()}</p>
+                                                                            <p className="text-xs opacity-75 mt-1">{menuItem.category}</p>
+
+                                                                            {/* Price variants */}
+                                                                            {prices.length === 1 ? (
+                                                                                <p className="text-sm opacity-90 mt-1">₱ {prices[0].toLocaleString()}</p>
+                                                                            ) : (
+                                                                                <div className="mt-2 space-y-1">
+                                                                                    <p className="text-xs opacity-75">Select size & price:</p>
+                                                                                    <div className="flex flex-wrap gap-2">
+                                                                                        {prices.map((price, index) => {
+                                                                                            const size = sizes[index] || `Option ${index + 1}`
+                                                                                            const isSelected = selectedItem?.selectedPriceIndex === index
+
+                                                                                            return (
+                                                                                                <button
+                                                                                                    key={index}
+                                                                                                    onClick={() => {
+                                                                                                        // Remove old item first if exists
+                                                                                                        setOrderForm(prev => ({
+                                                                                                            ...prev,
+                                                                                                            selectedMenuItems: prev.selectedMenuItems.filter(
+                                                                                                                item => item.menu_id !== menuItem.menu_id
+                                                                                                            )
+                                                                                                        }))
+
+                                                                                                        // Add with selected variant
+                                                                                                        setOrderForm(prev => ({
+                                                                                                            ...prev,
+                                                                                                            selectedMenuItems: [
+                                                                                                                ...prev.selectedMenuItems,
+                                                                                                                {
+                                                                                                                    menu_id: menuItem.menu_id,
+                                                                                                                    name: menuItem.name,
+                                                                                                                    price: price,
+                                                                                                                    quantity: 1,
+                                                                                                                    inclusion: menuItem.inclusion || '',
+                                                                                                                    size: size,
+                                                                                                                    selectedPriceIndex: index
+                                                                                                                }
+                                                                                                            ]
+                                                                                                        }))
+                                                                                                    }}
+                                                                                                    className={`px-2 py-1 rounded text-xs font-medium transition-colors ${isSelected
+                                                                                                        ? 'bg-white text-amber-600'
+                                                                                                        : 'bg-amber-500 hover:bg-amber-400'
+                                                                                                        }`}
+                                                                                                >
+                                                                                                    {size}: ₱{price.toLocaleString()}
+                                                                                                </button>
+                                                                                            )
+                                                                                        })}
+                                                                                    </div>
+                                                                                </div>
+                                                                            )}
+
                                                                             {menuItem.inclusion && (
                                                                                 <>
-                                                                                    <p className="text-sm opacity-90 mt-1">Inclusion:</p>
+                                                                                    <p className="text-sm opacity-90 mt-2">Inclusion:</p>
                                                                                     <p className="text-xs opacity-75">{menuItem.inclusion}</p>
                                                                                 </>
                                                                             )}
+
+                                                                            {selectedItem && (
+                                                                                <p className="text-xs mt-2 bg-white/20 px-2 py-1 rounded inline-block">
+                                                                                    Added: {selectedItem.quantity}x
+                                                                                    {selectedItem.size && ` (${selectedItem.size})`}
+                                                                                </p>
+                                                                            )}
                                                                         </div>
+
+                                                                        {/* Quantity controls or Add button */}
                                                                         <div className="flex items-center gap-2">
-                                                                            <button
-                                                                                onClick={() => removeMenuItemFromOrder(menuItem.menu_id)}
-                                                                                disabled={quantity === 0}
-                                                                                className="w-8 h-8 bg-white text-amber-600 rounded-full flex items-center justify-center disabled:opacity-50"
-                                                                            >
-                                                                                -
-                                                                            </button>
-                                                                            <span className="text-white font-semibold w-6 text-center">{quantity}</span>
-                                                                            <button
-                                                                                onClick={() => addMenuItemToOrder(menuItem)}
-                                                                                className="w-8 h-8 bg-white text-amber-600 rounded-full flex items-center justify-center"
-                                                                            >
-                                                                                +
-                                                                            </button>
+                                                                            {selectedItem ? (
+                                                                                // Show quantity controls if already added
+                                                                                <>
+                                                                                    <button
+                                                                                        onClick={() => removeMenuItemFromOrder(menuItem.menu_id)}
+                                                                                        className="w-8 h-8 bg-white text-amber-600 rounded-full flex items-center justify-center font-bold"
+                                                                                    >
+                                                                                        -
+                                                                                    </button>
+                                                                                    <span className="text-white font-semibold w-6 text-center">
+                                                                                        {selectedItem.quantity}
+                                                                                    </span>
+                                                                                    <button
+                                                                                        onClick={() => {
+                                                                                            setOrderForm(prev => ({
+                                                                                                ...prev,
+                                                                                                selectedMenuItems: prev.selectedMenuItems.map(item =>
+                                                                                                    item.menu_id === menuItem.menu_id
+                                                                                                        ? { ...item, quantity: item.quantity + 1 }
+                                                                                                        : item
+                                                                                                )
+                                                                                            }))
+                                                                                        }}
+                                                                                        className="w-8 h-8 bg-white text-amber-600 rounded-full flex items-center justify-center font-bold"
+                                                                                    >
+                                                                                        +
+                                                                                    </button>
+                                                                                </>
+                                                                            ) : (
+                                                                                // Show Add button if not added yet
+                                                                                prices.length === 1 && (
+                                                                                    <button
+                                                                                        onClick={() => {
+                                                                                            setOrderForm(prev => ({
+                                                                                                ...prev,
+                                                                                                selectedMenuItems: [
+                                                                                                    ...prev.selectedMenuItems,
+                                                                                                    {
+                                                                                                        menu_id: menuItem.menu_id,
+                                                                                                        name: menuItem.name,
+                                                                                                        price: prices[0],
+                                                                                                        quantity: 1,
+                                                                                                        inclusion: menuItem.inclusion || '',
+                                                                                                        size: sizes[0] || null,
+                                                                                                        selectedPriceIndex: 0
+                                                                                                    }
+                                                                                                ]
+                                                                                            }))
+                                                                                        }}
+                                                                                        className="px-4 py-2 bg-white text-amber-600 rounded-lg font-semibold hover:bg-amber-50 transition-colors text-sm"
+                                                                                    >
+                                                                                        Add
+                                                                                    </button>
+                                                                                )
+                                                                            )}
                                                                         </div>
                                                                     </div>
                                                                 </div>
@@ -1418,7 +1779,14 @@ function RouteComponent() {
                                             pickDate: '',
                                             pickTime: '',
                                             selectedMenuItems: [],
-                                            addOns: {}
+                                            addOns: {},
+                                            deliveryAddress: {
+                                                addressLine: '',
+                                                region: '',
+                                                city: '',
+                                                barangay: '',
+                                                postalCode: ''
+                                            }
                                         })
                                         setMenuSearchQuery('')
                                     }}
@@ -1443,12 +1811,26 @@ function RouteComponent() {
                         <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
                             {/* Modal Header */}
                             <div className="flex items-center justify-between p-6 border-b border-gray-200">
-                                <div className="flex items-center gap-4">
-                                    <span className="text-gray-600 font-medium">FRONT</span>
-                                    <span className="text-xl font-bold text-gray-800">Order ID: {selectedOrder.id}</span>
-                                    <span className="bg-black text-white px-4 py-1 rounded-full text-sm font-medium">
-                                        {selectedOrder.orderData.order_status}
-                                    </span>
+                                <div className="flex flex-col gap-2">
+                                    <div className="flex items-center gap-4">
+                                        <span className="text-gray-600 font-medium">FRONT</span>
+                                        <span className="text-xl font-bold text-gray-800">Order ID: {selectedOrder.id}</span>
+                                        <span className="bg-black text-white px-4 py-1 rounded-full text-sm font-medium">
+                                            {selectedOrder.orderData.order_status}
+                                        </span>
+                                    </div>
+                                    {selectedOrder.statusUpdatedAt && (
+                                        <p className="text-sm text-gray-500">
+                                            Status updated: {new Date(selectedOrder.statusUpdatedAt).toLocaleString('en-US', {
+                                                year: 'numeric',
+                                                month: 'long',
+                                                day: 'numeric',
+                                                hour: '2-digit',
+                                                minute: '2-digit',
+                                                hour12: true
+                                            })}
+                                        </p>
+                                    )}
                                 </div>
                                 <button
                                     onClick={closeOrderDetails}
@@ -1464,7 +1846,7 @@ function RouteComponent() {
                                 <div>
                                     <h3 className="text-2xl font-bold text-gray-800 mb-2">{selectedOrder.customerName}</h3>
                                     <p className="text-gray-600 text-lg">
-                                        {formatScheduleTime(selectedOrder.orderData.schedule.schedule_date, selectedOrder.orderData.schedule.schedule_time)}
+                                        {formatScheduleTime(selectedOrder.orderData.schedule.schedule_date, selectedOrder.orderData.schedule.schedule_time, selectedOrder.orderData.order_type)}
                                     </p>
                                 </div>
 
@@ -1660,8 +2042,8 @@ function RouteComponent() {
 
                             {/* Modal Body */}
                             <div className="p-6 space-y-6">
-                                {/* Delivery Information */}
-                                {selectedOrder.orderData.delivery && (
+                                {/* Delivery Information - Only show if order_type is Delivery */}
+                                {selectedOrder.orderData.order_type === 'Delivery' && selectedOrder.orderData.delivery && (
                                     <div className="bg-yellow-50 p-4 rounded-lg border border-yellow-200">
                                         <div className="flex items-center gap-2 mb-3">
                                             <Truck className="h-5 w-5 text-amber-600" />
@@ -1859,41 +2241,6 @@ function RouteComponent() {
                     </div>
                 )}
 
-                {/* Pagination */}
-                {totalPages > 1 && (
-                    <div className="flex justify-center items-center gap-2 mt-6 pb-6">
-                        <button
-                            onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                            disabled={currentPage === 1}
-                            className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                        >
-                            Previous
-                        </button>
-
-                        <div className="flex gap-2">
-                            {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
-                                <button
-                                    key={page}
-                                    onClick={() => setCurrentPage(page)}
-                                    className={`px-4 py-2 rounded-lg transition-colors ${currentPage === page
-                                        ? 'bg-amber-500 text-white'
-                                        : 'border border-gray-300 hover:bg-gray-50'
-                                        }`}
-                                >
-                                    {page}
-                                </button>
-                            ))}
-                        </div>
-
-                        <button
-                            onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-                            disabled={currentPage === totalPages}
-                            className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                        >
-                            Next
-                        </button>
-                    </div>
-                )}
                 {/* View Receipt Modal */}
                 {showViewReceiptModal && (
                     <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">

@@ -58,6 +58,8 @@ function RouteComponent() {
     const [showOrderBackView, setShowOrderBackView] = useState(false)
     const [isCancellationModalOpen, setIsCancellationModalOpen] = useState(false)
     const [cancellationDetails, setCancellationDetails] = useState<any>(null)
+    const [isRemoveRiderModalOpen, setIsRemoveRiderModalOpen] = useState(false)
+    const [isRemovingRider, setIsRemovingRider] = useState(false)
 
     // NEW: State for fetched data from Supabase
     const [deliveryOrders, setDeliveryOrders] = useState<any[]>([])
@@ -371,6 +373,44 @@ function RouteComponent() {
         }
     }
 
+    // Remove rider from delivery
+    const removeRiderFromDelivery = async () => {
+        if (!selectedOrder?.deliveryId) {
+            alert('No delivery record found for this order.')
+            return
+        }
+
+        try {
+            setIsRemovingRider(true)
+
+            // Update the delivery record to set rider_id to null
+            const { error: updateError } = await supabase
+                .from('delivery')
+                .update({
+                    rider_id: null,
+                    status_updated_at: new Date().toISOString()
+                })
+                .eq('delivery_id', selectedOrder.deliveryId)
+
+            if (updateError) throw updateError
+
+            // Refresh the orders list
+            await fetchDeliveryOrders()
+
+            // Close modals
+            setIsRemoveRiderModalOpen(false)
+            setIsOrderDetailsModalOpen(false)
+            setSelectedOrder(null)
+
+            alert('Rider removed successfully!')
+        } catch (error) {
+            console.error('Error removing rider:', error)
+            alert('Failed to remove rider. Please try again.')
+        } finally {
+            setIsRemovingRider(false)
+        }
+    }
+
     const getRiderCurrentOrders = (riderName: string) => {
         return deliveryOrders.filter(order => order.assignedRider === riderName)
     }
@@ -405,7 +445,6 @@ function RouteComponent() {
         setIsCancellationModalOpen(true)
     }
 
-    // NEW: Update cancellation functions to update Supabase
     const approveCancellation = async () => {
         try {
             if (!selectedOrder) return
@@ -572,7 +611,10 @@ function RouteComponent() {
 
                     {/* Logout Button */}
                     <div className="px-4 pb-6">
-                        <button className="flex items-center gap-3 px-4 py-3 text-amber-900 hover:bg-red-100 hover:text-red-600 rounded-lg w-full transition-colors cursor-pointer">
+                        <button
+                            className="flex items-center gap-3 px-4 py-3 text-amber-900 hover:bg-red-100 hover:text-red-600 rounded-lg w-full transition-colors cursor-pointer"
+                            onClick={handleLogout}
+                        >
                             <LogOut className="h-5 w-5" />
                             Logout
                         </button>
@@ -1118,11 +1160,11 @@ function RouteComponent() {
                                             </div>
                                             <div className="flex justify-between items-center">
                                                 <span className="text-lg font-medium">Delivery fee</span>
-                                                <span className="text-lg font-bold">₱ {selectedOrder.deliveryFee || 75}</span>
+                                                <span className="text-lg font-bold">₱ {(selectedOrder.deliveryFee.toFixed(2))}</span>
                                             </div>
                                             <div className="flex justify-between items-center text-xl font-bold border-t border-gray-200 pt-3">
                                                 <span>Total Amount</span>
-                                                <span>₱ {selectedOrder.totalAmount || selectedOrder.price}</span>
+                                                <span>₱ {selectedOrder.totalAmount + (selectedOrder.deliveryFee)}</span>
                                             </div>
                                         </div>
                                     </div>
@@ -1139,9 +1181,14 @@ function RouteComponent() {
                                             See more
                                         </button>
                                         <div className="flex items-center gap-3">
-                                            <button className="px-6 py-3 bg-red-500 text-white rounded-lg font-medium hover:bg-red-600 transition-colors">
-                                                Remove
-                                            </button>
+                                            {selectedOrder.assignedRider && (
+                                                <button
+                                                    onClick={() => setIsRemoveRiderModalOpen(true)}
+                                                    className="px-6 py-3 bg-red-500 text-white rounded-lg font-medium hover:bg-red-600 transition-colors"
+                                                >
+                                                    Remove Rider
+                                                </button>
+                                            )}
                                             {selectedOrder.cancellationRequest === 'Pending' && selectedOrder.cancellationDetails && (
                                                 <button
                                                     onClick={() => handleCancellationRequest(selectedOrder)}
@@ -1360,6 +1407,66 @@ function RouteComponent() {
                                             className="px-6 py-3 border-2 border-gray-800 text-gray-800 rounded-lg font-medium hover:bg-gray-100 transition-colors"
                                         >
                                             Go back
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Remove Rider Confirmation Modal */}
+                        {isRemoveRiderModalOpen && selectedOrder && (
+                            <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+                                <div className="bg-white rounded-xl shadow-2xl w-full max-w-md mx-4">
+                                    {/* Modal Header */}
+                                    <div className="flex items-center justify-between p-6 border-b border-gray-200">
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center">
+                                                <Truck className="h-5 w-5 text-red-600" />
+                                            </div>
+                                            <h2 className="text-xl font-bold text-gray-800">Remove Rider</h2>
+                                        </div>
+                                        <button
+                                            onClick={() => setIsRemoveRiderModalOpen(false)}
+                                            className="text-gray-500 hover:text-gray-700 p-2 hover:bg-gray-100 rounded-full transition-colors"
+                                        >
+                                            <X className="h-6 w-6" />
+                                        </button>
+                                    </div>
+
+                                    {/* Modal Body */}
+                                    <div className="p-6 space-y-4">
+                                        <p className="text-gray-700">
+                                            Are you sure you want to remove <span className="font-semibold">{selectedOrder.assignedRider}</span> from order <span className="font-semibold">{selectedOrder.id}</span>?
+                                        </p>
+                                        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                                            <p className="text-yellow-800 text-sm">
+                                                This action will unassign the rider from this delivery. You can assign a new rider afterwards.
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                    {/* Modal Footer */}
+                                    <div className="flex items-center justify-end gap-3 p-6 border-t border-gray-200 bg-gray-50">
+                                        <button
+                                            onClick={() => setIsRemoveRiderModalOpen(false)}
+                                            disabled={isRemovingRider}
+                                            className="px-6 py-3 border border-gray-300 rounded-lg text-gray-700 font-medium hover:bg-gray-100 transition-colors disabled:opacity-50"
+                                        >
+                                            Cancel
+                                        </button>
+                                        <button
+                                            onClick={removeRiderFromDelivery}
+                                            disabled={isRemovingRider}
+                                            className="px-6 py-3 bg-red-500 text-white rounded-lg font-medium hover:bg-red-600 transition-colors disabled:opacity-50 flex items-center gap-2"
+                                        >
+                                            {isRemovingRider ? (
+                                                <>
+                                                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                                                    Removing...
+                                                </>
+                                            ) : (
+                                                'Remove Rider'
+                                            )}
                                         </button>
                                     </div>
                                 </div>

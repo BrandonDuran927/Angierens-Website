@@ -261,24 +261,23 @@ function AdminOrdersInterface() {
         </div>
     );
 
-    const formatScheduleTime = (dateStr: string, timeStr: string): string => {
+    const formatScheduleTime = (dateStr: string, timeStr: string, orderType?: string): string => {
         // Convert to Date object for formatting
         const date = new Date(`${dateStr}T${timeStr}`);
 
-        // Format time (e.g. 10:00:00 → 10 AM)
         const formattedTime = date.toLocaleTimeString('en-US', {
             hour: 'numeric',
             hour12: true,
         });
 
-        // Format date (e.g. 2025-11-03 → November 3, 2025)
         const formattedDate = date.toLocaleDateString('en-US', {
             month: 'long',
             day: 'numeric',
             year: 'numeric',
         });
 
-        return `${formattedTime} to be delivered on ${formattedDate}`;
+        const actionText = orderType === 'Pick-up' ? 'for pick-up on' : 'to be delivered on';
+        return `${formattedTime} ${actionText} ${formattedDate}`;
     }
 
     return (
@@ -721,12 +720,26 @@ function AdminOrdersInterface() {
                         <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto">
                             {/* Modal Header */}
                             <div className="flex items-center justify-between p-6 border-b border-gray-200">
-                                <div className="flex items-center gap-4">
-                                    <span className="text-gray-600 font-medium">FRONT</span>
-                                    <span className="text-xl font-bold text-gray-800">Order #: {selectedOrder.order_number}</span>
-                                    <span className="bg-black text-white px-4 py-1 rounded-full text-sm font-medium">
-                                        {selectedOrder.order_status}
-                                    </span>
+                                <div className="flex flex-col gap-2">
+                                    <div className="flex items-center gap-4">
+                                        <span className="text-gray-600 font-medium">FRONT</span>
+                                        <span className="text-xl font-bold text-gray-800">Order ID: {selectedOrder.order_number}</span>
+                                        <span className="bg-black text-white px-4 py-1 rounded-full text-sm font-medium">
+                                            {selectedOrder.order_status}
+                                        </span>
+                                    </div>
+                                    {selectedOrder.status_updated_at && (
+                                        <p className="text-sm text-gray-500">
+                                            Status updated: {new Date(selectedOrder.status_updated_at).toLocaleString('en-US', {
+                                                year: 'numeric',
+                                                month: 'long',
+                                                day: 'numeric',
+                                                hour: '2-digit',
+                                                minute: '2-digit',
+                                                hour12: true
+                                            })}
+                                        </p>
+                                    )}
                                 </div>
                                 <button
                                     onClick={closeOrderDetails}
@@ -741,7 +754,7 @@ function AdminOrdersInterface() {
                                 {/* Customer Info */}
                                 <div>
                                     <h3 className="text-2xl font-bold text-gray-800 mb-2">{selectedOrder.user.customer_name}</h3>
-                                    <p className="text-gray-600 text-lg">{formatScheduleTime(selectedOrder.schedule.schedule_date, selectedOrder.schedule.schedule_time)}</p>
+                                    <p className="text-gray-600 text-lg">{formatScheduleTime(selectedOrder.schedule.schedule_date, selectedOrder.schedule.schedule_time, selectedOrder.order_type)}</p>
                                 </div>
 
                                 {/* Date and Time */}
@@ -807,15 +820,13 @@ function AdminOrdersInterface() {
                                     {selectedOrder.delivery && (
                                         <div className="flex justify-between items-center">
                                             <span className="text-lg font-medium">Delivery fee</span>
-                                            <span className="text-lg font-bold">
-                                                ₱ {Number(selectedOrder.delivery.delivery_fee || 0).toLocaleString()}
-                                            </span>
+                                            <span className="text-lg font-bold">₱ {Number(selectedOrder.delivery.delivery_fee).toFixed(2)}</span>
                                         </div>
                                     )}
                                     <div className="flex justify-between items-center border-t-2 border-gray-300 pt-3">
                                         <span className="text-xl font-bold">Total</span>
                                         <span className="text-2xl font-bold text-amber-600">
-                                            ₱ {(orderPrice + (selectedOrder.delivery ? Number(selectedOrder.delivery.delivery_fee || 0) : 0)).toLocaleString()}
+                                            ₱ {(orderPrice + (selectedOrder.delivery ? Number(selectedOrder.delivery.delivery_fee || 0) : 0)).toFixed(2).toLocaleString()}
                                         </span>
                                     </div>
                                 </div>

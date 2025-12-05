@@ -19,10 +19,10 @@ interface Order {
     addOns: string
     price: number
     quantity: number
-    status: 'pending' | 'pending' | 'in-process' | 'completed' | 'cancelled' | 'refunded'
+    status: 'pending' | 'in-process' | 'completed' | 'refunded' | 'rejected'
     image: string
     totalAmount: number
-    deliveryStatus?: 'queueing' | 'on-delivery' | 'claim-order' | 'refunding'
+    deliveryStatus?: 'queueing' | 'on-delivery' | 'claim-order' | 'refunding' | 'preparing' | 'cooking' | 'ready'
     createdAt: string
     proofOfPaymentUrl?: string | null
     order_items?: Array<{
@@ -190,11 +190,21 @@ function RouteComponent() {
                     deliveryStatus = 'refunding'
                 } else if (order.order_status === 'Completed') {
                     uiStatus = 'completed'
-                } else if (order.order_status === 'Cancelled') {
-                    uiStatus = 'cancelled'
                 } else if (order.order_status === 'Refund') {
                     uiStatus = 'refunded'
+                } else if (order.order_status === 'Rejected') {
+                    uiStatus = 'rejected'
+                } else if (order.order_status === 'Preparing') {
+                    uiStatus = 'in-process'
+                    deliveryStatus = 'preparing'
+                } else if (order.order_status === 'Cooking') {
+                    uiStatus = 'in-process'
+                    deliveryStatus = 'cooking'
+                } else if (order.order_status === 'Ready') {
+                    uiStatus = 'in-process'
+                    deliveryStatus = 'ready'
                 }
+
 
                 // Build detailed order items array
                 const orderItems = order.order_item.map((item: any) => {
@@ -437,8 +447,8 @@ function RouteComponent() {
     const tabs = [
         { id: 'all', label: 'All' },
         { id: 'completed', label: 'Completed' },
-        { id: 'cancelled', label: 'Cancelled' },
         { id: 'refunded', label: 'Refunded' },
+        { id: 'rejected', label: 'Rejected' },
     ]
 
     const getDeliveryStatusInfo = (deliveryStatus?: string) => {
@@ -451,6 +461,12 @@ function RouteComponent() {
                 return { text: 'On Delivery', color: 'bg-blue-100 text-blue-700 border-blue-300' }
             case 'claim-order':
                 return { text: 'Claim Order', color: 'bg-indigo-100 text-indigo-700 border-indigo-300' }
+            case 'preparing':
+                return { text: 'Preparing', color: 'bg-orange-100 text-orange-700 border-orange-300' }
+            case 'cooking':
+                return { text: 'Cooking', color: 'bg-amber-100 text-amber-700 border-amber-300' }
+            case 'ready':
+                return { text: 'Ready', color: 'bg-green-100 text-green-700 border-green-300' }
             default:
                 return { text: '', color: '' }
         }
@@ -462,8 +478,8 @@ function RouteComponent() {
             case 'to-pay': return 'text-blue-600'
             case 'in-process': return 'text-yellow-600'
             case 'completed': return 'text-green-600'
-            case 'cancelled': return 'text-red-600'
             case 'refunded': return 'text-purple-600'
+            case 'rejected': return 'text-gray-600'
             default: return 'text-gray-600'
         }
     }
@@ -590,24 +606,7 @@ function RouteComponent() {
         setCancelStep(2)
     }
 
-    const handleConfirmCancelOrder = async () => {
-        try {
-            const { error } = await supabase
-                .from('order')
-                .update({
-                    order_status: 'Cancelled',
-                    status_updated_at: new Date().toISOString()
-                })
-                .eq('order_id', currentOrderId)
 
-            if (error) throw error
-
-            setCancelStep(3)
-        } catch (error) {
-            console.error('Error cancelling order:', error)
-            alert('Failed to cancel order')
-        }
-    }
 
     const handleGoBackFromCancel = async () => {
         handleCloseCancelModal()
@@ -1403,151 +1402,6 @@ function RouteComponent() {
                 </div>
             )}
 
-            {/* Cancel Order Modal (To Pay) */}
-            {showCancelModal && (
-                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-                    <div className="bg-white rounded-xl shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto">
-                        {/* Step 1: Select Cancellation Reason */}
-                        {cancelStep === 1 && (
-                            <div className="p-8">
-                                <h2 className="text-2xl font-bold text-black mb-8">Select Cancellation Reason</h2>
-
-                                <div className="space-y-4 mb-8">
-                                    <label className="flex items-center space-x-3 cursor-pointer">
-                                        <input
-                                            type="radio"
-                                            name="cancel-reason"
-                                            value="change-mind"
-                                            checked={selectedReason === 'change-mind'}
-                                            onChange={(e) => setSelectedReason(e.target.value)}
-                                            className="w-5 h-5 text-yellow-500"
-                                        />
-                                        <span className="text-lg text-gray-700">Changed my mind</span>
-                                    </label>
-
-                                    <label className="flex items-center space-x-3 cursor-pointer">
-                                        <input
-                                            type="radio"
-                                            name="cancel-reason"
-                                            value="wrong-item"
-                                            checked={selectedReason === 'wrong-item'}
-                                            onChange={(e) => setSelectedReason(e.target.value)}
-                                            className="w-5 h-5 text-yellow-500"
-                                        />
-                                        <span className="text-lg text-gray-700">Ordered wrong item</span>
-                                    </label>
-
-                                    <label className="flex items-center space-x-3 cursor-pointer">
-                                        <input
-                                            type="radio"
-                                            name="cancel-reason"
-                                            value="found-better"
-                                            checked={selectedReason === 'found-better'}
-                                            onChange={(e) => setSelectedReason(e.target.value)}
-                                            className="w-5 h-5 text-yellow-500"
-                                        />
-                                        <span className="text-lg text-gray-700">Found a better option</span>
-                                    </label>
-
-                                    <label className="flex items-center space-x-3 cursor-pointer">
-                                        <input
-                                            type="radio"
-                                            name="cancel-reason"
-                                            value="others"
-                                            checked={selectedReason === 'others'}
-                                            onChange={(e) => setSelectedReason(e.target.value)}
-                                            className="w-5 h-5 text-yellow-500"
-                                        />
-                                        <span className="text-lg text-gray-700">Others</span>
-                                    </label>
-                                </div>
-
-                                <div className="flex space-x-4">
-                                    <button
-                                        onClick={handleCloseCancelModal}
-                                        className="flex-1 bg-gray-300 hover:bg-gray-400 text-gray-800 font-medium py-3 px-6 rounded-lg transition-colors"
-                                    >
-                                        Not Now
-                                    </button>
-                                    <button
-                                        onClick={handleProceedToCancelOrder}
-                                        disabled={!selectedReason}
-                                        className="flex-1 bg-red-500 hover:bg-red-600 disabled:bg-red-300 text-white font-medium py-3 px-6 rounded-lg transition-colors"
-                                    >
-                                        Proceed to Cancel
-                                    </button>
-                                </div>
-                            </div>
-                        )}
-
-                        {/* Step 2: Cancel Order Confirmation */}
-                        {cancelStep === 2 && (
-                            <div className="p-8">
-                                <h2 className="text-2xl font-bold text-black mb-6">Cancel Order</h2>
-
-                                <div className="mb-6">
-                                    <p className="text-lg text-gray-700 mb-2">
-                                        Are you sure you want to cancel Order {orders.find(o => o.id === currentOrderId)?.orderNumber}?
-                                    </p>
-                                    <p className="text-lg text-gray-700 mb-6">
-                                        This order has not been paid yet, so you can cancel it without any charges.
-                                    </p>
-
-                                    <p className="text-lg font-medium text-gray-800 mb-4">Please note:</p>
-
-                                    <ul className="space-y-3 text-gray-700">
-                                        <li className="flex items-start">
-                                            <span className="w-2 h-2 bg-gray-400 rounded-full mt-2 mr-3 flex-shrink-0"></span>
-                                            <p>Once cancelled, you will need to place a new order if you change your mind.</p>
-                                        </li>
-                                        <li className="flex items-start">
-                                            <span className="w-2 h-2 bg-gray-400 rounded-full mt-2 mr-3 flex-shrink-0"></span>
-                                            <p>Your order will be removed from the system immediately.</p>
-                                        </li>
-                                    </ul>
-                                </div>
-
-                                <div className="flex space-x-4">
-                                    <button
-                                        onClick={() => setCancelStep(1)}
-                                        className="flex-1 bg-white border-2 border-red-500 text-red-500 hover:bg-red-50 font-medium py-3 px-6 rounded-full transition-colors"
-                                    >
-                                        Go Back
-                                    </button>
-                                    <button
-                                        onClick={handleConfirmCancelOrder}
-                                        className="flex-1 bg-red-500 hover:bg-red-600 text-white font-medium py-3 px-6 rounded-full transition-colors"
-                                    >
-                                        Confirm Cancel
-                                    </button>
-                                </div>
-                            </div>
-                        )}
-
-                        {/* Step 3: Cancellation Success */}
-                        {cancelStep === 3 && (
-                            <div className="p-8 text-center">
-                                <h2 className="text-2xl font-bold text-black mb-6">Order Cancelled Successfully</h2>
-
-                                <div className="space-y-4 text-gray-700 text-lg mb-8">
-                                    <p>Your order has been cancelled.</p>
-
-                                    <p>You can place a new order anytime from our menu.</p>
-
-                                    <p className="font-medium">Thank you for considering Angieren's Lutong Bahay!</p>
-                                </div>
-
-                                <button
-                                    onClick={handleGoBackFromCancel}
-                                    className="bg-amber-600 hover:bg-amber-700 text-white font-medium py-3 px-8 rounded-full transition-colors"
-                                >
-                                    Go back to Orders
-                                </button>
-                            </div>
-                        )}
-                    </div>
-                </div>
-            )}
 
             {/* Upload Proof of Payment Modal */}
             {showUploadModal && (

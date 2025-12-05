@@ -322,7 +322,7 @@ function Signup() {
     }
   };
 
-  const validateForm = () => {
+  const validateForm = async () => {
     const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
 
     if (!passwordRegex.test(form.password)) {
@@ -352,13 +352,35 @@ function Signup() {
       return false;
     }
 
+    // Check if email is already registered
+    const { data: existingUser, error } = await supabase
+      .from('users')
+      .select('email')
+      .eq('email', form.email)
+      .limit(1);
+
+    if (error) {
+      console.error('Error checking email:', error);
+      alert('An error occurred while validating your email. Please try again.');
+      return false;
+    }
+
+    if (existingUser && existingUser.length > 0) {
+      alert('This email address is already registered. Please use a different email or sign in to your existing account.');
+      return false;
+    }
+
     return true;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    if (!validateForm()) {
+    setIsLoading(true);
+    const isValid = await validateForm();
+    setIsLoading(false);
+
+    if (!isValid) {
       return;
     }
 

@@ -336,6 +336,39 @@ function RouteComponent() {
         if (!selectedOrder) return
 
         try {
+            // If updating to "Ready", check if all items and add-ons are completed
+            if (newStatus === 'Ready') {
+                // Fetch current completion status from database
+                const { data: orderItems, error: itemsError } = await supabase
+                    .from('order_item')
+                    .select(`
+                        order_item_id,
+                        is_completed,
+                        order_item_add_on(
+                            order_item_add_on_id,
+                            is_completed
+                        )
+                    `)
+                    .eq('order_id', selectedOrder.id)
+
+                if (itemsError) throw itemsError
+
+                // Check if all order items are completed
+                const allItemsCompleted = orderItems?.every(item => item.is_completed === true)
+
+                // Check if all add-ons are completed
+                const allAddOnsCompleted = orderItems?.every(item =>
+                    !item.order_item_add_on ||
+                    item.order_item_add_on.length === 0 ||
+                    item.order_item_add_on.every((addOn: any) => addOn.is_completed === true)
+                )
+
+                if (!allItemsCompleted || !allAddOnsCompleted) {
+                    alert('Cannot mark order as Ready. Please complete all items and add-ons first.')
+                    return
+                }
+            }
+
             const { error } = await supabase
                 .from('order')
                 .update({

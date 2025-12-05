@@ -546,8 +546,33 @@ function RouteComponent() {
         const month = String(date.getMonth() + 1).padStart(2, '0');
         const day = String(date.getDate()).padStart(2, '0');
         const dateString = `${year}-${month}-${day}`;
+
+        // Check if the selected date is today
+        const now = new Date();
+        const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        const selectedDay = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+        const isToday = today.getTime() === selectedDay.getTime();
+
         const timesForDate = schedules
-            .filter(s => s.schedule_date === dateString)
+            .filter(s => {
+                if (s.schedule_date !== dateString) return false;
+
+                // If it's today, filter out times that have already passed
+                if (isToday) {
+                    const [hours, minutes] = s.schedule_time.split(':');
+                    const scheduleHour = parseInt(hours);
+                    const scheduleMinute = parseInt(minutes);
+
+                    const currentHour = now.getHours();
+                    const currentMinute = now.getMinutes();
+
+                    // Compare time: if schedule time is before or equal to current time, filter it out
+                    if (scheduleHour < currentHour) return false;
+                    if (scheduleHour === currentHour && scheduleMinute <= currentMinute) return false;
+                }
+
+                return true;
+            })
             .map(s => {
                 // Convert time format from HH:MM:SS to h:MM AM/PM
                 const [hours, minutes] = s.schedule_time.split(':');
@@ -1567,20 +1592,6 @@ function RouteComponent() {
                                                     <span className="text-white font-bold text-sm">G</span>
                                                 </div>
                                                 GCash
-                                            </label>
-                                        </div>
-                                        <div className="flex items-center">
-                                            <input
-                                                type="radio"
-                                                id="onsite"
-                                                name="payment"
-                                                value="onsite"
-                                                checked={paymentMethod === 'onsite'}
-                                                onChange={(e) => setPaymentMethod(e.target.value)}
-                                                className="w-4 h-4 text-yellow-400 bg-gray-100 border-gray-300 focus:ring-yellow-400 focus:ring-2"
-                                            />
-                                            <label htmlFor="onsite" className="ml-3 text-gray-700">
-                                                On-Site Payment
                                             </label>
                                         </div>
                                     </div>

@@ -16,6 +16,7 @@ export interface Order {
   payment: Payment
   delivery: Delivery
   order_item: OrderItem[]
+  status_updated_at: string | null
 }
 
 export interface User {
@@ -121,6 +122,7 @@ export async function fetchOrders(): Promise<Order[]> {
     order_number,
     order_cooked,
     created_at,
+    status_updated_at,
 
     users!customer_uid (
       user_uid,
@@ -213,7 +215,7 @@ export async function fetchOrders(): Promise<Order[]> {
       order_cooked: order.order_cooked ?? null,
       date: new Date(order.created_at).toLocaleDateString(),
       time: new Date(order.created_at).toLocaleTimeString(),
-
+      status_updated_at: order.status_updated_at ?? null,
       user: {
         user_uid: userObj?.user_uid ?? '',
         customer_name:
@@ -272,6 +274,8 @@ export async function fetchOrders(): Promise<Order[]> {
       })),
     }
   })
+
+  console.log('Orders fetched:', formatted)
 
   return formatted
 }
