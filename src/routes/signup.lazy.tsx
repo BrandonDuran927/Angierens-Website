@@ -58,6 +58,9 @@ function Signup() {
     agree: false,
   })
 
+  const [errors, setErrors] = useState<{ [key: string]: string }>({})
+  const [validationMessage, setValidationMessage] = useState<{ type: 'error' | 'success'; message: string } | null>(null)
+
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const [cartCount, setCartCount] = useState(0)
   const [isNotificationOpen, setIsNotificationOpen] = useState(false)
@@ -250,6 +253,13 @@ function Signup() {
         city: '',
         barangay: ''
       }));
+      // Clear province error
+      if (errors.province) {
+        setErrors(prev => ({ ...prev, province: '' }));
+      }
+      if (validationMessage) {
+        setValidationMessage(null);
+      }
       return;
     }
 
@@ -261,6 +271,13 @@ function Signup() {
         city: selectedCity?.name || '',
         barangay: ''
       }));
+      // Clear city error
+      if (errors.city) {
+        setErrors(prev => ({ ...prev, city: '' }));
+      }
+      if (validationMessage) {
+        setValidationMessage(null);
+      }
       return;
     }
 
@@ -271,6 +288,10 @@ function Signup() {
         barangayCode: value,
         barangay: selectedBarangay?.name || ''
       }))
+      // Clear barangay error
+      if (errors.barangay) {
+        setErrors(prev => ({ ...prev, barangay: '' }));
+      }
       return
     }
 
@@ -278,6 +299,15 @@ function Signup() {
       ...prev,
       [name]: target.type === 'checkbox' ? (target as HTMLInputElement).checked : value,
     }))
+
+    // Clear error for this field when user starts typing
+    if (errors[name]) {
+      setErrors(prev => ({ ...prev, [name]: '' }));
+    }
+    // Clear validation message when user makes changes
+    if (validationMessage) {
+      setValidationMessage(null);
+    }
   }
 
   const formatPhoneNumber = (number: string): string => {
@@ -296,10 +326,29 @@ function Signup() {
 
     setForm(updatedForm);
 
+    // Clear birth date error when user makes changes
+    if (errors.birthDate) {
+      setErrors(prev => ({ ...prev, birthDate: '' }));
+    }
+    if (validationMessage) {
+      setValidationMessage(null);
+    }
+
     const { birthMonth, birthDay, birthYear } = updatedForm;
 
     if (birthMonth && birthDay && birthYear) {
-      const birthDate = new Date(Number(birthYear), Number(birthMonth) - 1, Number(birthDay));
+      const month = parseInt(birthMonth);
+      const day = parseInt(birthDay);
+      const year = parseInt(birthYear);
+
+      // Validate the date is valid
+      const daysInMonth = new Date(year, month, 0).getDate();
+      if (day > daysInMonth) {
+        setErrors(prev => ({ ...prev, birthDate: `Day must be between 1 and ${daysInMonth} for the selected month` }));
+        return;
+      }
+
+      const birthDate = new Date(year, month - 1, day);
       const today = new Date();
 
       let age = today.getFullYear() - birthDate.getFullYear();
@@ -311,7 +360,7 @@ function Signup() {
       }
 
       if (age < 18) {
-        alert("You must be at least 18 years old to sign up.");
+        setErrors(prev => ({ ...prev, birthDate: 'You must be at least 18 years old to sign up' }));
         setForm({
           ...updatedForm,
           birthMonth: "",
@@ -323,53 +372,227 @@ function Signup() {
   };
 
   const validateForm = async () => {
-    const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
+    const newErrors: { [key: string]: string } = {};
 
-    if (!passwordRegex.test(form.password)) {
-      alert('Password must be at least 8 characters long and contain:\n- At least one uppercase letter\n- At least one lowercase letter\n- At least one number\n- At least one special character (@$!%*?&)');
-      return false;
+    // Sanitize and trim text inputs
+    const trimmedFirstName = form.firstName.trim();
+    const trimmedMiddleName = form.middleName.trim();
+    const trimmedLastName = form.lastName.trim();
+    const trimmedEmail = form.email.trim().toLowerCase();
+    const trimmedAddressLine = form.address_line.trim();
+    const trimmedOtherContact = form.otherContact.trim();
+    const trimmedPostalCode = form.postalCode.trim();
+
+    // First Name validation
+    if (!trimmedFirstName) {
+      newErrors.firstName = 'First name is required';
+    } else if (trimmedFirstName.length < 2) {
+      newErrors.firstName = 'First name must be at least 2 characters';
+    } else if (trimmedFirstName.length > 100) {
+      newErrors.firstName = 'First name must not exceed 100 characters';
+    } else if (!/^[a-zA-ZÀ-ÿ\s'-]+$/.test(trimmedFirstName)) {
+      newErrors.firstName = 'First name can only contain letters, spaces, hyphens, and apostrophes';
     }
 
-    if (form.password !== form.confirmPassword) {
-      alert('Passwords do not match!');
-      return false;
+    // Middle Name validation (optional but if provided, validate)
+    if (trimmedMiddleName) {
+      if (trimmedMiddleName.length > 100) {
+        newErrors.middleName = 'Middle name must not exceed 100 characters';
+      } else if (!/^[a-zA-ZÀ-ÿ\s'-]*$/.test(trimmedMiddleName)) {
+        newErrors.middleName = 'Middle name can only contain letters, spaces, hyphens, and apostrophes';
+      }
     }
 
+    // Last Name validation
+    if (!trimmedLastName) {
+      newErrors.lastName = 'Last name is required';
+    } else if (trimmedLastName.length < 2) {
+      newErrors.lastName = 'Last name must be at least 2 characters';
+    } else if (trimmedLastName.length > 100) {
+      newErrors.lastName = 'Last name must not exceed 100 characters';
+    } else if (!/^[a-zA-ZÀ-ÿ\s'-]+$/.test(trimmedLastName)) {
+      newErrors.lastName = 'Last name can only contain letters, spaces, hyphens, and apostrophes';
+    }
+
+    // Birth Date validation
+    if (!form.birthMonth || !form.birthDay || !form.birthYear) {
+      newErrors.birthDate = 'Complete date of birth is required';
+    } else {
+      const month = parseInt(form.birthMonth);
+      const day = parseInt(form.birthDay);
+      const year = parseInt(form.birthYear);
+
+      // Validate month
+      if (month < 1 || month > 12) {
+        newErrors.birthDate = 'Please select a valid month';
+      }
+
+      // Validate day based on month
+      const daysInMonth = new Date(year, month, 0).getDate();
+      if (day < 1 || day > daysInMonth) {
+        newErrors.birthDate = `Day must be between 1 and ${daysInMonth} for the selected month`;
+      }
+
+      // Validate year
+      const currentYear = new Date().getFullYear();
+      if (year < currentYear - 120 || year > currentYear) {
+        newErrors.birthDate = 'Please enter a valid birth year';
+      }
+
+      // Validate age (must be 18+)
+      const birthDate = new Date(year, month - 1, day);
+      const today = new Date();
+      let age = today.getFullYear() - birthDate.getFullYear();
+      const monthDiff = today.getMonth() - birthDate.getMonth();
+      const dayDiff = today.getDate() - birthDate.getDate();
+      if (monthDiff < 0 || (monthDiff === 0 && dayDiff < 0)) {
+        age--;
+      }
+      if (age < 18) {
+        newErrors.birthDate = 'You must be at least 18 years old to create an account';
+      }
+      if (age > 120) {
+        newErrors.birthDate = 'Please enter a valid birth date';
+      }
+    }
+
+    // Gender validation
+    const validGenders = ['Male', 'Female', 'Other'];
+    if (!form.gender) {
+      newErrors.gender = 'Please select your gender';
+    } else if (!validGenders.includes(form.gender)) {
+      newErrors.gender = 'Please select a valid gender option';
+    }
+
+    // Postal Code validation
+    if (!trimmedPostalCode) {
+      newErrors.postalCode = 'Postal code is required';
+    } else if (!/^\d{4}$/.test(trimmedPostalCode)) {
+      newErrors.postalCode = 'Postal code must be exactly 4 digits';
+    }
+
+    // Region/Province validation
+    if (!form.provinceCode) {
+      newErrors.province = 'Please select a region';
+    }
+
+    // City validation
+    if (!form.cityCode) {
+      newErrors.city = 'Please select a city/municipality';
+    }
+
+    // Barangay validation
+    if (!form.barangayCode) {
+      newErrors.barangay = 'Please select a barangay';
+    }
+
+    // Address Line validation
+    if (!trimmedAddressLine) {
+      newErrors.address_line = 'Complete address is required';
+    } else if (trimmedAddressLine.length < 5) {
+      newErrors.address_line = 'Please provide a more complete address';
+    } else if (trimmedAddressLine.length > 255) {
+      newErrors.address_line = 'Address must not exceed 255 characters';
+    }
+
+    // Phone Number validation
+    const cleanedPhone = form.phone_number.replace(/\s+/g, '');
     const phoneRegex = /^(09|\+639)\d{9}$/;
-    if (!phoneRegex.test(form.phone_number.replace(/\s+/g, ''))) {
-      alert('Please enter a valid Philippine mobile number (09xxxxxxxxx)');
+    if (!cleanedPhone) {
+      newErrors.phone_number = 'Mobile number is required';
+    } else if (!phoneRegex.test(cleanedPhone)) {
+      newErrors.phone_number = 'Please enter a valid Philippine mobile number (09xxxxxxxxx or +639xxxxxxxxx)';
+    }
+
+    // Other Contact validation (optional but if provided, validate)
+    if (trimmedOtherContact) {
+      if (trimmedOtherContact.length > 50) {
+        newErrors.otherContact = 'Alternate contact must not exceed 50 characters';
+      }
+    }
+
+    // Email validation
+    const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+    if (!trimmedEmail) {
+      newErrors.email = 'Email address is required';
+    } else if (!emailRegex.test(trimmedEmail)) {
+      newErrors.email = 'Please enter a valid email address';
+    } else if (trimmedEmail.length > 255) {
+      newErrors.email = 'Email must not exceed 255 characters';
+    }
+
+    // Password validation
+    const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
+    if (!form.password) {
+      newErrors.password = 'Password is required';
+    } else if (form.password.length < 8) {
+      newErrors.password = 'Password must be at least 8 characters long';
+    } else if (form.password.length > 72) {
+      newErrors.password = 'Password must not exceed 72 characters';
+    } else if (!passwordRegex.test(form.password)) {
+      newErrors.password = 'Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character (@$!%*?&)';
+    }
+
+    // Confirm Password validation
+    if (!form.confirmPassword) {
+      newErrors.confirmPassword = 'Please confirm your password';
+    } else if (form.password !== form.confirmPassword) {
+      newErrors.confirmPassword = 'Passwords do not match';
+    }
+
+    // Terms Agreement validation
+    if (!form.agree) {
+      newErrors.agree = 'You must agree to the Terms and Conditions and Privacy Policy';
+    }
+
+    // If there are validation errors, set them and return false
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(newErrors);
+      // Show first error message
+      const firstError = Object.values(newErrors)[0];
+      setValidationMessage({ type: 'error', message: firstError });
       return false;
     }
 
-    if (!/^\d{4}$/.test(form.postalCode)) {
-      alert('Postal code must be exactly 4 digits');
+    // Check if email is already registered (only if no other errors)
+    try {
+      const { data: existingUser, error } = await supabase
+        .from('users')
+        .select('email')
+        .eq('email', trimmedEmail)
+        .limit(1);
+
+      if (error) {
+        console.error('Error checking email:', error);
+        setValidationMessage({ type: 'error', message: 'An error occurred while validating your email. Please try again.' });
+        return false;
+      }
+
+      if (existingUser && existingUser.length > 0) {
+        setErrors({ email: 'This email is already registered' });
+        setValidationMessage({ type: 'error', message: 'This email address is already registered. Please use a different email or sign in to your existing account.' });
+        return false;
+      }
+    } catch (err) {
+      console.error('Error during email check:', err);
+      setValidationMessage({ type: 'error', message: 'A network error occurred. Please check your connection and try again.' });
       return false;
     }
 
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(form.email)) {
-      alert('Please enter a valid email address');
-      return false;
-    }
+    // Update form with sanitized values
+    setForm(prev => ({
+      ...prev,
+      firstName: trimmedFirstName,
+      middleName: trimmedMiddleName,
+      lastName: trimmedLastName,
+      email: trimmedEmail,
+      address_line: trimmedAddressLine,
+      otherContact: trimmedOtherContact,
+      postalCode: trimmedPostalCode,
+    }));
 
-    // Check if email is already registered
-    const { data: existingUser, error } = await supabase
-      .from('users')
-      .select('email')
-      .eq('email', form.email)
-      .limit(1);
-
-    if (error) {
-      console.error('Error checking email:', error);
-      alert('An error occurred while validating your email. Please try again.');
-      return false;
-    }
-
-    if (existingUser && existingUser.length > 0) {
-      alert('This email address is already registered. Please use a different email or sign in to your existing account.');
-      return false;
-    }
-
+    setErrors({});
+    setValidationMessage(null);
     return true;
   };
 
@@ -395,14 +618,15 @@ function Signup() {
 
   const verifyOtp = async () => {
     try {
-      alert('OTP verified successfully!')
-
+      setIsLoading(true);
       await signUpNewUser()
-
       closeOtpModal()
       navigate({ to: "/login" })
     } catch (error) {
       console.error('Error verifying OTP or signing up:', error)
+      // Error message is already set in signUpNewUser
+    } finally {
+      setIsLoading(false);
     }
   }
 
@@ -410,60 +634,96 @@ function Signup() {
     setIsLoading(true)
 
     try {
+      // Prepare sanitized data
+      const sanitizedFirstName = form.firstName.trim().substring(0, 100);
+      const sanitizedMiddleName = form.middleName.trim().substring(0, 100) || null;
+      const sanitizedLastName = form.lastName.trim().substring(0, 100);
+      const sanitizedEmail = form.email.trim().toLowerCase();
+      const sanitizedPhone = form.phone_number.replace(/\s+/g, '');
+      const sanitizedAddressLine = form.address_line.trim().substring(0, 255);
+      const sanitizedOtherContact = form.otherContact.trim().substring(0, 50) || null;
+      const sanitizedPostalCode = form.postalCode.trim();
+
+      // Format birth date with proper padding
+      const birthMonth = form.birthMonth.padStart(2, '0');
+      const birthDay = form.birthDay.padStart(2, '0');
+      const formattedBirthDate = `${form.birthYear}-${birthMonth}-${birthDay}`;
+
       const { data: authData, error: authError } = await supabase.auth.signUp({
-        email: form.email,
+        email: sanitizedEmail,
         password: form.password,
         options: {
           emailRedirectTo: `${window.location.origin}/login`,
         },
       })
 
-      if (authError) throw authError
+      if (authError) {
+        if (authError.message.includes('already registered')) {
+          setValidationMessage({ type: 'error', message: 'This email is already registered. Please use a different email or sign in.' });
+        } else {
+          setValidationMessage({ type: 'error', message: `Authentication error: ${authError.message}` });
+        }
+        throw authError;
+      }
 
       const userAuthId = authData?.user?.id
-      if (!userAuthId) throw new Error("Auth signup failed, no user ID returned.")
+      if (!userAuthId) {
+        setValidationMessage({ type: 'error', message: 'Registration failed. Please try again.' });
+        throw new Error("Auth signup failed, no user ID returned.");
+      }
 
       const { data: userData, error: userError } = await supabase
         .from("users")
         .insert([
           {
             user_uid: userAuthId,
-            first_name: form.firstName,
-            middle_name: form.middleName,
-            last_name: form.lastName,
-            email: form.email,
-            phone_number: form.phone_number,
+            first_name: sanitizedFirstName,
+            middle_name: sanitizedMiddleName,
+            last_name: sanitizedLastName,
+            email: sanitizedEmail,
+            phone_number: sanitizedPhone,
             is_active: true,
             user_role: "customer",
             date_hired: null,
-            birth_date: `${form.birthYear}-${form.birthMonth}-${form.birthDay}`,
+            birth_date: formattedBirthDate,
             gender: form.gender,
-            other_contact: form.otherContact,
+            other_contact: sanitizedOtherContact,
           },
         ])
         .select("user_uid")
 
-      if (userError) throw userError
+      if (userError) {
+        console.error("Error inserting user:", userError);
+        // Try to clean up the auth user if DB insert fails
+        setValidationMessage({ type: 'error', message: `Failed to create user profile: ${userError.message}` });
+        throw userError;
+      }
 
       const userId = userData[0].user_uid
 
       const { error: addressError } = await supabase.from("address").insert([
         {
           address_type: "Primary",
-          address_line: form.address_line,
+          address_line: sanitizedAddressLine,
           region: form.provinceCode,
           city: form.city,
           barangay: form.barangay,
-          postal_code: form.postalCode,
+          postal_code: sanitizedPostalCode,
           customer_id: userId,
         },
       ])
 
-      if (addressError) throw addressError
+      if (addressError) {
+        console.error("Error inserting address:", addressError);
+        setValidationMessage({ type: 'error', message: `Failed to save address: ${addressError.message}` });
+        throw addressError;
+      }
 
-      console.log("User registration successful!", { userId, form })
+      setValidationMessage({ type: 'success', message: 'Account created successfully! Please check your email to verify your account.' });
+      console.log("User registration successful!", { userId })
     } catch (error) {
       console.error("Error inserting to database:", error)
+      throw error; // Re-throw to be handled by caller
     } finally {
       setIsLoading(false)
     }
@@ -696,6 +956,31 @@ function Signup() {
                 </p>
               </div>
             </div>
+
+            {/* Validation Message Banner */}
+            {validationMessage && (
+              <div className={`p-4 rounded-lg border-l-4 flex items-start gap-3 ${validationMessage.type === 'error'
+                ? 'bg-red-50 border-red-500 text-red-800'
+                : 'bg-green-50 border-green-500 text-green-800'
+                }`}>
+                {validationMessage.type === 'error' ? (
+                  <AlertCircle className="h-5 w-5 text-red-500 mt-0.5 flex-shrink-0" />
+                ) : (
+                  <CheckCircle2 className="h-5 w-5 text-green-500 mt-0.5 flex-shrink-0" />
+                )}
+                <div className="flex-1">
+                  <p className="text-sm font-medium">{validationMessage.message}</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setValidationMessage(null)}
+                  className={`p-1 rounded hover:bg-opacity-20 ${validationMessage.type === 'error' ? 'hover:bg-red-500' : 'hover:bg-green-500'
+                    }`}
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+            )}
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-6">
@@ -719,10 +1004,15 @@ function Signup() {
                       name="firstName"
                       value={form.firstName}
                       onChange={handleChange}
-                      className="w-full border-2 border-gray-200 rounded-lg px-4 py-3 focus:border-[#964B00] focus:ring-2 focus:ring-amber-200 transition-all outline-none"
+                      maxLength={100}
+                      className={`w-full border-2 rounded-lg px-4 py-3 focus:ring-2 focus:ring-amber-200 transition-all outline-none ${errors.firstName ? 'border-red-500 focus:border-red-500' : 'border-gray-200 focus:border-[#964B00]'
+                        }`}
                       placeholder='Juan'
                       required
                     />
+                    {errors.firstName && (
+                      <p className="text-red-500 text-xs mt-1">{errors.firstName}</p>
+                    )}
                   </div>
                   <div>
                     <label className="block text-sm font-semibold text-gray-700 mb-2">
@@ -733,9 +1023,14 @@ function Signup() {
                       name="middleName"
                       value={form.middleName}
                       onChange={handleChange}
-                      className="w-full border-2 border-gray-200 rounded-lg px-4 py-3 focus:border-[#964B00] focus:ring-2 focus:ring-amber-200 transition-all outline-none"
+                      maxLength={100}
+                      className={`w-full border-2 rounded-lg px-4 py-3 focus:ring-2 focus:ring-amber-200 transition-all outline-none ${errors.middleName ? 'border-red-500 focus:border-red-500' : 'border-gray-200 focus:border-[#964B00]'
+                        }`}
                       placeholder='Santos'
                     />
+                    {errors.middleName && (
+                      <p className="text-red-500 text-xs mt-1">{errors.middleName}</p>
+                    )}
                   </div>
                   <div>
                     <label className="block text-sm font-semibold text-gray-700 mb-2">
@@ -746,15 +1041,23 @@ function Signup() {
                       name="lastName"
                       value={form.lastName}
                       onChange={handleChange}
-                      className="w-full border-2 border-gray-200 rounded-lg px-4 py-3 focus:border-[#964B00] focus:ring-2 focus:ring-amber-200 transition-all outline-none"
+                      maxLength={100}
+                      className={`w-full border-2 rounded-lg px-4 py-3 focus:ring-2 focus:ring-amber-200 transition-all outline-none ${errors.lastName ? 'border-red-500 focus:border-red-500' : 'border-gray-200 focus:border-[#964B00]'
+                        }`}
                       placeholder='Dela Cruz'
                       required
                     />
+                    {errors.lastName && (
+                      <p className="text-red-500 text-xs mt-1">{errors.lastName}</p>
+                    )}
                   </div>
                 </div>
 
                 <div className="border-t pt-5">
                   <h3 className="text-sm font-semibold text-gray-700 mb-3">Date of Birth <span className="text-red-500">*</span></h3>
+                  {errors.birthDate && (
+                    <p className="text-red-500 text-xs mb-2">{errors.birthDate}</p>
+                  )}
                   <div className="grid md:grid-cols-4 gap-4">
                     <div>
                       <select
@@ -810,7 +1113,8 @@ function Signup() {
                         name="gender"
                         value={form.gender}
                         onChange={handleChange}
-                        className="w-full border-2 border-gray-200 rounded-lg px-4 py-3 focus:border-[#964B00] focus:ring-2 focus:ring-amber-200 transition-all outline-none"
+                        className={`w-full border-2 rounded-lg px-4 py-3 focus:ring-2 focus:ring-amber-200 transition-all outline-none ${errors.gender ? 'border-red-500 focus:border-red-500' : 'border-gray-200 focus:border-[#964B00]'
+                          }`}
                         required
                       >
                         <option value="">Sex</option>
@@ -818,6 +1122,9 @@ function Signup() {
                         <option value="Female">Female</option>
                         <option value="Other">Other</option>
                       </select>
+                      {errors.gender && (
+                        <p className="text-red-500 text-xs mt-1">{errors.gender}</p>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -857,10 +1164,15 @@ function Signup() {
                       name="postalCode"
                       value={form.postalCode}
                       onChange={handleChange}
-                      className="w-full border-2 border-gray-200 rounded-lg px-4 py-3 focus:border-[#964B00] focus:ring-2 focus:ring-amber-200 transition-all outline-none"
+                      maxLength={4}
+                      className={`w-full border-2 rounded-lg px-4 py-3 focus:ring-2 focus:ring-amber-200 transition-all outline-none ${errors.postalCode ? 'border-red-500 focus:border-red-500' : 'border-gray-200 focus:border-[#964B00]'
+                        }`}
                       placeholder='1234'
                       required
                     />
+                    {errors.postalCode && (
+                      <p className="text-red-500 text-xs mt-1">{errors.postalCode}</p>
+                    )}
                   </div>
 
                   <div>
@@ -872,7 +1184,8 @@ function Signup() {
                       value={form.provinceCode}
                       onChange={handleChange}
                       required
-                      className="w-full border-2 border-gray-200 rounded-lg px-4 py-3 focus:border-[#964B00] focus:ring-2 focus:ring-amber-200 transition-all outline-none"
+                      className={`w-full border-2 rounded-lg px-4 py-3 focus:ring-2 focus:ring-amber-200 transition-all outline-none ${errors.province ? 'border-red-500 focus:border-red-500' : 'border-gray-200 focus:border-[#964B00]'
+                        }`}
                     >
                       <option value="">Select Region</option>
                       {provinces.map((region) => (
@@ -881,6 +1194,9 @@ function Signup() {
                         </option>
                       ))}
                     </select>
+                    {errors.province && (
+                      <p className="text-red-500 text-xs mt-1">{errors.province}</p>
+                    )}
                   </div>
 
                   <div>
@@ -892,7 +1208,8 @@ function Signup() {
                       value={form.cityCode}
                       onChange={handleChange}
                       required
-                      className="w-full border-2 border-gray-200 rounded-lg px-4 py-3 focus:border-[#964B00] focus:ring-2 focus:ring-amber-200 transition-all outline-none disabled:bg-gray-50 disabled:cursor-not-allowed"
+                      className={`w-full border-2 rounded-lg px-4 py-3 focus:ring-2 focus:ring-amber-200 transition-all outline-none disabled:bg-gray-50 disabled:cursor-not-allowed ${errors.city ? 'border-red-500 focus:border-red-500' : 'border-gray-200 focus:border-[#964B00]'
+                        }`}
                       disabled={!form.provinceCode}
                     >
                       <option value="">
@@ -904,6 +1221,9 @@ function Signup() {
                         </option>
                       ))}
                     </select>
+                    {errors.city && (
+                      <p className="text-red-500 text-xs mt-1">{errors.city}</p>
+                    )}
                   </div>
 
                   <div className="md:col-span-2">
@@ -914,7 +1234,8 @@ function Signup() {
                       name="barangay"
                       value={form.barangayCode}
                       onChange={handleChange}
-                      className="w-full border-2 border-gray-200 rounded-lg px-4 py-3 focus:border-[#964B00] focus:ring-2 focus:ring-amber-200 transition-all outline-none disabled:bg-gray-50 disabled:cursor-not-allowed"
+                      className={`w-full border-2 rounded-lg px-4 py-3 focus:ring-2 focus:ring-amber-200 transition-all outline-none disabled:bg-gray-50 disabled:cursor-not-allowed ${errors.barangay ? 'border-red-500 focus:border-red-500' : 'border-gray-200 focus:border-[#964B00]'
+                        }`}
                       required
                       disabled={!form.cityCode}
                     >
@@ -927,6 +1248,9 @@ function Signup() {
                         </option>
                       ))}
                     </select>
+                    {errors.barangay && (
+                      <p className="text-red-500 text-xs mt-1">{errors.barangay}</p>
+                    )}
                   </div>
 
                   <div className="md:col-span-2">
@@ -938,10 +1262,15 @@ function Signup() {
                       name="address_line"
                       value={form.address_line}
                       onChange={handleChange}
+                      maxLength={255}
                       placeholder="House/Unit/Floor No., Building Name, Street Name"
-                      className="w-full border-2 border-gray-200 rounded-lg px-4 py-3 focus:border-[#964B00] focus:ring-2 focus:ring-amber-200 transition-all outline-none"
+                      className={`w-full border-2 rounded-lg px-4 py-3 focus:ring-2 focus:ring-amber-200 transition-all outline-none ${errors.address_line ? 'border-red-500 focus:border-red-500' : 'border-gray-200 focus:border-[#964B00]'
+                        }`}
                       required
                     />
+                    {errors.address_line && (
+                      <p className="text-red-500 text-xs mt-1">{errors.address_line}</p>
+                    )}
                   </div>
                 </div>
 
@@ -957,10 +1286,15 @@ function Signup() {
                         name="phone_number"
                         value={form.phone_number}
                         onChange={handleChange}
+                        maxLength={13}
                         placeholder="09xxxxxxxxx"
-                        className="w-full border-2 border-gray-200 rounded-lg px-4 py-3 focus:border-[#964B00] focus:ring-2 focus:ring-amber-200 transition-all outline-none"
+                        className={`w-full border-2 rounded-lg px-4 py-3 focus:ring-2 focus:ring-amber-200 transition-all outline-none ${errors.phone_number ? 'border-red-500 focus:border-red-500' : 'border-gray-200 focus:border-[#964B00]'
+                          }`}
                         required
                       />
+                      {errors.phone_number && (
+                        <p className="text-red-500 text-xs mt-1">{errors.phone_number}</p>
+                      )}
                     </div>
                     <div>
                       <label className="block text-sm font-semibold text-gray-700 mb-2">
@@ -971,9 +1305,14 @@ function Signup() {
                         name="otherContact"
                         value={form.otherContact}
                         onChange={handleChange}
+                        maxLength={50}
                         placeholder="8-xxxxxxx (Optional)"
-                        className="w-full border-2 border-gray-200 rounded-lg px-4 py-3 focus:border-[#964B00] focus:ring-2 focus:ring-amber-200 transition-all outline-none"
+                        className={`w-full border-2 rounded-lg px-4 py-3 focus:ring-2 focus:ring-amber-200 transition-all outline-none ${errors.otherContact ? 'border-red-500 focus:border-red-500' : 'border-gray-200 focus:border-[#964B00]'
+                          }`}
                       />
+                      {errors.otherContact && (
+                        <p className="text-red-500 text-xs mt-1">{errors.otherContact}</p>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -999,10 +1338,15 @@ function Signup() {
                     name="email"
                     value={form.email}
                     onChange={handleChange}
-                    className="w-full border-2 border-gray-200 rounded-lg px-4 py-3 focus:border-[#964B00] focus:ring-2 focus:ring-amber-200 transition-all outline-none"
+                    maxLength={255}
+                    className={`w-full border-2 rounded-lg px-4 py-3 focus:ring-2 focus:ring-amber-200 transition-all outline-none ${errors.email ? 'border-red-500 focus:border-red-500' : 'border-gray-200 focus:border-[#964B00]'
+                      }`}
                     placeholder='your.email@example.com'
                     required
                   />
+                  {errors.email && (
+                    <p className="text-red-500 text-xs mt-1">{errors.email}</p>
+                  )}
                 </div>
 
                 <div className="grid md:grid-cols-2 gap-4">
@@ -1015,13 +1359,19 @@ function Signup() {
                       name="password"
                       value={form.password}
                       onChange={handleChange}
-                      className="w-full border-2 border-gray-200 rounded-lg px-4 py-3 focus:border-[#964B00] focus:ring-2 focus:ring-amber-200 transition-all outline-none"
+                      maxLength={72}
+                      className={`w-full border-2 rounded-lg px-4 py-3 focus:ring-2 focus:ring-amber-200 transition-all outline-none ${errors.password ? 'border-red-500 focus:border-red-500' : 'border-gray-200 focus:border-[#964B00]'
+                        }`}
                       placeholder='••••••••'
                       required
                     />
-                    <p className="text-xs text-gray-500 mt-2 leading-relaxed">
-                      Must include: 8+ characters, uppercase, lowercase, number, special character (@$!%*?&)
-                    </p>
+                    {errors.password ? (
+                      <p className="text-red-500 text-xs mt-2">{errors.password}</p>
+                    ) : (
+                      <p className="text-xs text-gray-500 mt-2 leading-relaxed">
+                        Must include: 8+ characters, uppercase, lowercase, number, special character (@$!%*?&)
+                      </p>
+                    )}
                   </div>
                   <div>
                     <label className="block text-sm font-semibold text-gray-700 mb-2">
@@ -1032,10 +1382,15 @@ function Signup() {
                       name="confirmPassword"
                       value={form.confirmPassword}
                       onChange={handleChange}
-                      className="w-full border-2 border-gray-200 rounded-lg px-4 py-3 focus:border-[#964B00] focus:ring-2 focus:ring-amber-200 transition-all outline-none"
+                      maxLength={72}
+                      className={`w-full border-2 rounded-lg px-4 py-3 focus:ring-2 focus:ring-amber-200 transition-all outline-none ${errors.confirmPassword ? 'border-red-500 focus:border-red-500' : 'border-gray-200 focus:border-[#964B00]'
+                        }`}
                       placeholder='••••••••'
                       required
                     />
+                    {errors.confirmPassword && (
+                      <p className="text-red-500 text-xs mt-1">{errors.confirmPassword}</p>
+                    )}
                   </div>
                 </div>
 
@@ -1046,7 +1401,8 @@ function Signup() {
                       name="agree"
                       checked={form.agree}
                       onChange={handleChange}
-                      className="mt-1 w-5 h-5 rounded border-2 border-gray-300 text-[#964B00] focus:ring-2 focus:ring-amber-200 cursor-pointer"
+                      className={`mt-1 w-5 h-5 rounded border-2 text-[#964B00] focus:ring-2 focus:ring-amber-200 cursor-pointer ${errors.agree ? 'border-red-500' : 'border-gray-300'
+                        }`}
                       required
                     />
                     <span className="text-sm text-gray-700 leading-relaxed">
@@ -1075,6 +1431,9 @@ function Signup() {
                       {' '}of Angieren's Lutong Bahay.
                     </span>
                   </label>
+                  {errors.agree && (
+                    <p className="text-red-500 text-xs mt-2 ml-8">{errors.agree}</p>
+                  )}
                 </div>
               </div>
             </div>

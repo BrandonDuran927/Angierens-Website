@@ -934,9 +934,9 @@ function RouteComponent() {
                                             <div className="flex items-center gap-3">
                                                 <span className="text-sm font-bold text-gray-500 w-6">#{item.rank}</span>
                                                 <div className="w-10 h-10 bg-amber-300 rounded-lg flex items-center justify-center text-xl overflow-hidden">
-                                                    <img 
-                                                        src={getImageUrl(item.image_url)} 
-                                                        alt={item.name} 
+                                                    <img
+                                                        src={getImageUrl(item.image_url)}
+                                                        alt={item.name}
                                                         className="w-full h-full object-cover"
                                                         onError={(e) => {
                                                             (e.target as HTMLImageElement).src = '/api/placeholder/40/40'
@@ -978,9 +978,9 @@ function RouteComponent() {
                                             <div className="flex items-center gap-3">
                                                 <span className="text-sm font-bold text-gray-500 w-6">#{item.rank}</span>
                                                 <div className="w-10 h-10 bg-amber-100 rounded-lg flex items-center justify-center text-xl overflow-hidden">
-                                                    <img 
-                                                        src={getImageUrl(item.image_url)} 
-                                                        alt={item.name} 
+                                                    <img
+                                                        src={getImageUrl(item.image_url)}
+                                                        alt={item.name}
                                                         className="w-full h-full object-cover"
                                                         onError={(e) => {
                                                             (e.target as HTMLImageElement).src = '/api/placeholder/40/40'

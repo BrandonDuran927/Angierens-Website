@@ -606,13 +606,6 @@ function RouteComponent() {
         setCancelStep(2)
     }
 
-
-
-    const handleGoBackFromCancel = async () => {
-        handleCloseCancelModal()
-        await fetchOrders() // Refresh orders list
-    }
-
     const handleOpenViewReceipt = (receiptUrl: string, orderId: string) => {
         setViewReceiptUrl(receiptUrl)
         setCurrentOrderId(orderId)
