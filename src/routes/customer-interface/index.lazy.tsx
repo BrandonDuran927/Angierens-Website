@@ -72,6 +72,7 @@ function RouteComponent() {
   const [loading, setLoading] = useState(true)
   const [categories, setCategories] = useState<string[]>(['All Categories'])
   const [selectedSize, setSelectedSize] = useState<string>('')
+  const [isProcessing, setIsProcessing] = useState(false)
 
   useEffect(() => {
     fetchMenuItems()
@@ -152,6 +153,8 @@ function RouteComponent() {
   }
 
   const orderNow = async () => {
+    if (isProcessing) return
+
     if (!user?.id) {
       alert('Please sign in to place an order')
       navigate({ to: '/login' })
@@ -162,6 +165,7 @@ function RouteComponent() {
 
     const itemPrice = getPriceForSize(selectedItem, selectedSize)
 
+    setIsProcessing(true)
     try {
       // Get or create cart for user
       let { data: cartData, error: cartError } = await supabase
@@ -189,50 +193,82 @@ function RouteComponent() {
 
       if (!cartData) throw new Error('Failed to get or create cart')
 
-      // Add cart item
-      const { data: cartItem, error: itemError } = await supabase
+      // Check if the same item with the same price already exists in the cart
+      const { data: existingCartItem, error: existingError } = await supabase
         .from('cart_item')
-        .insert([{
-          cart_id: cartData.cart_id,
-          menu_id: selectedItem.menu_id,
-          quantity: orderQuantity,
-          price: itemPrice
-        }])
-        .select()
+        .select('cart_item_id, quantity')
+        .eq('cart_id', cartData.cart_id)
+        .eq('menu_id', selectedItem.menu_id)
+        .eq('price', itemPrice)
         .single()
 
-      if (itemError) throw itemError
+      if (existingError && existingError.code !== 'PGRST116') {
+        throw existingError
+      }
 
-      // Add cart item add-ons if any
-      const addOnEntries = Object.entries(addOns).filter(([_, qty]) => qty > 0)
+      let cartItemId: string
 
-      if (addOnEntries.length > 0) {
-        const addOnInserts = addOnEntries.map(([addOnId, quantity]) => {
-          const addOn = addOnOptions.find(ao => ao.add_on === addOnId)
-          return {
-            cart_item_id: cartItem.cart_item_id,
-            add_on_id: addOnId,
-            quantity: quantity,
-            price: addOn ? Number(addOn.price) : 0
-          }
-        })
+      if (existingCartItem) {
+        // Item already exists, update the quantity
+        const newQuantity = existingCartItem.quantity + orderQuantity
+        const { error: updateError } = await supabase
+          .from('cart_item')
+          .update({ quantity: newQuantity })
+          .eq('cart_item_id', existingCartItem.cart_item_id)
 
-        const { error: addOnError } = await supabase
-          .from('cart_item_add_on')
-          .insert(addOnInserts)
+        if (updateError) throw updateError
 
-        if (addOnError) throw addOnError
+        cartItemId = existingCartItem.cart_item_id
+      } else {
+        // Item doesn't exist, create a new cart item
+        const { data: cartItem, error: itemError } = await supabase
+          .from('cart_item')
+          .insert([{
+            cart_id: cartData.cart_id,
+            menu_id: selectedItem.menu_id,
+            quantity: orderQuantity,
+            price: itemPrice
+          }])
+          .select()
+          .single()
+
+        if (itemError) throw itemError
+
+        // Add cart item add-ons if any
+        const addOnEntries = Object.entries(addOns).filter(([_, qty]) => qty > 0)
+
+        if (addOnEntries.length > 0) {
+          const addOnInserts = addOnEntries.map(([addOnId, quantity]) => {
+            const addOn = addOnOptions.find(ao => ao.add_on === addOnId)
+            return {
+              cart_item_id: cartItem.cart_item_id,
+              add_on_id: addOnId,
+              quantity: quantity,
+              price: addOn ? Number(addOn.price) : 0
+            }
+          })
+
+          const { error: addOnError } = await supabase
+            .from('cart_item_add_on')
+            .insert(addOnInserts)
+
+          if (addOnError) throw addOnError
+        }
+
+        cartItemId = cartItem.cart_item_id
       }
 
       // Navigate directly to payment with this cart item
       closeModal()
       navigate({
         to: '/customer-interface/payment',
-        search: { items: cartItem.cart_item_id }
+        search: { items: cartItemId }
       })
     } catch (error) {
       console.error('Error processing order:', error)
       alert('Failed to process order. Please try again.')
+    } finally {
+      setIsProcessing(false)
     }
   }
 
@@ -390,6 +426,8 @@ function RouteComponent() {
   }
 
   const addToCart = async () => {
+    if (isProcessing) return // Prevent duplicate clicks
+
     if (!user?.id) {
       alert('Please sign in to add items to cart')
       navigate({ to: '/login' })
@@ -400,6 +438,7 @@ function RouteComponent() {
 
     const itemPrice = getPriceForSize(selectedItem, selectedSize)
 
+    setIsProcessing(true)
     try {
       // Get or create cart for user
       let { data: cartData, error: cartError } = await supabase
@@ -427,39 +466,63 @@ function RouteComponent() {
 
       if (!cartData) throw new Error('Failed to get or create cart')
 
-      // Add cart item
-      const { data: cartItem, error: itemError } = await supabase
+      // Check if the same item with the same price already exists in the cart
+      const { data: existingCartItem, error: existingError } = await supabase
         .from('cart_item')
-        .insert([{
-          cart_id: cartData.cart_id,
-          menu_id: selectedItem.menu_id,
-          quantity: orderQuantity,
-          price: itemPrice
-        }])
-        .select()
+        .select('cart_item_id, quantity')
+        .eq('cart_id', cartData.cart_id)
+        .eq('menu_id', selectedItem.menu_id)
+        .eq('price', itemPrice)
         .single()
 
-      if (itemError) throw itemError
+      if (existingError && existingError.code !== 'PGRST116') {
+        throw existingError
+      }
 
-      // Add cart item add-ons if any
-      const addOnEntries = Object.entries(addOns).filter(([_, qty]) => qty > 0)
+      if (existingCartItem) {
+        // Item already exists, update the quantity
+        const newQuantity = existingCartItem.quantity + orderQuantity
+        const { error: updateError } = await supabase
+          .from('cart_item')
+          .update({ quantity: newQuantity })
+          .eq('cart_item_id', existingCartItem.cart_item_id)
 
-      if (addOnEntries.length > 0) {
-        const addOnInserts = addOnEntries.map(([addOnId, quantity]) => {
-          const addOn = addOnOptions.find(ao => ao.add_on === addOnId)
-          return {
-            cart_item_id: cartItem.cart_item_id,
-            add_on_id: addOnId,
-            quantity: quantity,
-            price: addOn ? Number(addOn.price) : 0
-          }
-        })
+        if (updateError) throw updateError
+      } else {
+        // Item doesn't exist, create a new cart item
+        const { data: cartItem, error: itemError } = await supabase
+          .from('cart_item')
+          .insert([{
+            cart_id: cartData.cart_id,
+            menu_id: selectedItem.menu_id,
+            quantity: orderQuantity,
+            price: itemPrice
+          }])
+          .select()
+          .single()
 
-        const { error: addOnError } = await supabase
-          .from('cart_item_add_on')
-          .insert(addOnInserts)
+        if (itemError) throw itemError
 
-        if (addOnError) throw addOnError
+        // Add cart item add-ons if any
+        const addOnEntries = Object.entries(addOns).filter(([_, qty]) => qty > 0)
+
+        if (addOnEntries.length > 0) {
+          const addOnInserts = addOnEntries.map(([addOnId, quantity]) => {
+            const addOn = addOnOptions.find(ao => ao.add_on === addOnId)
+            return {
+              cart_item_id: cartItem.cart_item_id,
+              add_on_id: addOnId,
+              quantity: quantity,
+              price: addOn ? Number(addOn.price) : 0
+            }
+          })
+
+          const { error: addOnError } = await supabase
+            .from('cart_item_add_on')
+            .insert(addOnInserts)
+
+          if (addOnError) throw addOnError
+        }
       }
 
       // Update cart count
@@ -470,6 +533,8 @@ function RouteComponent() {
     } catch (error) {
       console.error('Error adding to cart:', error)
       alert('Failed to add item to cart. Please try again.')
+    } finally {
+      setIsProcessing(false)
     }
   }
 
@@ -944,17 +1009,19 @@ function RouteComponent() {
                 <div className="flex flex-col sm:flex-row gap-3">
                   <button
                     onClick={addToCart}
-                    className="flex-1 bg-white text-[#964B00] border-2 border-[#964B00] px-6 py-4 rounded-xl font-bold hover:bg-gray-50 active:scale-95 transition-all duration-200 shadow-md hover:shadow-xl flex items-center justify-center gap-2"
+                    disabled={isProcessing}
+                    className="flex-1 bg-white text-[#964B00] border-2 border-[#964B00] px-6 py-4 rounded-xl font-bold hover:bg-gray-50 active:scale-95 transition-all duration-200 shadow-md hover:shadow-xl flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <ShoppingCart className="h-5 w-5" />
-                    Add To Cart
+                    {isProcessing ? 'Processing...' : 'Add To Cart'}
                   </button>
                   <button
                     onClick={orderNow}
-                    className="flex-1 bg-yellow-400 text-black px-6 py-4 rounded-xl font-bold hover:bg-yellow-500 active:scale-95 transition-all duration-200 shadow-md hover:shadow-xl flex items-center justify-center gap-2"
+                    disabled={isProcessing}
+                    className="flex-1 bg-yellow-400 text-black px-6 py-4 rounded-xl font-bold hover:bg-yellow-500 active:scale-95 transition-all duration-200 shadow-md hover:shadow-xl flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <ShoppingCart className="h-5 w-5" />
-                    Order Now
+                    {isProcessing ? 'Processing...' : 'Order Now'}
                   </button>
                 </div>
               </div>

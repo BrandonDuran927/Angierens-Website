@@ -122,6 +122,7 @@ function RouteComponent() {
     const [totalDistance, setTotalDistance] = useState(0);
     const [routeOrigin, setRouteOrigin] = useState<{ lat: number; lng: number } | null>(null);
     const [routeDestination, setRouteDestination] = useState<{ lat: number; lng: number } | null>(null);
+    const [isSubmittingOrder, setIsSubmittingOrder] = useState(false);
 
     const handleShowDirections = (originLat: number, originLng: number, destLat: number, destLng: number) => {
         setRouteOrigin({ lat: originLat, lng: originLng });
@@ -721,6 +722,13 @@ function RouteComponent() {
             return;
         }
 
+        if (isSubmittingOrder) {
+            return;
+        }
+
+        setIsSubmittingOrder(true);
+
+
         try {
             // Upload to Supabase storage
             const fileExt = receiptFile.name.split('.').pop();
@@ -744,6 +752,7 @@ function RouteComponent() {
         } catch (error) {
             console.error('Error uploading receipt:', error);
             alert('Failed to upload receipt. Please try again.');
+            setIsSubmittingOrder(false); // Re-enable on error
         }
     };
 
@@ -752,6 +761,12 @@ function RouteComponent() {
             alert('Please take a photo of your payment');
             return;
         }
+
+        if (isSubmittingOrder) {
+            return;
+        }
+
+        setIsSubmittingOrder(true);
 
         try {
             // Upload to Supabase storage
@@ -776,6 +791,7 @@ function RouteComponent() {
         } catch (error) {
             console.error('Error uploading proof of payment:', error);
             alert('Failed to upload photo. Please try again.');
+            setIsSubmittingOrder(false); // Re-enable on error
         }
     };
 
@@ -799,6 +815,7 @@ function RouteComponent() {
         try {
             if (!selectedDate || isDateDisabled(selectedDate)) {
                 alert('Please select a valid date for your order');
+                setIsSubmittingOrder(false);
                 return;
             }
 
@@ -934,6 +951,7 @@ function RouteComponent() {
         } catch (error) {
             console.error('Error placing order:', error);
             alert('Failed to place order. Please try again.');
+            setIsSubmittingOrder(false); // Re-enable button on error
         }
     };
 
@@ -957,7 +975,7 @@ function RouteComponent() {
                 .from('address')
                 .insert({
                     customer_id: user.id,
-                    address_type: newAddressForm.address_type,
+                    address_type: 'Secondary',
                     address_line: newAddressForm.address_line,
                     region: newAddressForm.region || 'Metro Manila',
                     city: newAddressForm.city,
@@ -1797,13 +1815,13 @@ function RouteComponent() {
                                                     }
                                                     handleUploadReceipt();
                                                 }}
-                                                disabled={!receiptFile}
-                                                className={`flex-1 px-6 py-3 font-semibold rounded-lg transition-colors ${receiptFile
+                                                disabled={!receiptFile || isSubmittingOrder}
+                                                className={`flex-1 px-6 py-3 font-semibold rounded-lg transition-colors ${receiptFile && !isSubmittingOrder
                                                     ? 'bg-yellow-400 text-black hover:bg-yellow-500'
                                                     : 'bg-gray-300 text-gray-500 cursor-not-allowed'
                                                     }`}
                                             >
-                                                Submit & Place Order
+                                                {isSubmittingOrder ? 'Processing...' : 'Submit & Place Order'}
                                             </button>
                                         </div>
                                     </>

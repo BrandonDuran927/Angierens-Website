@@ -64,8 +64,7 @@ function RouteComponent() {
     const [loading, setLoading] = useState(true);
     const [cartId, setCartId] = useState<string | null>(null);
     const [isCheckoutAddOnsModalOpen, setIsCheckoutAddOnsModalOpen] = useState(false);
-    const [checkoutAddOns, setCheckoutAddOns] = useState<Record<string, Record<string, number>>>({});
-
+    const [checkoutAddOns, setCheckoutAddOns] = useState<Record<string, number>>({});
 
     // Navigation items with their corresponding routes
     const navigationItems = [
@@ -574,18 +573,8 @@ function RouteComponent() {
     };
 
     const openCheckoutAddOnsModal = () => {
-        // Initialize add-ons state for selected items
-        const initialAddOns: Record<string, Record<string, number>> = {};
-        cartItems
-            .filter(item => selectedItems.has(item.cart_item_id))
-            .forEach(item => {
-                const itemAddOns: Record<string, number> = {};
-                item.addOns.forEach(addOn => {
-                    itemAddOns[addOn.id] = addOn.quantity;
-                });
-                initialAddOns[item.cart_item_id] = itemAddOns;
-            });
-        setCheckoutAddOns(initialAddOns);
+        // Initialize with empty add-ons for the entire order
+        setCheckoutAddOns({});
         setIsCheckoutAddOnsModalOpen(true);
     };
 
@@ -594,18 +583,15 @@ function RouteComponent() {
         setCheckoutAddOns({});
     };
 
-    const updateCheckoutAddOnQuantity = (cartItemId: string, addOnId: string, quantity: number) => {
+    const updateCheckoutAddOnQuantity = (addOnId: string, quantity: number) => {
         setCheckoutAddOns(prev => {
-            const itemAddOns = { ...(prev[cartItemId] || {}) };
+            const newAddOns = { ...prev };
             if (quantity <= 0) {
-                delete itemAddOns[addOnId];
+                delete newAddOns[addOnId];
             } else {
-                itemAddOns[addOnId] = quantity;
+                newAddOns[addOnId] = quantity;
             }
-            return {
-                ...prev,
-                [cartItemId]: itemAddOns
-            };
+            return newAddOns;
         });
     };
 
@@ -625,7 +611,7 @@ function RouteComponent() {
 
     const proceedToPayment = async () => {
         try {
-            // Update all selected items with their add-ons
+            // Apply the same add-ons to all selected items
             for (const item of cartItems.filter(i => selectedItems.has(i.cart_item_id))) {
                 // Delete existing add-ons
                 await supabase
@@ -634,9 +620,8 @@ function RouteComponent() {
                     .eq('cart_item_id', item.cart_item_id);
 
                 // Insert new add-ons if any
-                const itemAddOns = checkoutAddOns[item.cart_item_id] || {};
-                if (Object.keys(itemAddOns).length > 0) {
-                    const addOnsToInsert = Object.entries(itemAddOns)
+                if (Object.keys(checkoutAddOns).length > 0) {
+                    const addOnsToInsert = Object.entries(checkoutAddOns)
                         .filter(([_, quantity]) => quantity > 0)
                         .map(([addOnId, quantity]) => {
                             const addOn = addOnOptions.find(option => option.add_on === addOnId);
@@ -1310,7 +1295,7 @@ function RouteComponent() {
                 {/* Checkout Add-ons Modal - Enhanced */}
                 {isCheckoutAddOnsModalOpen && (
                     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-in fade-in duration-200">
-                        <div className="bg-white rounded-3xl max-w-5xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">
+                        <div className="bg-white rounded-3xl max-w-3xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">
                             <div className="p-6 lg:p-8">
                                 <div className="flex justify-between items-start mb-8">
                                     <div>
@@ -1330,84 +1315,74 @@ function RouteComponent() {
                                     </button>
                                 </div>
 
-                                {/* Selected Items with Add-ons */}
-                                <div className="space-y-6 mb-8">
-                                    {cartItems
-                                        .filter(item => selectedItems.has(item.cart_item_id))
-                                        .map((item) => (
-                                            <div key={item.cart_item_id} className="bg-gradient-to-br from-gray-50 to-gray-100 border-2 border-gray-200 rounded-2xl p-5 hover:border-yellow-400 transition-all">
-                                                <div className="flex items-center gap-4 mb-5 pb-4 border-b-2 border-gray-200">
-                                                    <div className="relative">
-                                                        <div className="absolute inset-0 bg-gradient-to-br from-yellow-400/20 to-orange-400/20 rounded-xl"></div>
-                                                        <img
-                                                            src={getImageUrl(item.image)}
-                                                            alt={item.name}
-                                                            className="relative w-20 h-20 object-cover rounded-xl border-3 border-white shadow-md"
-                                                        />
-                                                    </div>
+                                {/* Selected Items Summary */}
+                                <div className="bg-gradient-to-br from-gray-50 to-gray-100 border-2 border-gray-200 rounded-2xl p-5 mb-8">
+                                    <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
+                                        <Package className="w-5 h-5 text-yellow-600" />
+                                        Your Selected Items ({selectedItems.size})
+                                    </h3>
+                                    <div className="space-y-3">
+                                        {cartItems
+                                            .filter(item => selectedItems.has(item.cart_item_id))
+                                            .map((item) => (
+                                                <div key={item.cart_item_id} className="flex items-center gap-4 bg-white p-3 rounded-xl">
+                                                    <img
+                                                        src={getImageUrl(item.image)}
+                                                        alt={item.name}
+                                                        className="w-16 h-16 object-cover rounded-lg border-2 border-gray-200"
+                                                    />
                                                     <div className="flex-1">
-                                                        <h3 className="text-xl font-bold text-gray-900 mb-1">{item.name}</h3>
-                                                        <p className="text-sm text-gray-600 mb-1">Quantity: {item.quantity}</p>
-                                                        <p className="text-lg font-bold bg-gradient-to-r from-yellow-600 to-orange-600 bg-clip-text text-transparent">
-                                                            {formatPrice(Number(item.price))}
-                                                        </p>
+                                                        <h4 className="font-bold text-gray-900">{item.name}</h4>
+                                                        <p className="text-sm text-gray-600">Qty: {item.quantity} × {formatPrice(Number(item.price))}</p>
+                                                    </div>
+                                                    <p className="font-bold text-gray-900">{formatPrice(Number(item.price) * item.quantity)}</p>
+                                                </div>
+                                            ))}
+                                    </div>
+                                </div>
+
+                                {/* Add-ons Section */}
+                                <div className="mb-8">
+                                    <h4 className="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">
+                                        <Tag className="w-5 h-5 text-yellow-600" />
+                                        Add-ons for Your Order
+                                    </h4>
+                                    <p className="text-sm text-gray-600 mb-4">These add-ons will be applied to your entire order</p>
+                                    {addOnOptions.length === 0 ? (
+                                        <p className="text-gray-500 text-center py-8 bg-gray-50 rounded-xl">No add-ons available</p>
+                                    ) : (
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                            {addOnOptions.map((addOn) => (
+                                                <div key={addOn.add_on} className="bg-gradient-to-br from-gray-50 to-white rounded-xl p-5 shadow-sm hover:shadow-md transition-all border-2 border-transparent hover:border-yellow-400">
+                                                    <div className="flex items-center justify-between mb-4">
+                                                        <div className="flex-1">
+                                                            <span className="inline-block bg-gradient-to-r from-yellow-400 to-orange-400 text-white px-3 py-1.5 rounded-lg text-sm font-bold mb-2">
+                                                                {addOn.name}
+                                                            </span>
+                                                            <p className="text-sm font-bold text-gray-900">₱{Number(addOn.price).toLocaleString()} each</p>
+                                                        </div>
+                                                    </div>
+                                                    <div className="flex items-center justify-center gap-3 bg-white rounded-lg p-2">
+                                                        <button
+                                                            onClick={() => updateCheckoutAddOnQuantity(addOn.add_on, (checkoutAddOns[addOn.add_on] || 0) - 1)}
+                                                            className="w-10 h-10 rounded-lg bg-gray-200 hover:bg-gray-300 flex items-center justify-center transition-colors"
+                                                        >
+                                                            <Minus className="h-5 w-5 text-gray-700" />
+                                                        </button>
+                                                        <span className="w-12 text-center font-bold text-lg text-gray-900">
+                                                            {checkoutAddOns[addOn.add_on] || 0}
+                                                        </span>
+                                                        <button
+                                                            onClick={() => updateCheckoutAddOnQuantity(addOn.add_on, (checkoutAddOns[addOn.add_on] || 0) + 1)}
+                                                            className="w-10 h-10 rounded-lg bg-gradient-to-br from-yellow-400 to-orange-400 hover:from-yellow-500 hover:to-orange-500 flex items-center justify-center transition-all shadow-sm"
+                                                        >
+                                                            <Plus className="h-5 w-5 text-white" />
+                                                        </button>
                                                     </div>
                                                 </div>
-
-                                                {/* Add-ons for this item */}
-                                                <div>
-                                                    <h4 className="text-base font-bold text-gray-800 mb-4 flex items-center gap-2">
-                                                        <Tag className="w-4 h-4 text-yellow-600" />
-                                                        Available Add-ons
-                                                    </h4>
-                                                    {addOnOptions.length === 0 ? (
-                                                        <p className="text-gray-500 text-sm text-center py-4 bg-white rounded-xl">No add-ons available</p>
-                                                    ) : (
-                                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                                            {addOnOptions.map((addOn) => (
-                                                                <div key={addOn.add_on} className="bg-white rounded-xl p-4 shadow-sm hover:shadow-md transition-all border-2 border-transparent hover:border-yellow-400">
-                                                                    <div className="flex items-center justify-between mb-3">
-                                                                        <div className="flex-1 min-w-0 mr-3">
-                                                                            <div className="flex items-center gap-2 mb-1">
-                                                                                <span className="bg-gradient-to-r from-yellow-400 to-orange-400 text-white px-2 py-1 rounded-lg text-xs font-bold truncate">
-                                                                                    {addOn.name}
-                                                                                </span>
-                                                                            </div>
-                                                                            <p className="text-xs font-bold text-gray-900">₱{Number(addOn.price).toLocaleString()}</p>
-                                                                        </div>
-                                                                    </div>
-                                                                    <div className="flex items-center justify-center gap-2">
-                                                                        <button
-                                                                            onClick={() => updateCheckoutAddOnQuantity(
-                                                                                item.cart_item_id,
-                                                                                addOn.add_on,
-                                                                                ((checkoutAddOns[item.cart_item_id] || {})[addOn.add_on] || 0) - 1
-                                                                            )}
-                                                                            className="w-8 h-8 rounded-lg bg-gray-200 hover:bg-gray-300 flex items-center justify-center transition-colors"
-                                                                        >
-                                                                            <Minus className="h-4 w-4 text-gray-700" />
-                                                                        </button>
-                                                                        <span className="w-10 text-center font-bold text-base text-gray-900">
-                                                                            {(checkoutAddOns[item.cart_item_id] || {})[addOn.add_on] || 0}
-                                                                        </span>
-                                                                        <button
-                                                                            onClick={() => updateCheckoutAddOnQuantity(
-                                                                                item.cart_item_id,
-                                                                                addOn.add_on,
-                                                                                ((checkoutAddOns[item.cart_item_id] || {})[addOn.add_on] || 0) + 1
-                                                                            )}
-                                                                            className="w-8 h-8 rounded-lg bg-gradient-to-br from-yellow-400 to-orange-400 hover:from-yellow-500 hover:to-orange-500 flex items-center justify-center transition-all shadow-sm"
-                                                                        >
-                                                                            <Plus className="h-4 w-4 text-white" />
-                                                                        </button>
-                                                                    </div>
-                                                                </div>
-                                                            ))}
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            </div>
-                                        ))}
+                                            ))}
+                                        </div>
+                                    )}
                                 </div>
 
                                 {/* Total and Buttons */}
@@ -1415,7 +1390,10 @@ function RouteComponent() {
                                     <div className="bg-gradient-to-br from-yellow-50 to-orange-50 px-6 py-4 rounded-2xl border-2 border-yellow-400 w-full lg:w-auto">
                                         <div className="text-sm text-gray-600 mb-1">Grand Total</div>
                                         <div className="text-3xl font-bold bg-gradient-to-r from-yellow-600 to-orange-600 bg-clip-text text-transparent">
-                                            ₱{calculateCheckoutTotal().toLocaleString()}
+                                            ₱{(calculateCheckoutTotal() + Object.entries(checkoutAddOns).reduce((sum, [addOnId, qty]) => {
+                                                const addOn = addOnOptions.find(a => a.add_on === addOnId);
+                                                return sum + (addOn ? Number(addOn.price) * qty : 0);
+                                            }, 0)).toLocaleString()}
                                         </div>
                                     </div>
                                     <div className="flex gap-3 w-full lg:w-auto">

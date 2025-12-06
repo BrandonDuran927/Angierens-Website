@@ -30,6 +30,8 @@ function Signup() {
   const [isLoading, setIsLoading] = useState(false);
   const [currentStep, setCurrentStep] = useState(1);
   const { setUser, user } = useUser();
+  const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
+  const [isRequestingLocation, setIsRequestingLocation] = useState(false);
 
 
 
@@ -197,6 +199,71 @@ function Signup() {
         return <Bell className="h-5 w-5" />
     }
   }
+
+  const requestUserLocation = () => {
+    setIsRequestingLocation(true);
+
+    if (!navigator.geolocation) {
+      setValidationMessage({
+        type: 'error',
+        message: 'Geolocation is not supported by your browser. Please use a modern browser like Chrome, Firefox, or Safari.'
+      });
+      setIsRequestingLocation(false);
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        setUserLocation({
+          lat: position.coords.latitude,
+          lng: position.coords.longitude
+        });
+        setIsRequestingLocation(false);
+
+        if (errors.location) {
+          setErrors(prev => ({ ...prev, location: '' }));
+        }
+        if (validationMessage) {
+          setValidationMessage(null);
+        }
+
+        setValidationMessage({
+          type: 'success',
+          message: 'Location captured successfully!'
+        });
+
+        setTimeout(() => {
+          setValidationMessage(null);
+        }, 3000);
+      },
+      (error) => {
+        console.error('Error getting location:', error);
+        let errorMessage = '';
+
+        switch (error.code) {
+          case error.PERMISSION_DENIED:
+            errorMessage = 'Location access denied. Please enable location permissions in your browser settings and try again.';
+            break;
+          case error.POSITION_UNAVAILABLE:
+            errorMessage = 'Location information is unavailable. Please check your device settings and try again.';
+            break;
+          case error.TIMEOUT:
+            errorMessage = 'Location request timed out. Please try again.';
+            break;
+          default:
+            errorMessage = 'An error occurred while getting your location. Please try again.';
+        }
+
+        setValidationMessage({ type: 'error', message: errorMessage });
+        setIsRequestingLocation(false);
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 0
+      }
+    );
+  };
 
   useEffect(() => {
     async function checkUserAndRedirect() {
@@ -495,6 +562,10 @@ function Signup() {
       newErrors.address_line = 'Address must not exceed 255 characters';
     }
 
+    if (!userLocation) {
+      newErrors.location = 'Please provide your location by clicking "Capture My Location"';
+    }
+
     // Phone Number validation
     const cleanedPhone = form.phone_number.replace(/\s+/g, '');
     const phoneRegex = /^(09|\+639)\d{9}$/;
@@ -701,15 +772,18 @@ function Signup() {
 
       const userId = userData[0].user_uid
 
+      // FIX: Use form.province (the name) instead of form.provinceCode
       const { error: addressError } = await supabase.from("address").insert([
         {
           address_type: "Primary",
           address_line: sanitizedAddressLine,
-          region: form.provinceCode,
+          region: form.province,
           city: form.city,
           barangay: form.barangay,
           postal_code: sanitizedPostalCode,
           customer_id: userId,
+          latitude: userLocation!.lat,
+          longitude: userLocation!.lng
         },
       ])
 
@@ -734,7 +808,7 @@ function Signup() {
   };
 
   const isStep2Complete = () => {
-    return form.postalCode && form.provinceCode && form.cityCode && form.barangayCode && form.address_line && form.phone_number;
+    return form.postalCode && form.provinceCode && form.cityCode && form.barangayCode && form.address_line && form.phone_number && userLocation;
   };
 
 
@@ -1271,6 +1345,70 @@ function Signup() {
                     {errors.address_line && (
                       <p className="text-red-500 text-xs mt-1">{errors.address_line}</p>
                     )}
+                  </div>
+
+                  {/* Add this after the "Complete Address" field */}
+                  <div className="md:col-span-2">
+                    <div className="border-t pt-5">
+                      <h3 className="text-sm font-semibold text-gray-700 mb-3">
+                        Location Information <span className="text-red-500">*</span>
+                      </h3>
+                      <p className="text-xs text-gray-600 mb-3">
+                        We need your exact location to calculate accurate delivery fees and ensure smooth delivery service.
+                      </p>
+
+                      <button
+                        type="button"
+                        onClick={requestUserLocation}
+                        disabled={isRequestingLocation}
+                        className={`w-full md:w-auto px-6 py-3 rounded-lg font-semibold transition-all flex items-center justify-center gap-2 ${userLocation
+                          ? 'bg-green-100 text-green-700 border-2 border-green-500'
+                          : errors.location
+                            ? 'bg-red-50 text-red-700 border-2 border-red-500 hover:bg-red-100'
+                            : 'bg-amber-100 text-amber-700 border-2 border-amber-500 hover:bg-amber-200'
+                          } ${isRequestingLocation ? 'opacity-50 cursor-not-allowed' : ''}`}
+                      >
+                        {isRequestingLocation ? (
+                          <>
+                            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-amber-700"></div>
+                            Getting Location...
+                          </>
+                        ) : userLocation ? (
+                          <>
+                            <CheckCircle2 className="h-5 w-5" />
+                            Location Captured ✓
+                          </>
+                        ) : (
+                          <>
+                            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                            </svg>
+                            Capture My Location
+                          </>
+                        )}
+                      </button>
+
+                      {errors.location && (
+                        <p className="text-red-500 text-xs mt-2">{errors.location}</p>
+                      )}
+
+                      {userLocation && (
+                        <div className="mt-3 p-3 bg-green-50 border border-green-200 rounded-lg">
+                          <p className="text-xs text-green-700 font-medium mb-1">
+                            ✓ Location captured successfully
+                          </p>
+                        </div>
+                      )}
+
+                      {!userLocation && (
+                        <div className="mt-3 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                          <p className="text-xs text-amber-700">
+                            <strong>Tip:</strong> Make sure to allow location access when prompted by your browser. This helps us serve you better!
+                          </p>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
 

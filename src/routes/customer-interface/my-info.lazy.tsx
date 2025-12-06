@@ -1056,46 +1056,11 @@ function RouteComponent() {
                   <label className="block text-sm font-medium text-gray-600 mb-1">
                     EMAIL ADDRESS
                   </label>
-                  {editingFields.email ? (
-                    <div className="space-y-3">
-                      <input
-                        type="email"
-                        value={editableData.email}
-                        onChange={(e) => handleInputChange('email', e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent"
-                        placeholder="Enter email address"
-                      />
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => saveField('email')}
-                          className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md transition-colors flex items-center gap-2"
-                        >
-                          <Save className="h-4 w-4" />
-                          Save
-                        </button>
-                        <button
-                          onClick={() => cancelEditing('email')}
-                          className="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-md transition-colors flex items-center gap-2"
-                        >
-                          <X className="h-4 w-4" />
-                          Cancel
-                        </button>
-                      </div>
+                  <div className="flex items-center gap-2">
+                    <div className="flex-1 px-3 py-2 border border-gray-200 rounded-md bg-gray-100 text-gray-500 cursor-not-allowed">
+                      {editableData.email || '-'}
                     </div>
-                  ) : (
-                    <div className="flex items-center gap-2">
-                      <div className="flex-1 px-3 py-2 border border-gray-200 rounded-md bg-gray-100 text-gray-500 cursor-not-allowed">
-                        {editableData.email || '-'}
-                      </div>
-                      <button
-                        onClick={() => startEditing('email')}
-                        className="bg-[#964B00] hover:bg-[#7a3d00] text-yellow-400 p-2 rounded-md transition-colors"
-                        title="Edit Email Address"
-                      >
-                        <Edit className="h-4 w-4" />
-                      </button>
-                    </div>
-                  )}
+                  </div>
                 </div>
               </div>
 

@@ -327,16 +327,6 @@ function SpecificOrder() {
         icon: CreditCard,
         completed: true
       })
-    } else {
-      steps.push({
-
-        key: 'payment',
-        label: orderData.paymentConfirmedDate ? 'Payment Confirmed' : 'For Payment',
-        date: orderData.paymentConfirmedDate,
-        icon: CreditCard,
-        completed: orderData.status !== 'Pending'
-      })
-
     }
 
     // Third step - Dynamic based on order status
@@ -830,6 +820,18 @@ function SpecificOrder() {
                               </div>
                             )}
 
+                            {/* Refund Button under "Order Placed" for Pending status */}
+                            {step.key === 'placed' && orderData.status === 'Pending' && (
+                              <div className="mt-3 sm:mt-4">
+                                <button
+                                  onClick={handleRefundClick}
+                                  className="bg-red-500 hover:bg-red-600 text-white px-3 sm:px-4 py-1 text-xs sm:text-sm rounded-md font-medium transition-colors"
+                                >
+                                  Refund Order
+                                </button>
+                              </div>
+                            )}
+
                             {/* Refund Button under "Queuing" */}
                             {step.key === 'queuing' && orderData.status === 'Queueing' && (
                               <div className="mt-3 sm:mt-4">
@@ -1036,7 +1038,6 @@ function SpecificOrder() {
           )}
         </main>
 
-
         {/* REFUND MODAL */}
         {showRefundModal && orderData && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
@@ -1182,12 +1183,24 @@ function SpecificOrder() {
                         Enter the number:
                       </label>
                       <input
-                        type="text"
+                        type="tel"
                         value={gcashNumber}
-                        onChange={(e) => setGcashNumber(e.target.value)}
-                        placeholder="+63 ...."
+                        onChange={(e) => {
+                          const value = e.target.value.replace(/\D/g, '');
+                          if (value.length <= 11) {
+                            setGcashNumber(value);
+                          }
+                        }}
+                        placeholder="09XXXXXXXXX"
+                        maxLength={11}
                         className="w-full bg-white border-2 border-gray-300 rounded-lg px-4 py-3 text-lg focus:outline-none focus:border-yellow-600"
                       />
+                      {gcashNumber && !gcashNumber.startsWith('09') && (
+                        <p className="text-red-600 text-sm mt-1">Must start with 09</p>
+                      )}
+                      {gcashNumber && gcashNumber.length > 0 && gcashNumber.length < 11 && (
+                        <p className="text-red-600 text-sm mt-1">Must be 11 digits</p>
+                      )}
                     </div>
 
                     <div>
@@ -1195,12 +1208,21 @@ function SpecificOrder() {
                         Re-enter the number:
                       </label>
                       <input
-                        type="text"
+                        type="tel"
                         value={confirmGcashNumber}
-                        onChange={(e) => setConfirmGcashNumber(e.target.value)}
-                        placeholder="+63 ...."
+                        onChange={(e) => {
+                          const value = e.target.value.replace(/\D/g, '');
+                          if (value.length <= 11) {
+                            setConfirmGcashNumber(value);
+                          }
+                        }}
+                        placeholder="09XXXXXXXXX"
+                        maxLength={11}
                         className="w-full bg-white border-2 border-gray-300 rounded-lg px-4 py-3 text-lg focus:outline-none focus:border-yellow-600"
                       />
+                      {confirmGcashNumber && gcashNumber !== confirmGcashNumber && (
+                        <p className="text-red-600 text-sm mt-1">Numbers do not match</p>
+                      )}
                     </div>
                   </div>
 
@@ -1213,7 +1235,13 @@ function SpecificOrder() {
                     </button>
                     <button
                       onClick={handleGcashSubmit}
-                      disabled={!gcashNumber || !confirmGcashNumber || gcashNumber !== confirmGcashNumber}
+                      disabled={
+                        !gcashNumber ||
+                        !confirmGcashNumber ||
+                        gcashNumber !== confirmGcashNumber ||
+                        gcashNumber.length !== 11 ||
+                        !gcashNumber.startsWith('09')
+                      }
                       className="flex-1 bg-green-500 hover:bg-green-600 disabled:bg-green-300 text-white font-medium py-3 px-6 rounded-full transition-colors"
                     >
                       Confirm
