@@ -70,6 +70,9 @@ function RouteComponent() {
     const location = useLocation()
     const navigate = useNavigate();
     const [searchQuery, setSearchQuery] = useState('')
+    const [imageFile, setImageFile] = useState<File | null>(null)
+    const [imagePreview, setImagePreview] = useState<string | null>(null)
+    const [uploadingImage, setUploadingImage] = useState(false)
 
     const { user, signOut } = useUser()
 
@@ -125,6 +128,48 @@ function RouteComponent() {
 
     const notificationCount = 1
 
+
+
+    const [menuItems, setMenuItems] = useState<MenuItem[]>([])
+    const [addons, setAddons] = useState<AddOn[]>([])
+    const [loading, setLoading] = useState(true)
+    const [error, setError] = useState<string | null>(null)
+
+    const [showMenuDetails, setShowMenuDetails] = useState(false)
+    const [selectedMenuItem, setSelectedMenuItem] = useState<MenuItem | null>(null)
+    const [isEditMode, setIsEditMode] = useState(false)
+    const [isAddMode, setIsAddMode] = useState(false)
+
+    const [showAddonsModal, setShowAddonsModal] = useState(false)
+    const [selectedAddon, setSelectedAddon] = useState<AddOn | null>(null)
+    const [isEditAddonMode, setIsEditAddonMode] = useState(false)
+    const [isAddAddonMode, setIsAddAddonMode] = useState(false)
+
+    // Form states for menu items
+    const [formData, setFormData] = useState({
+        name: '',
+        description: '',
+        price: '',
+        category: '',
+        size: '',
+        inclusion: '',
+        is_available: true
+    })
+
+    // Form states for add-ons
+    const [addonFormData, setAddonFormData] = useState({
+        name: '',
+        price: ''
+    })
+
+    const [inclusionInput, setInclusionInput] = useState('')
+    const [inclusionsList, setInclusionsList] = useState<string[]>([])
+
+    const [processingAction, setProcessingAction] = useState(false)
+    const [formErrors, setFormErrors] = useState<{ [key: string]: string }>({})
+    const [addonFormErrors, setAddonFormErrors] = useState<{ [key: string]: string }>({})
+
+
     const [notifications, setNotifications] = useState<Notification[]>([
         {
             id: '1',
@@ -167,44 +212,118 @@ function RouteComponent() {
             read: false
         }
     ])
+    const markAllAsRead = () => {
+        setNotifications(prev => prev.map(notif => ({ ...notif, read: true })))
+    }
 
-    const [menuItems, setMenuItems] = useState<MenuItem[]>([])
-    const [addons, setAddons] = useState<AddOn[]>([])
-    const [loading, setLoading] = useState(true)
-    const [error, setError] = useState<string | null>(null)
+    const getImageUrl = (imageUrl: string | null): string => {
+        if (!imageUrl) return '/api/placeholder/300/200'
 
-    const [showMenuDetails, setShowMenuDetails] = useState(false)
-    const [selectedMenuItem, setSelectedMenuItem] = useState<MenuItem | null>(null)
-    const [isEditMode, setIsEditMode] = useState(false)
-    const [isAddMode, setIsAddMode] = useState(false)
+        // If it's already a full URL, return it
+        if (imageUrl.startsWith('http://') || imageUrl.startsWith('https://')) {
+            return imageUrl
+        }
 
-    const [showAddonsModal, setShowAddonsModal] = useState(false)
-    const [selectedAddon, setSelectedAddon] = useState<AddOn | null>(null)
-    const [isEditAddonMode, setIsEditAddonMode] = useState(false)
-    const [isAddAddonMode, setIsAddAddonMode] = useState(false)
+        // Construct the Supabase storage URL
+        // Encode the filename to handle spaces and special characters
+        const encodedFileName = encodeURIComponent(imageUrl)
+        return `https://tvuawpgcpmqhsmwbwypy.supabase.co/storage/v1/object/public/menu-images/${encodedFileName}`
+    }
 
-    // Form states for menu items
-    const [formData, setFormData] = useState({
-        name: '',
-        description: '',
-        price: '',
-        category: '',
-        size: '',
-        inclusion: '',
-        is_available: true
-    })
+    const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0]
+        if (file) {
+            // Validate file type
+            if (!file.type.startsWith('image/')) {
+                alert('Please select an image file (PNG, JPG, JPEG, GIF, or WebP)')
+                e.target.value = ''
+                return
+            }
 
-    // Form states for add-ons
-    const [addonFormData, setAddonFormData] = useState({
-        name: '',
-        price: '',
-        quantity: ''
-    })
+            // Validate file size (max 5MB)
+            const maxSize = 5 * 1024 * 1024 // 5MB in bytes
+            if (file.size > maxSize) {
+                alert('Image size must not exceed 5MB. Please choose a smaller image.')
+                e.target.value = ''
+                return
+            }
 
-    const [inclusionInput, setInclusionInput] = useState('')
-    const [inclusionsList, setInclusionsList] = useState<string[]>([])
+            // Validate image dimensions
+            const img = new Image()
+            const objectUrl = URL.createObjectURL(file)
 
-    const [processingAction, setProcessingAction] = useState(false)
+            img.onload = () => {
+                URL.revokeObjectURL(objectUrl)
+
+                // Optional: Check minimum dimensions
+                if (img.width < 200 || img.height < 200) {
+                    alert('Image dimensions must be at least 200x200 pixels')
+                    e.target.value = ''
+                    return
+                }
+
+                // Optional: Check maximum dimensions
+                if (img.width > 4000 || img.height > 4000) {
+                    alert('Image dimensions must not exceed 4000x4000 pixels')
+                    e.target.value = ''
+                    return
+                }
+
+                // If all validations pass, set the file
+                setImageFile(file)
+                const reader = new FileReader()
+                reader.onloadend = () => {
+                    setImagePreview(reader.result as string)
+                }
+                reader.readAsDataURL(file)
+            }
+
+            img.onerror = () => {
+                URL.revokeObjectURL(objectUrl)
+                alert('Failed to load image. Please select a valid image file.')
+                e.target.value = ''
+            }
+
+            img.src = objectUrl
+        }
+    }
+
+    const uploadImage = async (menuName: string): Promise<string | null> => {
+        if (!imageFile) return null
+
+        try {
+            setUploadingImage(true)
+
+            // Get the file extension from the uploaded file
+            const fileExtension = imageFile.name.split('.').pop()?.toLowerCase() || 'png'
+
+            // Create filename: menu name + original extension
+            const fileName = `${menuName.toLowerCase().replace(/\s+/g, '-')}.${fileExtension}`
+
+            // Upload to Supabase Storage
+            const { error } = await supabase.storage
+                .from('menu-images')
+                .upload(fileName, imageFile, {
+                    cacheControl: '3600',
+                    upsert: true // Replace if exists
+                })
+
+            if (error) {
+                console.error('Supabase upload error:', error)
+                throw error
+            }
+
+            // Return just the filename, not the full URL
+            // We'll construct the full URL when displaying using getImageUrl
+            return fileName
+        } catch (err: any) {
+            console.error('Error uploading image:', err)
+            alert(`Failed to upload image: ${err.message || 'Unknown error'}`)
+            return null
+        } finally {
+            setUploadingImage(false)
+        }
+    }
 
     useEffect(() => {
         fetchMenuItems()
@@ -236,6 +355,7 @@ function RouteComponent() {
             const { data, error } = await supabase
                 .from('add_on')
                 .select('*')
+                .order('name', { ascending: true })
 
             if (error) throw error
 
@@ -243,10 +363,6 @@ function RouteComponent() {
         } catch (err) {
             console.error('Error fetching add-ons:', err)
         }
-    }
-
-    const markAllAsRead = () => {
-        setNotifications(prev => prev.map(notif => ({ ...notif, read: true })))
     }
 
     const getNotificationIcon = (iconType: string) => {
@@ -274,6 +390,10 @@ function RouteComponent() {
             is_available: item.is_available
         })
         setInclusionsList(parseInclusions(item.inclusion))
+        // Update this line to use getImageUrl
+        setImagePreview(item.image_url ? getImageUrl(item.image_url) : null)
+        setImageFile(null)
+        setFormErrors({})
         setIsEditMode(false)
         setShowMenuDetails(true)
     }
@@ -288,6 +408,7 @@ function RouteComponent() {
 
     const openAddMenuItem = () => {
         resetForm()
+        setFormErrors({})
         setIsAddMode(true)
         setShowMenuDetails(true)
     }
@@ -304,6 +425,8 @@ function RouteComponent() {
         })
         setInclusionsList([])
         setInclusionInput('')
+        setImageFile(null)
+        setImagePreview(null)
     }
 
     const handleAddInclusion = () => {
@@ -317,18 +440,112 @@ function RouteComponent() {
         setInclusionsList(inclusionsList.filter((_, i) => i !== index))
     }
 
+    const validateMenuItemForm = (): boolean => {
+        const errors: { [key: string]: string } = {}
+
+        // Name validation
+        if (!formData.name.trim()) {
+            errors.name = 'Food name is required'
+        } else if (formData.name.trim().length < 2) {
+            errors.name = 'Food name must be at least 2 characters'
+        } else if (formData.name.trim().length > 100) {
+            errors.name = 'Food name must not exceed 100 characters'
+        }
+
+        // Description validation
+        if (!formData.description.trim()) {
+            errors.description = 'Description is required'
+        } else if (formData.description.trim().length < 10) {
+            errors.description = 'Description must be at least 10 characters'
+        } else if (formData.description.trim().length > 500) {
+            errors.description = 'Description must not exceed 500 characters'
+        }
+
+        // Price validation
+        if (!formData.price) {
+            errors.price = 'Price is required'
+        } else {
+            const priceValue = parseFloat(formData.price)
+            if (isNaN(priceValue) || priceValue <= 0) {
+                errors.price = 'Price must be a positive number'
+            } else if (priceValue > 100000) {
+                errors.price = 'Price must not exceed ₱100,000'
+            }
+        }
+
+        // Category validation
+        if (formData.category && formData.category.trim().length > 50) {
+            errors.category = 'Category must not exceed 50 characters'
+        }
+
+        // Size validation
+        if (formData.size && formData.size.trim().length > 50) {
+            errors.size = 'Size must not exceed 50 characters'
+        }
+
+        setFormErrors(errors)
+        return Object.keys(errors).length === 0
+    }
+
     const handleSaveMenuItem = async () => {
+        // Validate form
+        if (!validateMenuItemForm()) {
+            alert('Please fix the errors in the form before saving.')
+            return
+        }
+
         try {
             setProcessingAction(true)
 
+            // Sanitize data
+            const sanitizedName = formData.name.trim()
+            const sanitizedDescription = formData.description.trim()
+            const sanitizedCategory = formData.category?.trim() || null
+            const sanitizedSize = formData.size?.trim() || null
+
+            // Check for duplicate name (case-insensitive) when adding or editing
+            const { data: existingItems, error: checkError } = await supabase
+                .from('menu')
+                .select('menu_id, name')
+                .ilike('name', sanitizedName)
+
+            if (checkError) throw checkError
+
+            // If adding mode, any duplicate is an error
+            if (isAddMode && existingItems && existingItems.length > 0) {
+                alert(`A menu item with the name "${sanitizedName}" already exists. Please use a different name.`)
+                setProcessingAction(false)
+                return
+            }
+
+            // If editing mode, check if duplicate is different item
+            if (isEditMode && selectedMenuItem && existingItems) {
+                const duplicates = existingItems.filter(item => item.menu_id !== selectedMenuItem.menu_id)
+                if (duplicates.length > 0) {
+                    alert(`A menu item with the name "${sanitizedName}" already exists. Please use a different name.`)
+                    setProcessingAction(false)
+                    return
+                }
+            }
+
+            // Upload image if there's a new one
+            let imageUrl = selectedMenuItem?.image_url || null
+            if (imageFile) {
+                const uploadedUrl = await uploadImage(sanitizedName)
+                if (uploadedUrl) {
+                    imageUrl = uploadedUrl
+                }
+            }
+
             const menuData = {
-                name: formData.name,
-                description: formData.description,
+                name: sanitizedName,
+                description: sanitizedDescription,
                 price: formData.price,
-                category: formData.category || null,
-                size: formData.size || null,
+                category: sanitizedCategory,
+                size: sanitizedSize,
                 inclusion: inclusionsList.length > 0 ? JSON.stringify(inclusionsList) : null,
-                is_available: formData.is_available
+                is_available: formData.is_available,
+                image_url: imageUrl
             }
 
             if (isAddMode) {
@@ -350,9 +567,9 @@ function RouteComponent() {
 
             await fetchMenuItems()
             closeMenuDetails()
-        } catch (err) {
+        } catch (err: any) {
             console.error('Error saving menu item:', err)
-            alert('Failed to save menu item')
+            alert(`Failed to save menu item: ${err.message || 'Unknown error'}`)
         } finally {
             setProcessingAction(false)
         }
@@ -398,12 +615,12 @@ function RouteComponent() {
         setAddonFormData({
             name: '',
             price: '',
-            quantity: ''
         })
     }
 
     const openAddAddon = () => {
         resetAddonForm()
+        setAddonFormErrors({})
         setIsAddAddonMode(true)
     }
 
@@ -411,20 +628,80 @@ function RouteComponent() {
         setSelectedAddon(addon)
         setAddonFormData({
             name: addon.name,
-            price: addon.price.toString(),
-            quantity: addon.quantity?.toString() || ''
+            price: addon.price.toString()
         })
+        setAddonFormErrors({})
         setIsEditAddonMode(true)
     }
 
+    const validateAddonForm = (): boolean => {
+        const errors: { [key: string]: string } = {}
+
+        // Name validation
+        if (!addonFormData.name.trim()) {
+            errors.name = 'Add-on name is required'
+        } else if (addonFormData.name.trim().length < 2) {
+            errors.name = 'Add-on name must be at least 2 characters'
+        } else if (addonFormData.name.trim().length > 100) {
+            errors.name = 'Add-on name must not exceed 100 characters'
+        }
+
+        // Price validation
+        if (!addonFormData.price) {
+            errors.price = 'Price is required'
+        } else {
+            const priceValue = parseFloat(addonFormData.price)
+            if (isNaN(priceValue) || priceValue < 0) {
+                errors.price = 'Price must be a non-negative number'
+            } else if (priceValue > 10000) {
+                errors.price = 'Price must not exceed ₱10,000'
+            }
+        }
+
+        setAddonFormErrors(errors)
+        return Object.keys(errors).length === 0
+    }
+
     const handleSaveAddon = async () => {
+        // Validate form
+        if (!validateAddonForm()) {
+            alert('Please fix the errors in the form before saving.')
+            return
+        }
+
         try {
             setProcessingAction(true)
 
+            const sanitizedName = addonFormData.name.trim()
+
+            // Check for duplicate name (case-insensitive)
+            const { data: existingAddons, error: checkError } = await supabase
+                .from('add_on')
+                .select('add_on, name')
+                .ilike('name', sanitizedName)
+
+            if (checkError) throw checkError
+
+            // If adding mode, any duplicate is an error
+            if (isAddAddonMode && existingAddons && existingAddons.length > 0) {
+                alert(`An add-on with the name "${sanitizedName}" already exists. Please use a different name.`)
+                setProcessingAction(false)
+                return
+            }
+
+            // If editing mode, check if duplicate is different add-on
+            if (isEditAddonMode && selectedAddon && existingAddons) {
+                const duplicates = existingAddons.filter(addon => addon.add_on !== selectedAddon.add_on)
+                if (duplicates.length > 0) {
+                    alert(`An add-on with the name "${sanitizedName}" already exists. Please use a different name.`)
+                    setProcessingAction(false)
+                    return
+                }
+            }
+
             const addonData = {
-                name: addonFormData.name,
+                name: sanitizedName,
                 price: parseFloat(addonFormData.price),
-                // quantity: addonFormData.quantity ? parseInt(addonFormData.quantity) : null
             }
 
             if (isAddAddonMode) {
@@ -449,9 +726,9 @@ function RouteComponent() {
             setIsEditAddonMode(false)
             setSelectedAddon(null)
             resetAddonForm()
-        } catch (err) {
+        } catch (err: any) {
             console.error('Error saving add-on:', err)
-            alert('Failed to save add-on')
+            alert(`Failed to save add-on: ${err.message || 'Unknown error'}`)
         } finally {
             setProcessingAction(false)
         }
@@ -733,6 +1010,9 @@ function RouteComponent() {
                                             <th className="px-6 py-4 text-center text-sm font-bold text-yellow-400 uppercase tracking-wider w-[20%]">
                                                 Actions
                                             </th>
+                                            <th className="px-6 py-4 text-left text-sm font-bold text-yellow-400 uppercase tracking-wider w-[10%]">
+                                                Image
+                                            </th>
                                         </tr>
                                     </thead>
                                     {loading ? (
@@ -827,6 +1107,19 @@ function RouteComponent() {
                                                             </button>
                                                         </div>
                                                     </td>
+
+                                                    <td className="px-6 py-4 whitespace-nowrap">
+                                                        <div className="w-16 h-16 rounded-lg overflow-hidden border border-gray-200 bg-gray-50">
+                                                            <img
+                                                                src={getImageUrl(item.image_url)}
+                                                                alt={item.name}
+                                                                className="w-full h-full object-cover"
+                                                                onError={(e) => {
+                                                                    e.currentTarget.src = '/api/placeholder/300/200'
+                                                                }}
+                                                            />
+                                                        </div>
+                                                    </td>
                                                 </tr>
                                             ))}
                                         </tbody>
@@ -854,13 +1147,19 @@ function RouteComponent() {
                                 <div>
                                     <label className="block text-sm font-semibold text-gray-700 mb-2">Food Name:</label>
                                     {isEditMode || isAddMode ? (
-                                        <input
-                                            type="text"
-                                            value={formData.name}
-                                            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                                            className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-amber-500 transition-all"
-                                            placeholder="Enter food name"
-                                        />
+                                        <>
+                                            <input
+                                                type="text"
+                                                value={formData.name}
+                                                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                                                className={`w-full px-4 py-3 border-2 rounded-lg focus:outline-none focus:border-amber-500 transition-all ${formErrors.name ? 'border-red-500 bg-red-50' : 'border-gray-300'
+                                                    }`}
+                                                placeholder="Enter food name"
+                                            />
+                                            {formErrors.name && (
+                                                <p className="mt-1 text-sm text-red-600">{formErrors.name}</p>
+                                            )}
+                                        </>
                                     ) : (
                                         <div className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg text-gray-800 font-semibold">
                                             {selectedMenuItem?.name}
@@ -872,13 +1171,19 @@ function RouteComponent() {
                                 <div>
                                     <label className="block text-sm font-semibold text-gray-700 mb-2">Description:</label>
                                     {isEditMode || isAddMode ? (
-                                        <textarea
-                                            value={formData.description}
-                                            onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                                            className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-amber-500 transition-all"
-                                            rows={3}
-                                            placeholder="Enter description"
-                                        />
+                                        <>
+                                            <textarea
+                                                value={formData.description}
+                                                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                                                className={`w-full px-4 py-3 border-2 rounded-lg focus:outline-none focus:border-amber-500 transition-all ${formErrors.description ? 'border-red-500 bg-red-50' : 'border-gray-300'
+                                                    }`}
+                                                rows={3}
+                                                placeholder="Enter description"
+                                            />
+                                            {formErrors.description && (
+                                                <p className="mt-1 text-sm text-red-600">{formErrors.description}</p>
+                                            )}
+                                        </>
                                     ) : (
                                         <div className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg text-gray-800">
                                             {selectedMenuItem?.description || '-'}
@@ -890,14 +1195,20 @@ function RouteComponent() {
                                 <div>
                                     <label className="block text-sm font-semibold text-gray-700 mb-2">Price:</label>
                                     {isEditMode || isAddMode ? (
-                                        <input
-                                            type="number"
-                                            step="0.01"
-                                            value={formData.price}
-                                            onChange={(e) => setFormData({ ...formData, price: e.target.value })}
-                                            className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-amber-500 transition-all"
-                                            placeholder="0.00"
-                                        />
+                                        <>
+                                            <input
+                                                type="number"
+                                                step="0.01"
+                                                value={formData.price}
+                                                onChange={(e) => setFormData({ ...formData, price: e.target.value })}
+                                                className={`w-full px-4 py-3 border-2 rounded-lg focus:outline-none focus:border-amber-500 transition-all ${formErrors.price ? 'border-red-500 bg-red-50' : 'border-gray-300'
+                                                    }`}
+                                                placeholder="0.00"
+                                            />
+                                            {formErrors.price && (
+                                                <p className="mt-1 text-sm text-red-600">{formErrors.price}</p>
+                                            )}
+                                        </>
                                     ) : (
                                         <div className="w-full px-4 py-3 bg-amber-50 border border-amber-200 rounded-lg text-amber-800 font-bold text-xl">
                                             ₱{selectedMenuItem?.price}
@@ -910,13 +1221,19 @@ function RouteComponent() {
                                     <div>
                                         <label className="block text-sm font-semibold text-gray-700 mb-2">Category:</label>
                                         {isEditMode || isAddMode ? (
-                                            < input
-                                                type="text"
-                                                value={formData.category}
-                                                onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                                                className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-amber-500 transition-all"
-                                                placeholder="Category"
-                                            />
+                                            <>
+                                                <input
+                                                    type="text"
+                                                    value={formData.category}
+                                                    onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                                                    className={`w-full px-4 py-3 border-2 rounded-lg focus:outline-none focus:border-amber-500 transition-all ${formErrors.category ? 'border-red-500 bg-red-50' : 'border-gray-300'
+                                                        }`}
+                                                    placeholder="Category"
+                                                />
+                                                {formErrors.category && (
+                                                    <p className="mt-1 text-sm text-red-600">{formErrors.category}</p>
+                                                )}
+                                            </>
                                         ) : (
                                             <div className="w-full px-4 py-3 bg-amber-50 border border-amber-200 rounded-lg text-amber-800">
                                                 {selectedMenuItem?.category || '-'}
@@ -926,13 +1243,19 @@ function RouteComponent() {
                                     <div>
                                         <label className="block text-sm font-semibold text-gray-700 mb-2">Size:</label>
                                         {isEditMode || isAddMode ? (
-                                            <input
-                                                type="text"
-                                                value={formData.size}
-                                                onChange={(e) => setFormData({ ...formData, size: e.target.value })}
-                                                className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-amber-500 transition-all"
-                                                placeholder="Size"
-                                            />
+                                            <>
+                                                <input
+                                                    type="text"
+                                                    value={formData.size}
+                                                    onChange={(e) => setFormData({ ...formData, size: e.target.value })}
+                                                    className={`w-full px-4 py-3 border-2 rounded-lg focus:outline-none focus:border-amber-500 transition-all ${formErrors.size ? 'border-red-500 bg-red-50' : 'border-gray-300'
+                                                        }`}
+                                                    placeholder="S, M, L"
+                                                />
+                                                {formErrors.size && (
+                                                    <p className="mt-1 text-sm text-red-600">{formErrors.size}</p>
+                                                )}
+                                            </>
                                         ) : (
                                             <div className="w-full px-4 py-3 bg-blue-50 border border-blue-200 rounded-lg text-blue-800">
                                                 {selectedMenuItem?.size || '-'}
@@ -947,38 +1270,79 @@ function RouteComponent() {
                                     <label className="block text-sm font-semibold text-gray-700 mb-2">Inclusions:</label>
                                     {isEditMode || isAddMode ? (
                                         <div className="space-y-3">
-                                            <div className="flex gap-2">
-                                                <input
-                                                    type="text"
-                                                    value={inclusionInput}
-                                                    onChange={(e) => setInclusionInput(e.target.value)}
-                                                    onKeyPress={(e) => e.key === 'Enter' && handleAddInclusion()}
-                                                    className="flex-1 px-4 py-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-amber-500 transition-all"
-                                                    placeholder="Type inclusion and press Enter or click Add"
-                                                />
-                                                <button
-                                                    onClick={handleAddInclusion}
-                                                    className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg font-medium transition-colors"
+                                            {/* Add-on Dropdown Selection */}
+                                            <div>
+                                                <label className="block text-xs font-medium text-gray-600 mb-1">Select from Add-ons:</label>
+                                                <select
+                                                    value=""
+                                                    onChange={(e) => {
+                                                        const selectedAddonId = e.target.value
+                                                        const selectedAddon = addons.find(a => a.add_on === selectedAddonId)
+                                                        if (selectedAddon && !inclusionsList.includes(selectedAddon.name)) {
+                                                            setInclusionsList([...inclusionsList, selectedAddon.name])
+                                                        }
+                                                    }}
+                                                    className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-amber-500 transition-all"
                                                 >
-                                                    <Plus className="h-5 w-5" />
-                                                </button>
-                                            </div>
-                                            {inclusionsList.length > 0 && (
-                                                <div className="flex flex-wrap gap-2">
-                                                    {inclusionsList.map((inclusion, idx) => (
-                                                        <span
-                                                            key={idx}
-                                                            className="inline-flex items-center gap-2 bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm font-medium"
-                                                        >
-                                                            {inclusion}
-                                                            <button
-                                                                onClick={() => handleRemoveInclusion(idx)}
-                                                                className="hover:text-red-600 transition-colors"
-                                                            >
-                                                                <X className="h-4 w-4" />
-                                                            </button>
-                                                        </span>
+                                                    <option value="">Choose an add-on...</option>
+                                                    {addons.map((addon) => (
+                                                        <option key={addon.add_on} value={addon.add_on}>
+                                                            {addon.name} (₱{Number(addon.price).toFixed(2)})
+                                                        </option>
                                                     ))}
+                                                </select>
+                                            </div>
+
+                                            {/* Manual Custom Input */}
+                                            <div>
+                                                <label className="block text-xs font-medium text-gray-600 mb-1">Or add custom inclusion:</label>
+                                                <div className="flex gap-2">
+                                                    <input
+                                                        type="text"
+                                                        value={inclusionInput}
+                                                        onChange={(e) => setInclusionInput(e.target.value)}
+                                                        onKeyPress={(e) => e.key === 'Enter' && handleAddInclusion()}
+                                                        className="flex-1 px-4 py-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-amber-500 transition-all"
+                                                        placeholder="Type custom inclusion..."
+                                                    />
+                                                    <button
+                                                        onClick={handleAddInclusion}
+                                                        className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-1"
+                                                    >
+                                                        <Plus className="h-5 w-5" />
+                                                        Add
+                                                    </button>
+                                                </div>
+                                            </div>
+
+                                            {/* Selected Inclusions List */}
+                                            {inclusionsList.length > 0 && (
+                                                <div>
+                                                    <label className="block text-xs font-medium text-gray-600 mb-2">Selected inclusions:</label>
+                                                    <div className="flex flex-wrap gap-2">
+                                                        {inclusionsList.map((inclusion, idx) => {
+                                                            const addon = addons.find(a => a.name === inclusion)
+                                                            return (
+                                                                <span
+                                                                    key={idx}
+                                                                    className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-sm font-medium ${addon
+                                                                        ? 'bg-blue-100 text-blue-800'
+                                                                        : 'bg-green-100 text-green-800'
+                                                                        }`}
+                                                                >
+                                                                    {inclusion}
+                                                                    {addon && `(₱${Number(addon.price).toFixed(2)})`}
+                                                                    {!addon && ' (Custom)'}
+                                                                    <button
+                                                                        onClick={() => handleRemoveInclusion(idx)}
+                                                                        className="hover:text-red-600 transition-colors"
+                                                                    >
+                                                                        <X className="h-4 w-4" />
+                                                                    </button>
+                                                                </span>
+                                                            )
+                                                        })}
+                                                    </div>
                                                 </div>
                                             )}
                                         </div>
@@ -986,14 +1350,22 @@ function RouteComponent() {
                                         <>
                                             {selectedMenuItem?.inclusion ? (
                                                 <div className="flex flex-wrap gap-2">
-                                                    {parseInclusions(selectedMenuItem.inclusion).map((inclusion, idx) => (
-                                                        <span
-                                                            key={idx}
-                                                            className="inline-flex items-center bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm font-medium"
-                                                        >
-                                                            {inclusion}
-                                                        </span>
-                                                    ))}
+                                                    {parseInclusions(selectedMenuItem.inclusion).map((inclusion, idx) => {
+                                                        const addon = addons.find(a => a.name === inclusion)
+                                                        return (
+                                                            <span
+                                                                key={idx}
+                                                                className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${addon
+                                                                    ? 'bg-blue-100 text-blue-800'
+                                                                    : 'bg-green-100 text-green-800'
+                                                                    }`}
+                                                            >
+                                                                {inclusion}
+                                                                {addon && `(₱${Number(addon.price).toFixed(2)})`}
+                                                                {!addon && ' (Custom)'}
+                                                            </span>
+                                                        )
+                                                    })}
                                                 </div>
                                             ) : (
                                                 <div className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg text-gray-400">
@@ -1038,16 +1410,65 @@ function RouteComponent() {
                                     )}
                                 </div>
 
+                                {/* Image Upload */}
+                                <div>
+                                    <label className="block text-sm font-semibold text-gray-700 mb-2">Menu Image:</label>
+                                    {isEditMode || isAddMode ? (
+                                        <div className="space-y-3">
+                                            <input
+                                                type="file"
+                                                accept="image/*"
+                                                onChange={handleImageChange}
+                                                className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-amber-500 transition-all file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-amber-50 file:text-amber-700 hover:file:bg-amber-100"
+                                            />
+                                            {imagePreview && (
+                                                <div className="relative w-full h-48 bg-gray-100 rounded-lg overflow-hidden border-2 border-gray-200">
+                                                    <img
+                                                        src={imagePreview}
+                                                        alt="Preview"
+                                                        className="w-full h-full object-cover"
+                                                        onError={(e) => {
+                                                            e.currentTarget.src = '/api/placeholder/300/200'
+                                                        }}
+                                                    />
+                                                </div>
+                                            )}
+                                            <p className="text-xs text-gray-500">
+                                                Image will be saved as: {formData.name ? `${formData.name.toLowerCase().replace(/\s+/g, '-')}.png` : 'menu-name.png'}
+                                            </p>
+                                        </div>
+                                    ) : (
+                                        <>
+                                            {selectedMenuItem?.image_url ? (
+                                                <div className="w-full h-48 bg-gray-100 rounded-lg overflow-hidden border-2 border-gray-200">
+                                                    <img
+                                                        src={getImageUrl(selectedMenuItem.image_url)}
+                                                        alt={selectedMenuItem.name}
+                                                        className="w-full h-full object-cover"
+                                                        onError={(e) => {
+                                                            e.currentTarget.src = '/api/placeholder/300/200'
+                                                        }}
+                                                    />
+                                                </div>
+                                            ) : (
+                                                <div className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg text-gray-400 text-center">
+                                                    No image uploaded
+                                                </div>
+                                            )}
+                                        </>
+                                    )}
+                                </div>
+
                                 {/* Action Buttons */}
                                 <div className="pt-4 space-y-3">
                                     {isEditMode || isAddMode ? (
                                         <>
                                             <button
                                                 onClick={handleSaveMenuItem}
-                                                disabled={processingAction}
+                                                disabled={processingAction || uploadingImage}
                                                 className="w-full bg-green-500 hover:bg-green-600 text-white font-semibold py-3 rounded-lg transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
                                             >
-                                                {processingAction ? 'Saving...' : isAddMode ? 'Add Menu Item' : 'Save Changes'}
+                                                {uploadingImage ? 'Uploading Image...' : processingAction ? 'Saving...' : isAddMode ? 'Add Menu Item' : 'Save Changes'}
                                             </button>
                                             <button
                                                 onClick={() => {
@@ -1139,9 +1560,13 @@ function RouteComponent() {
                                                     type="text"
                                                     value={addonFormData.name}
                                                     onChange={(e) => setAddonFormData({ ...addonFormData, name: e.target.value })}
-                                                    className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-amber-500 transition-all"
+                                                    className={`w-full px-4 py-3 border-2 rounded-lg focus:outline-none focus:border-amber-500 transition-all ${addonFormErrors.name ? 'border-red-500 bg-red-50' : 'border-gray-300'
+                                                        }`}
                                                     placeholder="Enter add-on name"
                                                 />
+                                                {addonFormErrors.name && (
+                                                    <p className="mt-1 text-sm text-red-600">{addonFormErrors.name}</p>
+                                                )}
                                             </div>
                                             <div>
                                                 <label className="block text-sm font-semibold text-gray-700 mb-2">Price:</label>
@@ -1150,9 +1575,13 @@ function RouteComponent() {
                                                     step="0.01"
                                                     value={addonFormData.price}
                                                     onChange={(e) => setAddonFormData({ ...addonFormData, price: e.target.value })}
-                                                    className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-amber-500 transition-all"
+                                                    className={`w-full px-4 py-3 border-2 rounded-lg focus:outline-none focus:border-amber-500 transition-all ${addonFormErrors.price ? 'border-red-500 bg-red-50' : 'border-gray-300'
+                                                        }`}
                                                     placeholder="0.00"
                                                 />
+                                                {addonFormErrors.price && (
+                                                    <p className="mt-1 text-sm text-red-600">{addonFormErrors.price}</p>
+                                                )}
                                             </div>
                                             {/* <div>
                                             <label className="block text-sm font-semibold text-gray-700 mb-2">Quantity (optional):</label>
@@ -1206,12 +1635,11 @@ function RouteComponent() {
                                                     <th className="px-6 py-4 text-left text-sm font-bold text-yellow-400 uppercase tracking-wider w-[20%]">
                                                         Price
                                                     </th>
-                                                    <th className="px-6 py-4 text-center text-sm font-bold text-yellow-400 uppercase tracking-wider w-[20%]">
-                                                        Quantity
-                                                    </th>
+
                                                     <th className="px-6 py-4 text-center text-sm font-bold text-yellow-400 uppercase tracking-wider w-[25%]">
                                                         Actions
                                                     </th>
+
                                                 </tr>
                                             </thead>
 
@@ -1234,12 +1662,6 @@ function RouteComponent() {
                                                         <td className="px-6 py-4 whitespace-nowrap">
                                                             <div className="text-sm font-bold text-amber-600">
                                                                 ₱{Number(addon.price).toFixed(2)}
-                                                            </div>
-                                                        </td>
-
-                                                        <td className="px-6 py-4 whitespace-nowrap text-center">
-                                                            <div className="text-sm font-medium text-gray-700">
-                                                                {addon.quantity ?? '-'}
                                                             </div>
                                                         </td>
 
