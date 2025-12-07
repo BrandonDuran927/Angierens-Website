@@ -131,6 +131,15 @@ function RouteComponent() {
         'bg-pink-400', 'bg-indigo-400', 'bg-yellow-400', 'bg-teal-400'
     ]
 
+    // Helper function to check if a date is in the past
+    const isDateInPast = (year: number, month: number, day: number): boolean => {
+        const selectedDateTime = new Date(year, month, day)
+        const today = new Date()
+        today.setHours(0, 0, 0, 0)
+        selectedDateTime.setHours(0, 0, 0, 0)
+        return selectedDateTime < today
+    }
+
     // Fetch schedule data from Supabase
     const fetchScheduleData = async (year: number, month: number) => {
         try {
@@ -321,7 +330,15 @@ function RouteComponent() {
         // Current month days - get data from Supabase
         for (let day = 1; day <= daysInMonth; day++) {
             const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
-            const scheduleForDay = scheduleData.find(s => s.schedule_date === dateStr)
+
+            // Get all schedules for this date (there might be multiple time slots)
+            const schedulesForDay = scheduleData.filter(s => s.schedule_date === dateStr)
+
+            // Sum up all orders from all schedules for this date
+            const totalOrders = schedulesForDay.reduce((sum, schedule) => sum + (schedule.order_count || 0), 0)
+
+            // Get the first schedule for availability and max orders (or defaults)
+            const firstSchedule = schedulesForDay[0]
 
             const today = new Date()
             const isToday = day === today.getDate() &&
@@ -330,12 +347,12 @@ function RouteComponent() {
 
             calendarData.push({
                 date: day,
-                orders: scheduleForDay?.order_count || 0,
-                isAvailable: scheduleForDay?.is_available || false,
+                orders: totalOrders,
+                isAvailable: firstSchedule?.is_available || false,
                 isToday: isToday,
                 isSelected: day === selectedDate,
-                scheduleId: scheduleForDay?.schedule_id,
-                maxOrders: scheduleForDay?.max_orders || 30
+                scheduleId: firstSchedule?.schedule_id,
+                maxOrders: firstSchedule?.max_orders || 30
             })
         }
 
@@ -646,38 +663,44 @@ function RouteComponent() {
                                                 ))}
 
                                                 {/* Calendar Days */}
-                                                {calendarData.map((day, index) => (
-                                                    <button
-                                                        key={index}
-                                                        onClick={() => !day.isPastMonth && !day.isFutureMonth && setSelectedDate(day.date)}
-                                                        className={`
+                                                {calendarData.map((day, index) => {
+                                                    const isPastDate = !day.isPastMonth && !day.isFutureMonth && isDateInPast(currentDate.getFullYear(), currentDate.getMonth(), day.date)
+
+                                                    return (
+                                                        <button
+                                                            key={index}
+                                                            onClick={() => !day.isPastMonth && !day.isFutureMonth && setSelectedDate(day.date)}
+                                                            className={`
                                                         relative p-1.5 md:p-3 rounded-lg text-center border-2 transition-all duration-200 active:scale-95 md:hover:scale-105 min-h-[60px] md:min-h-[80px] flex flex-col justify-center gap-0.5 md:gap-1 cursor-pointer
                                                         ${day.isPastMonth || day.isFutureMonth
-                                                                ? 'text-gray-400 border-transparent bg-white/30'
-                                                                : day.isSelected
-                                                                    ? 'bg-amber-600 text-white border-amber-700 shadow-lg'
-                                                                    : day.isToday
-                                                                        ? 'bg-white border-amber-600 text-gray-800 shadow-md'
-                                                                        : 'bg-white border-gray-300 text-gray-800 hover:border-amber-400'
-                                                            }
+                                                                    ? 'text-gray-400 border-transparent bg-white/30'
+                                                                    : isPastDate
+                                                                        ? 'bg-gray-100 border-gray-300 text-gray-500 opacity-60'
+                                                                        : day.isSelected
+                                                                            ? 'bg-amber-600 text-white border-amber-700 shadow-lg'
+                                                                            : day.isToday
+                                                                                ? 'bg-white border-amber-600 text-gray-800 shadow-md'
+                                                                                : 'bg-white border-gray-300 text-gray-800 hover:border-amber-400'
+                                                                }
                                                     `}
-                                                    >
-                                                        <span className="font-semibold text-sm md:text-lg">{day.date}</span>
-                                                        {!day.isPastMonth && !day.isFutureMonth && (
-                                                            <>
-                                                                {day.isAvailable ? (
-                                                                    <span className="text-[10px] md:text-xs text-blue-600 font-medium leading-tight">
-                                                                        {day.orders}/{day.maxOrders}
-                                                                    </span>
-                                                                ) : (
-                                                                    <span className="text-[10px] md:text-xs font-medium leading-tight">
-                                                                        N/A
-                                                                    </span>
-                                                                )}
-                                                            </>
-                                                        )}
-                                                    </button>
-                                                ))}
+                                                        >
+                                                            <span className="font-semibold text-sm md:text-lg">{day.date}</span>
+                                                            {!day.isPastMonth && !day.isFutureMonth && (
+                                                                <>
+                                                                    {day.isAvailable ? (
+                                                                        <span className="text-[10px] md:text-xs text-blue-600 font-medium leading-tight">
+                                                                            {day.orders}/{day.maxOrders}
+                                                                        </span>
+                                                                    ) : (
+                                                                        <span className="text-[10px] md:text-xs font-medium leading-tight">
+                                                                            N/A
+                                                                        </span>
+                                                                    )}
+                                                                </>
+                                                            )}
+                                                        </button>
+                                                    )
+                                                })}
                                             </div>
                                         </div>
 
@@ -690,10 +713,8 @@ function RouteComponent() {
                                                     {monthNames[currentDate.getMonth()]} {selectedDate}, {currentDate.getFullYear()}
                                                 </div>
                                                 <div className="text-base md:text-lg text-gray-700 mb-4">
-                                                    {selectedDayData?.orders || 0} Orders
-                                                </div>
-
-                                                <div className="space-y-3 max-h-48 overflow-y-auto pr-2">
+                                                    {ordersForSelectedDate.length} Orders
+                                                </div>                                                <div className="space-y-3 max-h-48 overflow-y-auto pr-2">
                                                     <h4 className="font-semibold text-gray-800 text-sm md:text-base">Customer Orders</h4>
                                                     {customerOrders.length > 0 ? (
                                                         customerOrders.map(member => (
@@ -733,7 +754,7 @@ function RouteComponent() {
                                                     {selectedDayData?.maxOrders || 30} orders/day
                                                 </div>
                                                 <div className="text-xs md:text-sm text-blue-600 mt-2">
-                                                    Current: {selectedDayData?.orders || 0} orders
+                                                    Current: {ordersForSelectedDate.length} orders
                                                 </div>
                                             </div>
 

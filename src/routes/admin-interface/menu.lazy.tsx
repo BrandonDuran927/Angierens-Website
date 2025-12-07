@@ -516,8 +516,17 @@ function RouteComponent() {
 
                                                     {/* Price */}
                                                     <td className="px-6 py-4 whitespace-nowrap">
-                                                        <div className="text-sm font-bold text-amber-600">
-                                                            ₱{Number(item.price).toFixed(2)}
+                                                        <div
+                                                            className="text-sm font-bold text-amber-600 max-w-[120px] overflow-hidden text-ellipsis truncate"
+                                                            title={item.price.includes(',')
+                                                                ? item.price.split(',').map(p => `₱${parseFloat(p.trim()).toFixed(2)}`).join(', ')
+                                                                : `₱${parseFloat(item.price).toFixed(2)}`
+                                                            }
+                                                        >
+                                                            {item.price.includes(',')
+                                                                ? item.price.split(',').map(p => `₱${parseFloat(p.trim()).toFixed(2)}`).join(', ')
+                                                                : `₱${parseFloat(item.price).toFixed(2)}`
+                                                            }
                                                         </div>
                                                     </td>
 

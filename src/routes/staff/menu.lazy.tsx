@@ -543,7 +543,7 @@ function RouteComponent() {
                 price: formData.price,
                 category: sanitizedCategory,
                 size: sanitizedSize,
-                inclusion: inclusionsList.length > 0 ? JSON.stringify(inclusionsList) : null,
+                inclusion: inclusionsList.length > 0 ? inclusionsList.join(', ') : null,
                 is_available: formData.is_available,
                 image_url: imageUrl
             }
@@ -761,13 +761,19 @@ function RouteComponent() {
 
     const parseInclusions = (inclusion: string | null): string[] => {
         if (!inclusion) return []
-        try {
-            const parsed = JSON.parse(inclusion)
-            if (Array.isArray(parsed)) return parsed
-        } catch {
-            return inclusion.split(/[,;\n]/).map(item => item.trim()).filter(item => item)
+
+        // Check if it's a JSON array (legacy format)
+        if (inclusion.trim().startsWith('[')) {
+            try {
+                const parsed = JSON.parse(inclusion)
+                if (Array.isArray(parsed)) return parsed
+            } catch {
+                // If parsing fails, fall through to string split
+            }
         }
-        return []
+
+        // Handle comma-separated string format
+        return inclusion.split(',').map(item => item.trim()).filter(item => item)
     }
 
     const filteredMenuItems = menuItems.filter(item => {
@@ -1053,7 +1059,7 @@ function RouteComponent() {
                                                     </td>
 
                                                     <td className="px-6 py-4 whitespace-nowrap">
-                                                        <div className="text-sm font-bold text-amber-600">
+                                                        <div className="text-sm font-bold text-amber-600 overflow-hidden text-ellipsis truncate">
                                                             ₱{item.price}
                                                         </div>
                                                     </td>

@@ -139,6 +139,22 @@ function RouteComponent() {
     'bg-pink-400', 'bg-indigo-400', 'bg-yellow-400', 'bg-teal-400'
   ]
 
+  // Helper function to check if a date is in the past
+  const isDateInPast = (year: number, month: number, day: number): boolean => {
+    const selectedDateTime = new Date(year, month, day)
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    selectedDateTime.setHours(0, 0, 0, 0)
+    return selectedDateTime < today
+  }
+
+  // Helper function to check if a time slot is in the past
+  const isTimeSlotInPast = (year: number, month: number, day: number, hour: number): boolean => {
+    const slotDateTime = new Date(year, month, day, hour, 0, 0)
+    const now = new Date()
+    return slotDateTime < now
+  }
+
   // paste the same fetchScheduleData function here
   const fetchScheduleData = async (year: number, month: number) => {
     try {
@@ -159,7 +175,7 @@ function RouteComponent() {
 
       const scheduleIds = schedules?.map(s => s.schedule_id) || []
 
-      let orderCounts: Record<string, number> = {}
+      let orderCountsBySchedule: Record<string, number> = {}
 
       if (scheduleIds.length > 0) {
         const { data: orders, error: orderError } = await supabase
@@ -169,7 +185,8 @@ function RouteComponent() {
 
         if (orderError) throw orderError
 
-        orderCounts = orders.reduce((acc: Record<string, number>, order) => {
+        // Count orders per schedule_id
+        orderCountsBySchedule = orders.reduce((acc: Record<string, number>, order) => {
           acc[order.schedule_id] = (acc[order.schedule_id] || 0) + 1
           return acc
         }, {})
@@ -177,7 +194,7 @@ function RouteComponent() {
 
       const enrichedSchedules = schedules?.map(schedule => ({
         ...schedule,
-        order_count: orderCounts[schedule.schedule_id] || 0
+        order_count: orderCountsBySchedule[schedule.schedule_id] || 0
       })) || []
 
       setScheduleData(enrichedSchedules)
@@ -248,9 +265,16 @@ function RouteComponent() {
   // Update availability status for the selected date
   const updateAvailabilityStatus = async (newStatus: boolean) => {
     try {
-      setSaving(true)
       const year = currentDate.getFullYear()
       const month = currentDate.getMonth()
+
+      // Check if selected date is in the past
+      if (isDateInPast(year, month, selectedDate)) {
+        alert('Cannot modify availability for past dates')
+        return
+      }
+
+      setSaving(true)
       const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(selectedDate).padStart(2, '0')}`
 
       // Get all schedules for this date
@@ -285,9 +309,16 @@ function RouteComponent() {
   // Update order limit for the selected date
   const updateOrderLimit = async (newLimit: number) => {
     try {
-      setSaving(true)
       const year = currentDate.getFullYear()
       const month = currentDate.getMonth()
+
+      // Check if selected date is in the past
+      if (isDateInPast(year, month, selectedDate)) {
+        alert('Cannot modify order limit for past dates')
+        return
+      }
+
+      setSaving(true)
       const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(selectedDate).padStart(2, '0')}`
 
       const schedulesForDate = scheduleData.filter(s => s.schedule_date === dateStr)
@@ -318,9 +349,16 @@ function RouteComponent() {
   // Add a new time slot
   const addTimeSlot = async (hour: number) => {
     try {
-      setSaving(true)
       const year = currentDate.getFullYear()
       const month = currentDate.getMonth()
+
+      // Check if the time slot is in the past
+      if (isTimeSlotInPast(year, month, selectedDate, hour)) {
+        alert('Cannot add time slots in the past')
+        return
+      }
+
+      setSaving(true)
       const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(selectedDate).padStart(2, '0')}`
       const timeStr = `${String(hour).padStart(2, '0')}:00:00`
 
@@ -358,6 +396,17 @@ function RouteComponent() {
   // Toggle time slot availability
   const toggleTimeSlotAvailability = async (scheduleId: string, currentStatus: boolean) => {
     try {
+      // Find the schedule to check if it's in the past
+      const schedule = scheduleData.find(s => s.schedule_id === scheduleId)
+      if (schedule) {
+        const scheduleDate = new Date(schedule.schedule_date + 'T' + schedule.schedule_time)
+        const now = new Date()
+        if (scheduleDate < now) {
+          alert('Cannot modify time slots in the past')
+          return
+        }
+      }
+
       setSaving(true)
       const { error } = await supabase
         .from('schedule')
@@ -379,6 +428,17 @@ function RouteComponent() {
 
   // Delete a time slot
   const deleteTimeSlot = async (scheduleId: string) => {
+    // Find the schedule to check if it's in the past
+    const schedule = scheduleData.find(s => s.schedule_id === scheduleId)
+    if (schedule) {
+      const scheduleDate = new Date(schedule.schedule_date + 'T' + schedule.schedule_time)
+      const now = new Date()
+      if (scheduleDate < now) {
+        alert('Cannot delete time slots in the past')
+        return
+      }
+    }
+
     if (!confirm('Are you sure you want to delete this time slot?')) return
 
     try {
@@ -483,7 +543,18 @@ function RouteComponent() {
 
     for (let day = 1; day <= daysInMonth; day++) {
       const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
-      const scheduleForDay = scheduleData.find(s => s.schedule_date === dateStr)
+
+      // Get all schedules for this date
+      const schedulesForDay = scheduleData.filter(s => s.schedule_date === dateStr)
+
+      // Calculate total orders for all schedules on this day
+      const totalOrders = schedulesForDay.reduce((sum, schedule) => sum + schedule.order_count, 0)
+
+      // Check if any schedule is available
+      const isAnyAvailable = schedulesForDay.some(s => s.is_available)
+
+      // Get the max orders (assuming all schedules on the same day have same max_orders)
+      const maxOrders = schedulesForDay.length > 0 ? schedulesForDay[0].max_orders : 30
 
       const today = new Date()
       const isToday = day === today.getDate() &&
@@ -492,12 +563,12 @@ function RouteComponent() {
 
       calendarData.push({
         date: day,
-        orders: scheduleForDay?.order_count || 0,
-        isAvailable: scheduleForDay?.is_available || false,
+        orders: totalOrders,
+        isAvailable: isAnyAvailable,
         isToday: isToday,
         isSelected: day === selectedDate,
-        scheduleId: scheduleForDay?.schedule_id,
-        maxOrders: scheduleForDay?.max_orders || 30
+        scheduleId: schedulesForDay.length > 0 ? schedulesForDay[0].schedule_id : undefined,
+        maxOrders: maxOrders
       })
     }
 
@@ -806,38 +877,44 @@ function RouteComponent() {
                       ))}
 
                       {/* Calendar Days */}
-                      {calendarData.map((day, index) => (
-                        <button
-                          key={index}
-                          onClick={() => !day.isPastMonth && !day.isFutureMonth && setSelectedDate(day.date)}
-                          className={`
+                      {calendarData.map((day, index) => {
+                        const isPastDate = !day.isPastMonth && !day.isFutureMonth && isDateInPast(currentDate.getFullYear(), currentDate.getMonth(), day.date)
+
+                        return (
+                          <button
+                            key={index}
+                            onClick={() => !day.isPastMonth && !day.isFutureMonth && setSelectedDate(day.date)}
+                            className={`
                             relative p-1.5 md:p-3 rounded-lg text-center border-2 transition-all duration-200 active:scale-95 md:hover:scale-105 min-h-[60px] md:min-h-[80px] flex flex-col justify-center gap-0.5 md:gap-1 cursor-pointer
                             ${day.isPastMonth || day.isFutureMonth
-                              ? 'text-gray-400 border-transparent bg-white/30'
-                              : day.isSelected
-                                ? 'bg-amber-600 text-white border-amber-700 shadow-lg'
-                                : day.isToday
-                                  ? 'bg-white border-amber-600 text-gray-800 shadow-md'
-                                  : 'bg-white border-gray-300 text-gray-800 hover:border-amber-400'
-                            }
+                                ? 'text-gray-400 border-transparent bg-white/30'
+                                : isPastDate
+                                  ? 'bg-gray-100 border-gray-300 text-gray-500 opacity-60'
+                                  : day.isSelected
+                                    ? 'bg-amber-600 text-white border-amber-700 shadow-lg'
+                                    : day.isToday
+                                      ? 'bg-white border-amber-600 text-gray-800 shadow-md'
+                                      : 'bg-white border-gray-300 text-gray-800 hover:border-amber-400'
+                              }
                           `}
-                        >
-                          <span className="font-semibold text-sm md:text-lg">{day.date}</span>
-                          {!day.isPastMonth && !day.isFutureMonth && (
-                            <>
-                              {day.isAvailable ? (
-                                <span className="text-[10px] md:text-xs text-blue-600 font-medium leading-tight">
-                                  {day.orders}/{day.maxOrders}
-                                </span>
-                              ) : (
-                                <span className="text-[10px] md:text-xs font-medium leading-tight">
-                                  N/A
-                                </span>
-                              )}
-                            </>
-                          )}
-                        </button>
-                      ))}
+                          >
+                            <span className="font-semibold text-sm md:text-lg">{day.date}</span>
+                            {!day.isPastMonth && !day.isFutureMonth && (
+                              <>
+                                {day.isAvailable ? (
+                                  <span className="text-[10px] md:text-xs text-blue-600 font-medium leading-tight">
+                                    {day.orders}/{day.maxOrders}
+                                  </span>
+                                ) : (
+                                  <span className="text-[10px] md:text-xs font-medium leading-tight">
+                                    N/A
+                                  </span>
+                                )}
+                              </>
+                            )}
+                          </button>
+                        )
+                      })}
                     </div>
                   </div>
 
@@ -887,14 +964,14 @@ function RouteComponent() {
                       <div className="flex gap-2">
                         <button
                           onClick={() => updateAvailabilityStatus(true)}
-                          disabled={saving}
+                          disabled={saving || isDateInPast(currentDate.getFullYear(), currentDate.getMonth(), selectedDate)}
                           className="flex-1 bg-green-600 text-white py-2 px-4 rounded-lg font-medium hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm md:text-base"
                         >
                           Set Available
                         </button>
                         <button
                           onClick={() => updateAvailabilityStatus(false)}
-                          disabled={saving}
+                          disabled={saving || isDateInPast(currentDate.getFullYear(), currentDate.getMonth(), selectedDate)}
                           className="flex-1 bg-red-600 text-white py-2 px-4 rounded-lg font-medium hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm md:text-base"
                         >
                           Set Unavailable
@@ -918,7 +995,7 @@ function RouteComponent() {
                       </div>
                       <button
                         onClick={() => updateOrderLimit(orderLimit)}
-                        disabled={saving}
+                        disabled={saving || isDateInPast(currentDate.getFullYear(), currentDate.getMonth(), selectedDate)}
                         className="w-full bg-amber-600 text-white py-2 px-4 rounded-lg font-medium hover:bg-amber-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                       >
                         <Save className="h-4 w-4" />
@@ -943,6 +1020,7 @@ function RouteComponent() {
                           const month = currentDate.getMonth()
                           const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(selectedDate).padStart(2, '0')}`
                           const exists = scheduleData.some(s => s.schedule_date === dateStr && s.schedule_time === timeStr)
+                          const isPastTime = isTimeSlotInPast(year, month, selectedDate, hour)
                           const displayHour = hour > 12 ? hour - 12 : hour
                           const period = hour < 12 ? 'AM' : 'PM'
 
@@ -950,8 +1028,8 @@ function RouteComponent() {
                             <button
                               key={hour}
                               onClick={() => addTimeSlot(hour)}
-                              disabled={saving || exists}
-                              className={`py-1.5 px-2 rounded-lg text-xs font-medium transition-colors ${exists
+                              disabled={saving || exists || isPastTime}
+                              className={`py-1.5 px-2 rounded-lg text-xs font-medium transition-colors ${exists || isPastTime
                                 ? 'bg-gray-300 text-gray-600 cursor-not-allowed'
                                 : 'bg-amber-600 text-white hover:bg-amber-700'
                                 } disabled:opacity-50`}
@@ -965,33 +1043,38 @@ function RouteComponent() {
                       {/* Existing Time Slots */}
                       <div className="space-y-2 max-h-64 overflow-y-auto pr-2">
                         {timeSlots.length > 0 ? (
-                          timeSlots.map((slot, index) => (
-                            <div key={index} className="flex items-center justify-between p-2 md:p-3 bg-white rounded-lg border border-gray-200 shadow-sm">
-                              <span className="text-xs md:text-sm font-medium text-gray-700">
-                                {slot.hour} {slot.period}
-                              </span>
-                              <div className="flex items-center gap-2">
-                                <button
-                                  onClick={() => slot.scheduleId && toggleTimeSlotAvailability(slot.scheduleId, slot.isAvailable)}
-                                  disabled={saving}
-                                  className={`px-2 md:px-3 py-1 rounded-full text-xs font-medium transition-colors ${slot.isAvailable
-                                    ? 'bg-green-100 text-green-700 hover:bg-green-200'
-                                    : 'bg-red-100 text-red-700 hover:bg-red-200'
-                                    } disabled:opacity-50`}
-                                >
-                                  {slot.isAvailable ? 'Available' : 'Unavailable'}
-                                </button>
-                                <button
-                                  onClick={() => slot.scheduleId && deleteTimeSlot(slot.scheduleId)}
-                                  disabled={saving}
-                                  className="p-1.5 text-red-600 hover:bg-red-100 rounded transition-colors disabled:opacity-50"
-                                  title="Delete time slot"
-                                >
-                                  <Trash2 className="h-4 w-4" />
-                                </button>
+                          timeSlots.map((slot, index) => {
+                            const schedule = scheduleData.find(s => s.schedule_id === slot.scheduleId)
+                            const isPastSlot = schedule ? new Date(schedule.schedule_date + 'T' + schedule.schedule_time) < new Date() : false
+
+                            return (
+                              <div key={index} className="flex items-center justify-between p-2 md:p-3 bg-white rounded-lg border border-gray-200 shadow-sm">
+                                <span className="text-xs md:text-sm font-medium text-gray-700">
+                                  {slot.hour} {slot.period}
+                                </span>
+                                <div className="flex items-center gap-2">
+                                  <button
+                                    onClick={() => slot.scheduleId && toggleTimeSlotAvailability(slot.scheduleId, slot.isAvailable)}
+                                    disabled={saving || isPastSlot}
+                                    className={`px-2 md:px-3 py-1 rounded-full text-xs font-medium transition-colors ${slot.isAvailable
+                                      ? 'bg-green-100 text-green-700 hover:bg-green-200'
+                                      : 'bg-red-100 text-red-700 hover:bg-red-200'
+                                      } disabled:opacity-50`}
+                                  >
+                                    {slot.isAvailable ? 'Available' : 'Unavailable'}
+                                  </button>
+                                  <button
+                                    onClick={() => slot.scheduleId && deleteTimeSlot(slot.scheduleId)}
+                                    disabled={saving || isPastSlot}
+                                    className="p-1.5 text-red-600 hover:bg-red-100 rounded transition-colors disabled:opacity-50"
+                                    title="Delete time slot"
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </button>
+                                </div>
                               </div>
-                            </div>
-                          ))
+                            )
+                          })
                         ) : (
                           <div className="text-sm text-gray-500 text-center py-4">
                             No time slots available. Add time slots using the buttons above.

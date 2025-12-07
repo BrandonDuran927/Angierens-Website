@@ -347,7 +347,64 @@ function RouteComponent() {
         // Use statusGroups instead of status matching
         const matchesTab = statusGroups[activeTab]?.includes(order.order_status)
 
-        return matchesSearch && matchesTab
+        // Date Range Filter
+        let matchesDateRange = true
+        if (filters.dateRange) {
+            const orderDate = new Date(order.orderData?.date || '')
+            const today = new Date()
+            today.setHours(0, 0, 0, 0)
+
+            if (filters.dateRange === 'today') {
+                const orderDateOnly = new Date(orderDate)
+                orderDateOnly.setHours(0, 0, 0, 0)
+                matchesDateRange = orderDateOnly.getTime() === today.getTime()
+            } else if (filters.dateRange === 'week') {
+                const weekAgo = new Date(today)
+                weekAgo.setDate(weekAgo.getDate() - 7)
+                matchesDateRange = orderDate >= weekAgo
+            } else if (filters.dateRange === 'month') {
+                const monthAgo = new Date(today)
+                monthAgo.setMonth(monthAgo.getMonth() - 1)
+                matchesDateRange = orderDate >= monthAgo
+            }
+        }
+
+        // Payment Method Filter
+        let matchesPaymentMethod = true
+        if (filters.paymentMethod) {
+            const orderPaymentMethod = order.paymentMethod.toLowerCase()
+            if (filters.paymentMethod === 'cash') {
+                matchesPaymentMethod = orderPaymentMethod.includes('cash') || orderPaymentMethod.includes('on-site')
+            } else if (filters.paymentMethod === 'gcash') {
+                matchesPaymentMethod = orderPaymentMethod.includes('gcash')
+            } else if (filters.paymentMethod === 'card') {
+                matchesPaymentMethod = orderPaymentMethod.includes('card')
+            }
+        }
+
+        // Fulfillment Type Filter
+        let matchesFulfillmentType = true
+        if (filters.fulfillmentType) {
+            const orderType = order.fulfillmentType.toLowerCase()
+            matchesFulfillmentType = orderType.includes(filters.fulfillmentType.toLowerCase())
+        }
+
+        // Price Range Filter
+        let matchesPriceRange = true
+        if (filters.priceRange) {
+            const priceString = order.price.replace(/[₱,\s]/g, '')
+            const price = parseFloat(priceString)
+
+            if (filters.priceRange === '0-500') {
+                matchesPriceRange = price >= 0 && price <= 500
+            } else if (filters.priceRange === '500-1000') {
+                matchesPriceRange = price > 500 && price <= 1000
+            } else if (filters.priceRange === '1000+') {
+                matchesPriceRange = price > 1000
+            }
+        }
+
+        return matchesSearch && matchesTab && matchesDateRange && matchesPaymentMethod && matchesFulfillmentType && matchesPriceRange
     })
 
 
@@ -415,6 +472,10 @@ function RouteComponent() {
             priceRange: '',
             status: ''
         })
+    }
+
+    const hasActiveFilters = () => {
+        return filters.dateRange || filters.paymentMethod || filters.fulfillmentType || filters.priceRange || filters.status
     }
 
     const getCurrentDate = () => {
@@ -1092,10 +1153,18 @@ function RouteComponent() {
                             <div className="flex items-center gap-2 sm:gap-3">
                                 <button
                                     onClick={() => setIsFilterOpen(true)}
-                                    className="flex items-center gap-2 px-3 sm:px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors text-sm"
+                                    className={`relative flex items-center gap-2 px-3 sm:px-4 py-2 border rounded-lg transition-colors text-sm ${hasActiveFilters()
+                                        ? 'border-amber-500 bg-amber-50 text-amber-700 hover:bg-amber-100'
+                                        : 'border-gray-300 hover:bg-gray-50'
+                                        }`}
                                 >
                                     <Filter className="h-4 w-4" />
                                     <span className="hidden sm:inline">Filter</span>
+                                    {hasActiveFilters() && (
+                                        <span className="absolute -top-1 -right-1 bg-amber-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center font-semibold">
+                                            {[filters.dateRange, filters.paymentMethod, filters.fulfillmentType, filters.priceRange].filter(Boolean).length}
+                                        </span>
+                                    )}
                                 </button>
                                 <button
                                     onClick={() => setIsAddOrderModalOpen(true)}
@@ -1107,6 +1176,63 @@ function RouteComponent() {
                                 </button>
                             </div>
                         </div>
+
+                        {/* Active Filters Display */}
+                        {hasActiveFilters() && (
+                            <div className="mt-3 flex flex-wrap items-center gap-2">
+                                <span className="text-sm text-gray-600 font-medium">Active filters:</span>
+                                {filters.dateRange && (
+                                    <span className="inline-flex items-center gap-1 px-3 py-1 bg-amber-100 text-amber-800 rounded-full text-xs font-medium">
+                                        Date: {filters.dateRange === 'today' ? 'Today' : filters.dateRange === 'week' ? 'This Week' : 'This Month'}
+                                        <button
+                                            onClick={() => handleFilterChange('dateRange', '')}
+                                            className="hover:text-amber-900"
+                                        >
+                                            <X className="h-3 w-3" />
+                                        </button>
+                                    </span>
+                                )}
+                                {filters.paymentMethod && (
+                                    <span className="inline-flex items-center gap-1 px-3 py-1 bg-amber-100 text-amber-800 rounded-full text-xs font-medium">
+                                        Payment: {filters.paymentMethod === 'cash' ? 'Cash/On-Site' : filters.paymentMethod === 'gcash' ? 'GCash' : filters.paymentMethod}
+                                        <button
+                                            onClick={() => handleFilterChange('paymentMethod', '')}
+                                            className="hover:text-amber-900"
+                                        >
+                                            <X className="h-3 w-3" />
+                                        </button>
+                                    </span>
+                                )}
+                                {filters.fulfillmentType && (
+                                    <span className="inline-flex items-center gap-1 px-3 py-1 bg-amber-100 text-amber-800 rounded-full text-xs font-medium">
+                                        Type: {filters.fulfillmentType === 'pick-up' ? 'Pick-up' : 'Delivery'}
+                                        <button
+                                            onClick={() => handleFilterChange('fulfillmentType', '')}
+                                            className="hover:text-amber-900"
+                                        >
+                                            <X className="h-3 w-3" />
+                                        </button>
+                                    </span>
+                                )}
+                                {filters.priceRange && (
+                                    <span className="inline-flex items-center gap-1 px-3 py-1 bg-amber-100 text-amber-800 rounded-full text-xs font-medium">
+                                        Price: {filters.priceRange === '0-500' ? '₱0-₱500' : filters.priceRange === '500-1000' ? '₱500-₱1,000' : '₱1,000+'}
+                                        <button
+                                            onClick={() => handleFilterChange('priceRange', '')}
+                                            className="hover:text-amber-900"
+                                        >
+                                            <X className="h-3 w-3" />
+                                        </button>
+                                    </span>
+                                )}
+                                <button
+                                    onClick={clearFilters}
+                                    className="text-xs text-amber-600 hover:text-amber-800 font-medium underline"
+                                >
+                                    Clear all
+                                </button>
+                            </div>
+                        )}
                     </div>
 
                     {/* Main Content - Mobile First */}
@@ -1120,6 +1246,12 @@ function RouteComponent() {
                             </div>
                         ) : (
                             <>
+                                {/* Results Counter */}
+                                <div className="mb-4 text-sm text-gray-600">
+                                    Showing <span className="font-semibold text-gray-800">{filteredOrders.length}</span> {filteredOrders.length === 1 ? 'order' : 'orders'}
+                                    {hasActiveFilters() && <span className="text-amber-600"> (filtered)</span>}
+                                </div>
+
                                 {/* Mobile Card View (Default) */}
                                 <div className="space-y-3 sm:space-y-4 lg:hidden">
                                     <div className="bg-yellow-400 p-4 rounded-xl sticky top-0 z-10 shadow-sm">
@@ -2181,9 +2313,8 @@ function RouteComponent() {
                                         className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500"
                                     >
                                         <option value="">All methods</option>
-                                        <option value="cash">Cash</option>
+                                        <option value="cash">Cash / On-Site Payment</option>
                                         <option value="gcash">GCash</option>
-                                        <option value="card">Card</option>
                                     </select>
                                 </div>
 
@@ -2195,7 +2326,7 @@ function RouteComponent() {
                                         className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500"
                                     >
                                         <option value="">All types</option>
-                                        <option value="pickup">Pick-up</option>
+                                        <option value="pick-up">Pick-up</option>
                                         <option value="delivery">Delivery</option>
                                     </select>
                                 </div>

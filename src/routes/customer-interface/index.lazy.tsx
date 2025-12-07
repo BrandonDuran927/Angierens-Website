@@ -1,10 +1,10 @@
 import { createLazyFileRoute, Link } from '@tanstack/react-router'
 import { useState, useEffect } from 'react'
-import { Search, ShoppingCart, Bell, ChevronDown, X, Plus, Minus, Heart, MessageSquare, Star, Menu } from 'lucide-react'
+import { Search, ShoppingCart, Bell, ChevronDown, X, Plus, Minus, Heart, MessageSquare, Star, Menu, ArrowRight, Tag } from 'lucide-react'
 import { useUser } from '@/context/UserContext'
 import { useNavigate } from '@tanstack/react-router'
 import { supabase } from '@/lib/supabaseClient'
-import { ProtectedRoute } from '@/components/ProtectedRoute'
+
 
 // Type definitions
 interface MenuItem {
@@ -73,10 +73,12 @@ function RouteComponent() {
   const [categories, setCategories] = useState<string[]>(['All Categories'])
   const [selectedSize, setSelectedSize] = useState<string>('')
   const [isProcessing, setIsProcessing] = useState(false)
+  const [isOrderAddOnsModalOpen, setIsOrderAddOnsModalOpen] = useState(false)
+  const [orderAddOns, setOrderAddOns] = useState<AddOns>({})
 
   useEffect(() => {
     fetchMenuItems()
-    // fetchAddOns()
+    fetchAddOns()
     if (user) {
       fetchCartCount()
     }
@@ -152,6 +154,32 @@ function RouteComponent() {
     return `${minPrice.toLocaleString()} - ${maxPrice.toLocaleString()}`
   }
 
+  const openOrderAddOnsModal = () => {
+    if (!user?.id) {
+      alert('Please sign in to place an order')
+      navigate({ to: '/login' })
+      return
+    }
+
+    if (!selectedItem) return
+
+    // Open add-ons modal instead of directly ordering
+    setIsOrderAddOnsModalOpen(true)
+    setOrderAddOns({})
+  }
+
+  const closeOrderAddOnsModal = () => {
+    setIsOrderAddOnsModalOpen(false)
+    setOrderAddOns({})
+  }
+
+  const updateOrderAddOnQuantity = (addOnId: string, quantity: number) => {
+    setOrderAddOns(prev => ({
+      ...prev,
+      [addOnId]: Math.max(0, quantity)
+    }))
+  }
+
   const orderNow = async () => {
     if (isProcessing) return
 
@@ -193,77 +221,39 @@ function RouteComponent() {
 
       if (!cartData) throw new Error('Failed to get or create cart')
 
-      // Check if the same item with the same price already exists in the cart
-      const { data: existingCartItem, error: existingError } = await supabase
-        .from('cart_item')
-        .select('cart_item_id, quantity')
-        .eq('cart_id', cartData.cart_id)
-        .eq('menu_id', selectedItem.menu_id)
-        .eq('price', itemPrice)
-        .single()
-
-      if (existingError && existingError.code !== 'PGRST116') {
-        throw existingError
-      }
-
-      let cartItemId: string
-
-      if (existingCartItem) {
-        // Item already exists, update the quantity
-        const newQuantity = existingCartItem.quantity + orderQuantity
-        const { error: updateError } = await supabase
-          .from('cart_item')
-          .update({ quantity: newQuantity })
-          .eq('cart_item_id', existingCartItem.cart_item_id)
-
-        if (updateError) throw updateError
-
-        cartItemId = existingCartItem.cart_item_id
-      } else {
-        // Item doesn't exist, create a new cart item
-        const { data: cartItem, error: itemError } = await supabase
-          .from('cart_item')
-          .insert([{
-            cart_id: cartData.cart_id,
-            menu_id: selectedItem.menu_id,
-            quantity: orderQuantity,
-            price: itemPrice
-          }])
-          .select()
-          .single()
-
-        if (itemError) throw itemError
-
-        // Add cart item add-ons if any
-        const addOnEntries = Object.entries(addOns).filter(([_, qty]) => qty > 0)
-
-        if (addOnEntries.length > 0) {
-          const addOnInserts = addOnEntries.map(([addOnId, quantity]) => {
+      // For "Order Now", store the order details in session storage to bypass cart
+      // This way we don't create or modify cart items
+      const orderDetails = {
+        menu_id: selectedItem.menu_id,
+        name: selectedItem.name,
+        description: selectedItem.description,
+        image_url: selectedItem.image_url,
+        quantity: orderQuantity,
+        price: itemPrice,
+        size: selectedSize,
+        addOns: Object.entries(orderAddOns)
+          .filter(([_, qty]) => qty > 0)
+          .map(([addOnId, quantity]) => {
             const addOn = addOnOptions.find(ao => ao.add_on === addOnId)
             return {
-              cart_item_id: cartItem.cart_item_id,
               add_on_id: addOnId,
+              name: addOn?.name || '',
               quantity: quantity,
               price: addOn ? Number(addOn.price) : 0
             }
           })
-
-          const { error: addOnError } = await supabase
-            .from('cart_item_add_on')
-            .insert(addOnInserts)
-
-          if (addOnError) throw addOnError
-        }
-
-        cartItemId = cartItem.cart_item_id
       }
 
-      // Navigate directly to payment with this cart item
+      // Store in session storage
+      sessionStorage.setItem('directOrder', JSON.stringify(orderDetails))
+
+      // Navigate directly to payment without cart item ID
       closeModal()
+      closeOrderAddOnsModal()
       navigate({
         to: '/customer-interface/payment',
-        search: { items: cartItemId }
-      })
+        search: { directOrder: 'true' }
+      } as any)
     } catch (error) {
       console.error('Error processing order:', error)
       alert('Failed to process order. Please try again.')
@@ -272,22 +262,22 @@ function RouteComponent() {
     }
   }
 
-  // const fetchAddOns = async () => {
-  //   try {
-  //     const { data, error } = await supabase
-  //       .from('add_on')
-  //       .select('*')
-  //       .order('name', { ascending: true })
+  const fetchAddOns = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('add_on')
+        .select('*')
+        .order('name', { ascending: true })
 
-  //     if (error) throw error
+      if (error) throw error
 
-  //     if (data) {
-  //       setAddOnOptions(data)
-  //     }
-  //   } catch (error) {
-  //     console.error('Error fetching add-ons:', error)
-  //   }
-  // }
+      if (data) {
+        setAddOnOptions(data)
+      }
+    } catch (error) {
+      console.error('Error fetching add-ons:', error)
+    }
+  }
 
   const fetchCartCount = async () => {
     if (!user?.id) return
@@ -402,13 +392,6 @@ function RouteComponent() {
     setOrderQuantity(1)
     setAddOns({})
     setSelectedSize('')
-  }
-
-  const updateAddOnQuantity = (addOnId: string, quantity: number) => {
-    setAddOns(prev => ({
-      ...prev,
-      [addOnId]: Math.max(0, quantity)
-    }))
   }
 
   const calculateTotal = () => {
@@ -955,7 +938,7 @@ function RouteComponent() {
                 <div className="mb-6">
                   <label className="block text-sm font-semibold text-gray-700 mb-3">Select Size</label>
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                    {getAvailableSizes(selectedItem).map((size, index) => {
+                    {getAvailableSizes(selectedItem).map((size) => {
                       const price = getPriceForSize(selectedItem, size)
                       return (
                         <button
@@ -1016,12 +999,137 @@ function RouteComponent() {
                     {isProcessing ? 'Processing...' : 'Add To Cart'}
                   </button>
                   <button
-                    onClick={orderNow}
+                    onClick={openOrderAddOnsModal}
                     disabled={isProcessing}
                     className="flex-1 bg-yellow-400 text-black px-6 py-4 rounded-xl font-bold hover:bg-yellow-500 active:scale-95 transition-all duration-200 shadow-md hover:shadow-xl flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <ShoppingCart className="h-5 w-5" />
                     {isProcessing ? 'Processing...' : 'Order Now'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Order Add-ons Modal */}
+      {isOrderAddOnsModalOpen && selectedItem && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl max-w-3xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">
+            <div className="p-6 lg:p-8">
+              <div className="flex justify-between items-start mb-8">
+                <div>
+                  <h2 className="text-2xl lg:text-3xl font-bold text-gray-900 mb-2 flex items-center gap-3">
+                    <div className="bg-gradient-to-br from-yellow-400 to-orange-400 p-2 rounded-xl">
+                      <Tag className="w-6 h-6 text-white" />
+                    </div>
+                    Customize Your Order
+                  </h2>
+                  <p className="text-gray-600">Add some extras to make your meal even better!</p>
+                </div>
+                <button
+                  onClick={closeOrderAddOnsModal}
+                  className="text-gray-400 hover:text-gray-600 p-2 hover:bg-gray-100 rounded-xl transition-all"
+                >
+                  <X className="h-6 w-6" />
+                </button>
+              </div>
+
+              {/* Selected Item Summary */}
+              <div className="bg-gradient-to-br from-gray-50 to-gray-100 border-2 border-gray-200 rounded-2xl p-5 mb-8">
+                <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
+                  <ShoppingCart className="w-5 h-5 text-yellow-600" />
+                  Your Selected Item
+                </h3>
+                <div className="flex items-center gap-4 bg-white p-3 rounded-xl">
+                  <img
+                    src={getImageUrl(selectedItem.image_url)}
+                    alt={selectedItem.name}
+                    className="w-16 h-16 object-cover rounded-lg border-2 border-gray-200"
+                  />
+                  <div className="flex-1">
+                    <h4 className="font-bold text-gray-900">{selectedItem.name}</h4>
+                    <p className="text-sm text-gray-600">
+                      Qty: {orderQuantity} × ₱{getPriceForSize(selectedItem, selectedSize).toLocaleString()}
+                      {selectedSize && ` (${selectedSize})`}
+                    </p>
+                  </div>
+                  <p className="font-bold text-gray-900">
+                    ₱{(getPriceForSize(selectedItem, selectedSize) * orderQuantity).toLocaleString()}
+                  </p>
+                </div>
+              </div>
+
+              {/* Add-ons Section */}
+              <div className="mb-8">
+                <h4 className="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">
+                  <Tag className="w-5 h-5 text-yellow-600" />
+                  Available Add-ons
+                </h4>
+                <p className="text-sm text-gray-600 mb-4">Enhance your meal with these delicious extras</p>
+                {addOnOptions.length === 0 ? (
+                  <p className="text-gray-500 text-center py-8 bg-gray-50 rounded-xl">No add-ons available</p>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {addOnOptions.map((addOn) => (
+                      <div key={addOn.add_on} className="bg-gradient-to-br from-gray-50 to-white rounded-xl p-5 shadow-sm hover:shadow-md transition-all border-2 border-transparent hover:border-yellow-400">
+                        <div className="flex items-center justify-between mb-4">
+                          <div className="flex-1">
+                            <span className="inline-block bg-gradient-to-r from-yellow-400 to-orange-400 text-white px-3 py-1.5 rounded-lg text-sm font-bold mb-2">
+                              {addOn.name}
+                            </span>
+                            <p className="text-sm font-bold text-gray-900">₱{Number(addOn.price).toLocaleString()} each</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center justify-center gap-3 bg-white rounded-lg p-2">
+                          <button
+                            onClick={() => updateOrderAddOnQuantity(addOn.add_on, (orderAddOns[addOn.add_on] || 0) - 1)}
+                            className="w-10 h-10 rounded-lg bg-gray-200 hover:bg-gray-300 flex items-center justify-center transition-colors"
+                          >
+                            <Minus className="h-5 w-5 text-gray-700" />
+                          </button>
+                          <span className="w-12 text-center font-bold text-lg text-gray-900">
+                            {orderAddOns[addOn.add_on] || 0}
+                          </span>
+                          <button
+                            onClick={() => updateOrderAddOnQuantity(addOn.add_on, (orderAddOns[addOn.add_on] || 0) + 1)}
+                            className="w-10 h-10 rounded-lg bg-gradient-to-br from-yellow-400 to-orange-400 hover:from-yellow-500 hover:to-orange-500 flex items-center justify-center transition-all shadow-sm"
+                          >
+                            <Plus className="h-5 w-5 text-white" />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Total and Buttons */}
+              <div className="flex flex-col lg:flex-row items-center justify-between gap-4 pt-6 border-t-2 border-gray-300">
+                <div className="bg-gradient-to-br from-yellow-50 to-orange-50 px-6 py-4 rounded-2xl border-2 border-yellow-400 w-full lg:w-auto">
+                  <div className="text-sm text-gray-600 mb-1">Grand Total</div>
+                  <div className="text-3xl font-bold bg-gradient-to-r from-yellow-600 to-orange-600 bg-clip-text text-transparent">
+                    ₱{(getPriceForSize(selectedItem, selectedSize) * orderQuantity + Object.entries(orderAddOns).reduce((sum, [addOnId, qty]) => {
+                      const addOn = addOnOptions.find(a => a.add_on === addOnId);
+                      return sum + (addOn ? Number(addOn.price) * qty : 0);
+                    }, 0)).toLocaleString()}
+                  </div>
+                </div>
+                <div className="flex gap-3 w-full lg:w-auto">
+                  <button
+                    onClick={closeOrderAddOnsModal}
+                    className="flex-1 lg:flex-none bg-gray-200 hover:bg-gray-300 text-gray-800 px-6 py-4 rounded-2xl font-bold transition-all"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={orderNow}
+                    disabled={isProcessing}
+                    className="flex-1 lg:flex-none bg-gradient-to-r from-yellow-400 to-orange-400 hover:from-yellow-500 hover:to-orange-500 text-white px-8 py-4 rounded-2xl font-bold transition-all duration-300 shadow-xl hover:shadow-2xl transform hover:scale-105 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {isProcessing ? 'Processing...' : 'Proceed to Payment'}
+                    <ArrowRight className="w-5 h-5" />
                   </button>
                 </div>
               </div>

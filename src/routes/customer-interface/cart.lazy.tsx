@@ -572,10 +572,41 @@ function RouteComponent() {
         return addOns.map(addOn => `${addOn.name} (${addOn.quantity})`).join(', ');
     };
 
-    const openCheckoutAddOnsModal = () => {
-        // Initialize with empty add-ons for the entire order
-        setCheckoutAddOns({});
-        setIsCheckoutAddOnsModalOpen(true);
+    const openCheckoutAddOnsModal = async () => {
+        // Check if any selected items are unavailable
+        const selectedCartItems = cartItems.filter(item => selectedItems.has(item.cart_item_id));
+
+        if (selectedCartItems.length === 0) {
+            alert('Please select at least one item to proceed.');
+            return;
+        }
+
+        try {
+            // Fetch menu availability for all selected items
+            const menuIds = selectedCartItems.map(item => item.menu_id);
+            const { data: menuData, error } = await supabase
+                .from('menu')
+                .select('menu_id, name, is_available')
+                .in('menu_id', menuIds);
+
+            if (error) throw error;
+
+            // Check for unavailable items
+            const unavailableItems = menuData?.filter(menu => !menu.is_available) || [];
+
+            if (unavailableItems.length > 0) {
+                const unavailableNames = unavailableItems.map(item => item.name).join(', ');
+                alert(`The following menu item(s) are currently unavailable and cannot be ordered:\n\n${unavailableNames}\n\nPlease remove them from your selection to proceed.`);
+                return;
+            }
+
+            // If all items are available, proceed with the modal
+            setCheckoutAddOns({});
+            setIsCheckoutAddOnsModalOpen(true);
+        } catch (error) {
+            console.error('Error checking menu availability:', error);
+            alert('An error occurred while checking menu availability. Please try again.');
+        }
     };
 
     const closeCheckoutAddOnsModal = () => {
@@ -611,8 +642,29 @@ function RouteComponent() {
 
     const proceedToPayment = async () => {
         try {
+            // Double-check menu availability before proceeding to payment
+            const selectedCartItems = cartItems.filter(item => selectedItems.has(item.cart_item_id));
+            const menuIds = selectedCartItems.map(item => item.menu_id);
+
+            const { data: menuData, error: menuError } = await supabase
+                .from('menu')
+                .select('menu_id, name, is_available')
+                .in('menu_id', menuIds);
+
+            if (menuError) throw menuError;
+
+            // Check for unavailable items
+            const unavailableItems = menuData?.filter(menu => !menu.is_available) || [];
+
+            if (unavailableItems.length > 0) {
+                const unavailableNames = unavailableItems.map(item => item.name).join(', ');
+                alert(`The following menu item(s) are currently unavailable:\n\n${unavailableNames}\n\nPlease remove them from your cart to proceed.`);
+                closeCheckoutAddOnsModal();
+                return;
+            }
+
             // Apply the same add-ons to all selected items
-            for (const item of cartItems.filter(i => selectedItems.has(i.cart_item_id))) {
+            for (const item of selectedCartItems) {
                 // Delete existing add-ons
                 await supabase
                     .from('cart_item_add_on')

@@ -1,5 +1,5 @@
 import { createLazyFileRoute, Link } from '@tanstack/react-router'
-import { ShoppingCart, Bell, ChevronDown, ArrowLeft, Edit2, X, Menu, Calendar, Heart, Star, MessageSquare, Upload, Check } from 'lucide-react'
+import { ShoppingCart, Bell, ChevronDown, ArrowLeft, X, Menu, Calendar, Heart, Star, MessageSquare, Upload, Check } from 'lucide-react'
 import { ProtectedRoute } from '@/components/ProtectedRoute'
 import { useState, useEffect } from 'react'
 import { useUser } from '@/context/UserContext'
@@ -8,8 +8,6 @@ import { supabase } from '@/lib/supabaseClient'
 import { useSearch } from '@tanstack/react-router'
 import L from "leaflet";
 import { MapContainer, TileLayer, Marker, useMapEvents } from "react-leaflet";
-import { DirectionsModal } from '@/components/DirectionsModal'
-
 
 
 export const Route = createLazyFileRoute('/customer-interface/payment')({
@@ -353,12 +351,60 @@ function RouteComponent() {
     // Fetch selected cart items from Supabase
     useEffect(() => {
         async function fetchSelectedItems() {
-            if (!search.items || !user) {
+            if (!user) {
                 setIsLoading(false);
                 return;
             }
 
             try {
+                // Check if this is a direct order from "Order Now"
+                const searchParams = search as any;
+                if (searchParams.directOrder === 'true') {
+                    const directOrderData = sessionStorage.getItem('directOrder');
+                    if (directOrderData) {
+                        const orderDetails = JSON.parse(directOrderData);
+
+                        // Format to match CartItem structure
+                        const formattedItem: CartItem = {
+                            cart_item_id: 'direct-order', // Temporary ID for direct orders
+                            menu_id: orderDetails.menu_id,
+                            quantity: orderDetails.quantity,
+                            price: orderDetails.price,
+                            menu: {
+                                name: orderDetails.name,
+                                description: orderDetails.description,
+                                image_url: orderDetails.image_url,
+                                price: String(orderDetails.price)
+                            },
+                            cart_item_add_on: orderDetails.addOns.map((addOn: any) => ({
+                                add_on_id: addOn.add_on_id,
+                                quantity: addOn.quantity,
+                                price: addOn.price,
+                                add_on: {
+                                    name: addOn.name,
+                                    price: addOn.price
+                                }
+                            }))
+                        };
+
+                        setSelectedCartItems([formattedItem]);
+                        setIsLoading(false);
+                        return;
+                    }
+                }
+            } catch (error) {
+                console.error('Error loading direct order:', error);
+                setIsLoading(false);
+                return;
+            }
+
+            // Regular cart checkout flow
+            try {
+                if (!search.items) {
+                    setIsLoading(false);
+                    return;
+                }
+
                 const itemIds = search.items.split(',');
 
                 // Fetch the selected items from Supabase with menu and add-ons
@@ -926,25 +972,31 @@ function RouteComponent() {
                     }
                 }
 
-                // 7. Remove item from cart - delete add-ons first
-                // Delete cart item add-ons first (foreign key constraint)
-                if (item.cart_item_add_on && item.cart_item_add_on.length > 0) {
-                    const { error: deleteAddOnsError } = await supabase
-                        .from('cart_item_add_on')
+                // 7. Remove item from cart ONLY if it's not a direct order
+                // Direct orders don't create cart items, so skip deletion
+                if (item.cart_item_id !== 'direct-order') {
+                    // Delete cart item add-ons first (foreign key constraint)
+                    if (item.cart_item_add_on && item.cart_item_add_on.length > 0) {
+                        const { error: deleteAddOnsError } = await supabase
+                            .from('cart_item_add_on')
+                            .delete()
+                            .eq('cart_item_id', item.cart_item_id);
+
+                        if (deleteAddOnsError) throw deleteAddOnsError;
+                    }
+
+                    // Then delete the cart item
+                    const { error: deleteError } = await supabase
+                        .from('cart_item')
                         .delete()
                         .eq('cart_item_id', item.cart_item_id);
 
-                    if (deleteAddOnsError) throw deleteAddOnsError;
+                    if (deleteError) throw deleteError;
                 }
-
-                // Then delete the cart item
-                const { error: deleteError } = await supabase
-                    .from('cart_item')
-                    .delete()
-                    .eq('cart_item_id', item.cart_item_id);
-
-                if (deleteError) throw deleteError;
             }
+
+            // Clear session storage for direct orders
+            sessionStorage.removeItem('directOrder');
 
             alert('Order placed successfully!');
             navigate({ to: '/customer-interface/order' });
