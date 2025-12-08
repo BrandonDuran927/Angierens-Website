@@ -73,7 +73,7 @@ function RouteComponent() {
     const [isNotificationOpen, setIsNotificationOpen] = useState(false)
     const [activeOrderTab, setActiveOrderTab] = useState<'New Orders' | 'In Process' | 'Completed'>('New Orders')
     const [searchQuery, setSearchQuery] = useState('')
-    const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null)
+    const [expandedOrderIds, setExpandedOrderIds] = useState<Set<string>>(new Set())
     const [isStatusModalOpen, setIsStatusModalOpen] = useState(false)
     const [selectedOrder, setSelectedOrder] = useState<Order | null>(null)
     const [orders, setOrders] = useState<Order[]>([])
@@ -229,7 +229,15 @@ function RouteComponent() {
     }, [])
 
     const toggleExpandOrder = (orderId: string) => {
-        setExpandedOrderId(expandedOrderId === orderId ? null : orderId)
+        setExpandedOrderIds(prev => {
+            const newSet = new Set(prev)
+            if (newSet.has(orderId)) {
+                newSet.delete(orderId)
+            } else {
+                newSet.add(orderId)
+            }
+            return newSet
+        })
     }
 
     const markAllAsRead = () => {
@@ -388,6 +396,9 @@ function RouteComponent() {
 
             setIsStatusModalOpen(false)
             setSelectedOrder(null)
+
+            // Show success alert
+            alert(`Order ${selectedOrder.orderNumber} status has been updated to ${newStatus}!`)
         } catch (error) {
             console.error('Error updating order status:', error)
             alert('Failed to update order status. Please try again.')
@@ -659,7 +670,7 @@ function RouteComponent() {
                                 <div className="md:overflow-x-auto">
                                     <div className="flex flex-col md:flex-row gap-4 md:gap-6 md:pb-4">
                                         {activeOrders.map((order) => {
-                                            const isExpanded = expandedOrderId === order.id
+                                            const isExpanded = expandedOrderIds.has(order.id)
 
                                             return (
                                                 <div

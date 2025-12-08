@@ -1,5 +1,5 @@
 import { createLazyFileRoute, Link } from '@tanstack/react-router'
-import { ArrowLeft, Package, CreditCard, Clock, ShoppingBag, Star, X, Menu, ShoppingCart, Bell, MessageSquare, Heart } from 'lucide-react'
+import { ArrowLeft, Package, CreditCard, Clock, ShoppingBag, Star, X, Menu, ShoppingCart, Bell, MessageSquare, Heart, MapPin, Navigation } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabaseClient'
 import { useUser } from '@/context/UserContext'
@@ -56,6 +56,8 @@ interface OrderData {
     name: string
     phone: string
     address: string
+    latitude?: number
+    longitude?: number
   }
   items: OrderItem[]
   pricing: {
@@ -65,11 +67,18 @@ interface OrderData {
   }
   specialInstructions: string
   proofOfPaymentUrl: string | null
+  riderId?: string | null
   refundData: {
     response: string | null
     proofOfRefundUrl: string | null
     status: string | null
   } | null
+}
+
+interface RiderLocation {
+  latitude: number
+  longitude: number
+  updated_at: string
 }
 
 function SpecificOrder() {
@@ -85,6 +94,8 @@ function SpecificOrder() {
   const [isLoading, setIsLoading] = useState(true)
   const [showViewReceiptModal, setShowViewReceiptModal] = useState(false)
   const [showRefundDetailsModal, setShowRefundDetailsModal] = useState(false)
+  const [showTrackRiderModal, setShowTrackRiderModal] = useState(false)
+  const [riderLocation, setRiderLocation] = useState<RiderLocation | null>(null)
 
   const { orderId } = Route.useParams()
 
@@ -232,6 +243,8 @@ function SpecificOrder() {
 
       // Build address string from delivery.address if order type is Delivery
       let customerAddress = ''
+      let customerLatitude: number | undefined
+      let customerLongitude: number | undefined
       if (orderDataRaw.order_type === 'Delivery' && orderDataRaw.delivery?.address) {
         const addr = orderDataRaw.delivery.address
         const addressParts = [
@@ -242,6 +255,8 @@ function SpecificOrder() {
           addr.postal_code
         ].filter(Boolean)
         customerAddress = addressParts.join(', ')
+        customerLatitude = addr.latitude ? Number(addr.latitude) : undefined
+        customerLongitude = addr.longitude ? Number(addr.longitude) : undefined
       }
 
       const transformed: OrderData = {
@@ -263,8 +278,11 @@ function SpecificOrder() {
         customer: {
           name: `${userData.first_name} ${userData.middle_name ? userData.middle_name + ' ' : ''}${userData.last_name}`,
           phone: userData.phone_number || 'N/A',
-          address: customerAddress
+          address: customerAddress,
+          latitude: customerLatitude,
+          longitude: customerLongitude
         },
+        riderId: orderDataRaw.delivery?.rider_id || null,
         items: items,
         pricing: {
           subtotal: subtotal,
@@ -387,7 +405,7 @@ function SpecificOrder() {
         label: orderData.status === 'Claim Order' || orderData.status === 'Completed' ? 'On Delivered' : 'On Delivery',
         date: orderData.isPaid ? orderData.status_updated_at : '',
         icon: ShoppingBag,
-        completed: orderData.isPaid ? true : false
+        completed: orderData.isPaid || orderData.status === 'Completed' ? true : false
       })
     }
 
@@ -505,7 +523,17 @@ function SpecificOrder() {
 
   const handleConfirmPickup = async () => {
     try {
-      const { error } = await supabase
+      // First, get the delivery_id from the order
+      const { data: orderRecord, error: fetchError } = await supabase
+        .from('order')
+        .select('delivery_id')
+        .eq('order_id', orderId)
+        .single()
+
+      if (fetchError) throw fetchError
+
+      // Update order status to Completed
+      const { error: orderError } = await supabase
         .from('order')
         .update({
           order_status: 'Completed',
@@ -513,7 +541,20 @@ function SpecificOrder() {
         })
         .eq('order_id', orderId)
 
-      if (error) throw error
+      if (orderError) throw orderError
+
+      // Update delivery status to Completed if delivery_id exists
+      if (orderRecord?.delivery_id) {
+        const { error: deliveryError } = await supabase
+          .from('delivery')
+          .update({
+            delivery_status: 'complete order',
+            status_updated_at: new Date().toISOString()
+          })
+          .eq('delivery_id', orderRecord.delivery_id)
+
+        if (deliveryError) throw deliveryError
+      }
 
       alert('Order confirmed as completed!')
       await fetchOrderData() // Refresh the order data
@@ -522,6 +563,219 @@ function SpecificOrder() {
       alert('Failed to confirm pickup. Please try again.')
     }
   }
+
+  const handleOpenTrackRider = async () => {
+    if (!orderData?.riderId) {
+      alert('Rider information not available')
+      return
+    }
+
+    try {
+      // Fetch initial rider location
+      const { data, error } = await supabase
+        .from('rider_location')
+        .select('*')
+        .eq('rider_id', orderData.riderId)
+        .single()
+
+      if (error) throw error
+
+      if (data) {
+        const riderLoc = {
+          latitude: Number(data.latitude),
+          longitude: Number(data.longitude),
+          updated_at: data.updated_at
+        }
+        setRiderLocation(riderLoc)
+      }
+
+      setShowTrackRiderModal(true)
+    } catch (error) {
+      console.error('Error fetching rider location:', error)
+      alert('Unable to fetch rider location. Please try again.')
+    }
+  }
+
+  const handleCloseTrackRider = () => {
+    setShowTrackRiderModal(false)
+    setRiderLocation(null)
+  }
+
+  // Initialize Google Maps
+  useEffect(() => {
+    if (!showTrackRiderModal || !orderData?.customer.latitude || !orderData?.customer.longitude) return
+
+    const initMap = async () => {
+      try {
+        // Load Google Maps script
+        const script = document.createElement('script')
+        script.src = `https://maps.googleapis.com/maps/api/js?key=${import.meta.env.VITE_GOOGLE_MAPS_API_KEY}&libraries=geometry`
+        script.async = true
+        script.defer = true
+
+        await new Promise<void>((resolve, reject) => {
+          script.onload = () => resolve()
+          script.onerror = reject
+          if (!document.querySelector(`script[src="${script.src}"]`)) {
+            document.head.appendChild(script)
+          } else {
+            resolve()
+          }
+        })
+
+        const mapElement = document.getElementById('track-rider-map')
+        if (!mapElement) return
+
+        const storeLocation = { lat: 14.818589037203248, lng: 121.05753223366108 }
+        const customerLocation = { lat: orderData.customer.latitude!, lng: orderData.customer.longitude! }
+
+        // Calculate center point between store and customer
+        const centerLat = (storeLocation.lat + customerLocation.lat) / 2
+        const centerLng = (storeLocation.lng + customerLocation.lng) / 2
+
+        const newMap = new google.maps.Map(mapElement, {
+          center: { lat: centerLat, lng: centerLng },
+          zoom: 13,
+          mapTypeControl: true,
+          streetViewControl: false,
+          fullscreenControl: true
+        })
+
+        // Add store marker (green)
+        new google.maps.Marker({
+          position: storeLocation,
+          map: newMap,
+          title: 'Angieren\'s Lutong Bahay',
+          icon: {
+            url: 'http://maps.google.com/mapfiles/ms/icons/green-dot.png'
+          }
+        })
+
+        // Add customer marker (red)
+        new google.maps.Marker({
+          position: customerLocation,
+          map: newMap,
+          title: 'Delivery Address',
+          icon: {
+            url: 'http://maps.google.com/mapfiles/ms/icons/red-dot.png'
+          }
+        })
+
+        // Add rider marker (blue) if rider location exists
+        if (riderLocation) {
+          new google.maps.Marker({
+            position: { lat: riderLocation.latitude, lng: riderLocation.longitude },
+            map: newMap,
+            title: 'Rider Location',
+            icon: {
+              url: '/delivery-bike.png',
+              scaledSize: new google.maps.Size(40, 40),
+              anchor: new google.maps.Point(20, 20)
+            }
+          })
+        }
+
+        // Fetch and draw routes
+        const fetchAndDrawRoutes = async () => {
+          try {
+            // Fetch store to customer route
+            const storeToCustomerResponse = await fetch(
+              `http://localhost:3001/api/directions?origin=${storeLocation.lat},${storeLocation.lng}&destination=${customerLocation.lat},${customerLocation.lng}`
+            )
+            const storeToCustomerData = await storeToCustomerResponse.json()
+
+            if (storeToCustomerData.routes && storeToCustomerData.routes.length > 0) {
+              const storeToCustomerPolyline = storeToCustomerData.routes[0].overview_polyline.points
+              const decodedStoreToCustomer = google.maps.geometry.encoding.decodePath(storeToCustomerPolyline)
+
+              // Draw store to customer route (orange dashed)
+              new google.maps.Polyline({
+                path: decodedStoreToCustomer,
+                geodesic: true,
+                strokeColor: '#FF8C00',
+                strokeOpacity: 0.8,
+                strokeWeight: 4,
+                map: newMap,
+                icons: [{
+                  icon: { path: 'M 0,-1 0,1', strokeOpacity: 1, scale: 3 },
+                  offset: '0',
+                  repeat: '20px'
+                }]
+              })
+            }
+
+            // Fetch store to rider route if rider location exists
+            if (riderLocation) {
+              const riderLoc = { lat: riderLocation.latitude, lng: riderLocation.longitude }
+              const storeToRiderResponse = await fetch(
+                `http://localhost:3001/api/directions?origin=${storeLocation.lat},${storeLocation.lng}&destination=${riderLoc.lat},${riderLoc.lng}`
+              )
+              const storeToRiderData = await storeToRiderResponse.json()
+
+              if (storeToRiderData.routes && storeToRiderData.routes.length > 0) {
+                const storeToRiderPolyline = storeToRiderData.routes[0].overview_polyline.points
+                const decodedStoreToRider = google.maps.geometry.encoding.decodePath(storeToRiderPolyline)
+
+                // Draw store to rider route (blue solid)
+                new google.maps.Polyline({
+                  path: decodedStoreToRider,
+                  geodesic: true,
+                  strokeColor: '#4285F4',
+                  strokeOpacity: 0.9,
+                  strokeWeight: 5,
+                  map: newMap
+                })
+              }
+            }
+          } catch (error) {
+            console.error('Error fetching routes:', error)
+          }
+        }
+
+        await fetchAndDrawRoutes()
+      } catch (error) {
+        console.error('Error loading Google Maps:', error)
+      }
+    }
+
+    initMap()
+  }, [showTrackRiderModal, orderData, riderLocation])
+
+  // Real-time rider location tracking
+  useEffect(() => {
+    if (!showTrackRiderModal || !orderData?.riderId) return
+
+    const subscription = supabase
+      .channel('rider_location_changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'rider_location',
+          filter: `rider_id=eq.${orderData.riderId}`
+        },
+        async (payload: any) => {
+          console.log('Rider location updated:', payload)
+          if (payload.new) {
+            const newRiderLoc = {
+              latitude: Number(payload.new.latitude),
+              longitude: Number(payload.new.longitude),
+              updated_at: payload.new.updated_at
+            }
+            setRiderLocation(newRiderLoc)
+
+            // Update rider to store route (only update state, map will re-render)
+            // The map will be redrawn by the main useEffect when riderLocation changes
+          }
+        }
+      )
+      .subscribe()
+
+    return () => {
+      subscription.unsubscribe()
+    }
+  }, [showTrackRiderModal, orderData?.riderId])
 
   const LoadingSpinner = () => (
     <div className="fixed inset-0 bg-black/50 flex justify-center items-center z-[60]">
@@ -848,9 +1102,10 @@ function SpecificOrder() {
                             {step.key === 'on-delivery' && orderData.status === 'On Delivery' && (
                               <div className="mt-3 sm:mt-4">
                                 <button
-                                  onClick={() => alert('Track Rider feature - to be implemented')}
-                                  className="bg-amber-500 hover:bg-amber-600 text-white px-3 sm:px-4 py-1 text-xs sm:text-sm rounded-md font-medium transition-colors"
+                                  onClick={handleOpenTrackRider}
+                                  className="bg-amber-500 hover:bg-amber-600 text-white px-3 sm:px-4 py-1 text-xs sm:text-sm rounded-md font-medium transition-colors flex items-center gap-1"
                                 >
+                                  <Navigation className="h-3 w-3 sm:h-4 sm:w-4" />
                                   Track Rider
                                 </button>
                               </div>
@@ -1360,6 +1615,78 @@ function SpecificOrder() {
                 >
                   Close
                 </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Track Rider Modal */}
+        {showTrackRiderModal && orderData && orderData.customer.latitude && orderData.customer.longitude && (
+          <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden">
+              <div className="p-4 border-b border-gray-200 flex items-center justify-between bg-amber-800 text-white">
+                <div className="flex items-center gap-2">
+                  <Navigation className="h-6 w-6" />
+                  <h2 className="text-xl font-bold">Track Rider - Order {orderData.orderNumber}</h2>
+                </div>
+                <button
+                  onClick={handleCloseTrackRider}
+                  className="text-white hover:text-gray-200 text-2xl font-bold"
+                >
+                  ×
+                </button>
+              </div>
+
+              <div className="p-4 bg-gray-50 border-b border-gray-200">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                  <div className="flex items-start gap-2">
+                    <MapPin className="h-5 w-5 text-green-600 flex-shrink-0 mt-0.5" />
+                    <div>
+                      <p className="font-semibold text-gray-700">Store Location</p>
+                      <p className="text-gray-600">Angieren's Lutong Bahay</p>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-2">
+                    <MapPin className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
+                    <div>
+                      <p className="font-semibold text-gray-700">Delivery Address</p>
+                      <p className="text-gray-600">{orderData.customer.address}</p>
+                    </div>
+                  </div>
+                </div>
+                {riderLocation && (
+                  <div className="mt-3 flex items-center gap-2 text-sm text-gray-600">
+                    <div className="w-3 h-3 bg-blue-500 rounded-full animate-pulse"></div>
+                    <span>Rider location updated: {new Date(riderLocation.updated_at).toLocaleTimeString()}</span>
+                  </div>
+                )}
+              </div>
+
+              <div id="track-rider-map" className="h-[500px] w-full relative"></div>
+
+              <div className="p-4 border-t border-gray-200 bg-gray-50">
+                <div className="flex items-center justify-between">
+                  <div className="flex gap-4 text-sm">
+                    <div className="flex items-center gap-2">
+                      <div className="w-4 h-4 bg-green-600 rounded-full"></div>
+                      <span>Store</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="w-4 h-4 bg-blue-600 rounded-full"></div>
+                      <span>Rider</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="w-4 h-4 bg-red-600 rounded-full"></div>
+                      <span>Destination</span>
+                    </div>
+                  </div>
+                  <button
+                    onClick={handleCloseTrackRider}
+                    className="bg-gray-300 hover:bg-gray-400 text-gray-800 font-medium py-2 px-6 rounded-lg transition-colors"
+                  >
+                    Close
+                  </button>
+                </div>
               </div>
             </div>
           </div>

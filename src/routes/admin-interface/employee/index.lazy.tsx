@@ -462,6 +462,22 @@ function RouteComponent() {
     const handleCreateAccount = async () => {
         setLoading(true)
         try {
+            // Check if email already exists in users table
+            const { data: existingUser, error: checkError } = await supabase
+                .from('users')
+                .select('email')
+                .eq('email', formData.email.trim().toLowerCase())
+                .maybeSingle()
+
+            if (checkError) throw checkError
+
+            if (existingUser) {
+                alert('This email is already registered. Please use a different email address.')
+                setLoading(false)
+                return
+            }
+
+            // Attempt to sign up with Supabase Auth
             const { data: authData, error: authError } = await supabase.auth.signUp({
                 email: formData.email,
                 password: formData.password,
@@ -470,7 +486,16 @@ function RouteComponent() {
                 },
             })
 
-            if (authError) throw authError
+            if (authError) {
+                // Check if it's a duplicate email error
+                if (authError.message.toLowerCase().includes('already registered') ||
+                    authError.message.toLowerCase().includes('already exists')) {
+                    alert('This email is already registered in the system. Please use a different email address.')
+                    setLoading(false)
+                    return
+                }
+                throw authError
+            }
 
             const userAuthId = authData?.user?.id
             if (!userAuthId) throw new Error("Auth signup failed, no user ID returned.")
@@ -483,7 +508,7 @@ function RouteComponent() {
                         first_name: formData.first_name,
                         middle_name: formData.middle_name || '',
                         last_name: formData.last_name,
-                        email: formData.email,
+                        email: formData.email.trim().toLowerCase(),
                         phone_number: formData.phoneNumber,
                         user_role: formData.employeeType.toLowerCase(),
                         is_active: true,
@@ -499,6 +524,7 @@ function RouteComponent() {
             // Refresh the employee list
             await fetchEmployees()
 
+            alert('Employee account created successfully!')
             setIsCreateModalOpen(false)
             setLoading(false)
             // Reset form
@@ -513,11 +539,11 @@ function RouteComponent() {
                 vehicleInfo: '',
                 profilePhoto: null
             })
-        } catch (error) {
+        } catch (error: any) {
             console.error('Error creating account:', error)
-            alert('Failed to create account. Please try again.')
+            alert(error.message || 'Failed to create account. Please try again.')
+            setLoading(false)
         }
-        setLoading(false)
     }
 
     const generateTemporaryPassword = () => {

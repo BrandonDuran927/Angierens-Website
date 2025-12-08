@@ -2126,7 +2126,7 @@ function RouteComponent() {
                                             </button>
                                         </div>
                                     )}
-                                    {selectedOrder.order_status === 'Ready' && (
+                                    {selectedOrder.order_status === 'Ready' && selectedOrder.orderData?.order_type === 'Pick-up' && (
                                         <button
                                             onClick={() => handleNotifyCustomer(selectedOrder.id)}
                                             className="px-6 py-2.5 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors font-medium flex items-center gap-2"

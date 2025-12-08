@@ -1,5 +1,5 @@
 import { createLazyFileRoute, Link } from '@tanstack/react-router'
-import { ShoppingCart, Bell, ChevronDown, ArrowLeft, X, Menu, Calendar, Heart, Star, MessageSquare, Upload, Check } from 'lucide-react'
+import { ShoppingCart, Bell, ChevronDown, ArrowLeft, X, Menu, Calendar, Heart, Star, MessageSquare, Upload, Check, Trash2 } from 'lucide-react'
 import { ProtectedRoute } from '@/components/ProtectedRoute'
 import { useState, useEffect } from 'react'
 import { useUser } from '@/context/UserContext'
@@ -1013,6 +1013,47 @@ function RouteComponent() {
         setIsCalendarDropdownOpen(false);
     };
 
+    const handleDeleteAddress = async (addressId: string, addressType: string) => {
+        // Prevent deletion of primary addresses
+        if (addressType === 'Primary') {
+            alert('Cannot delete primary address. Please change it to secondary first in your profile.');
+            return;
+        }
+
+        if (!confirm('Are you sure you want to delete this address?')) {
+            return;
+        }
+
+        try {
+            const { error } = await supabase
+                .from('address')
+                .delete()
+                .eq('address_id', addressId);
+
+            if (error) throw error;
+
+            // Update local state
+            const updatedAddresses = addresses.filter(addr => addr.address_id !== addressId);
+            setAddresses(updatedAddresses);
+
+            // If deleted address was selected, select the first available address
+            if (selectedAddressId === addressId) {
+                if (updatedAddresses.length > 0) {
+                    setSelectedAddress(updatedAddresses[0]);
+                    setSelectedAddressId(updatedAddresses[0].address_id);
+                } else {
+                    setSelectedAddress(null);
+                    setSelectedAddressId(null);
+                }
+            }
+
+            alert('Address deleted successfully!');
+        } catch (error) {
+            console.error('Error deleting address:', error);
+            alert('Failed to delete address. Please try again.');
+        }
+    };
+
     const handleSaveNewAddress = async () => {
         if (!user) return;
 
@@ -2021,20 +2062,38 @@ function RouteComponent() {
                                     {addresses.map((addr) => (
                                         <div
                                             key={addr.address_id}
-                                            onClick={() => {
-                                                setSelectedAddress(addr);
-                                                setSelectedAddressId(addr.address_id);
-                                                setIsEditAddressModalOpen(false);
-                                            }}
-                                            className={`p-4 border-2 rounded-lg cursor-pointer transition-colors ${selectedAddressId === addr.address_id
+                                            className={`p-4 border-2 rounded-lg transition-colors ${selectedAddressId === addr.address_id
                                                 ? 'border-yellow-400 bg-yellow-50'
                                                 : 'border-gray-200 hover:border-gray-300'
                                                 }`}
                                         >
-                                            <p className="font-medium text-gray-800">{addr.address_type}</p>
-                                            <p className="text-sm text-gray-600 mt-1">{addr.address_line}</p>
-                                            <p className="text-sm text-gray-600">{addr.barangay}, {addr.city}</p>
-                                            <p className="text-sm text-gray-600">{addr.region} {addr.postal_code}</p>
+                                            <div className="flex items-start justify-between gap-3">
+                                                <div
+                                                    onClick={() => {
+                                                        setSelectedAddress(addr);
+                                                        setSelectedAddressId(addr.address_id);
+                                                        setIsEditAddressModalOpen(false);
+                                                    }}
+                                                    className="flex-1 cursor-pointer"
+                                                >
+                                                    <p className="font-medium text-gray-800">{addr.address_type}</p>
+                                                    <p className="text-sm text-gray-600 mt-1">{addr.address_line}</p>
+                                                    <p className="text-sm text-gray-600">{addr.barangay}, {addr.city}</p>
+                                                    <p className="text-sm text-gray-600">{addr.region} {addr.postal_code}</p>
+                                                </div>
+                                                {addr.address_type === 'Secondary' && (
+                                                    <button
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            handleDeleteAddress(addr.address_id, addr.address_type);
+                                                        }}
+                                                        className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors flex-shrink-0"
+                                                        title="Delete address"
+                                                    >
+                                                        <Trash2 className="w-5 h-5" />
+                                                    </button>
+                                                )}
+                                            </div>
                                         </div>
                                     ))}
                                 </div>

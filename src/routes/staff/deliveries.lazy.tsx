@@ -82,6 +82,7 @@ function RouteComponent() {
                 .select(`
                     *,
                     customer:users!customer_uid(first_name, last_name, phone_number),
+                    schedule:schedule(schedule_date, schedule_time),
                     delivery:delivery(
                         delivery_id,
                         delivery_time,
@@ -105,43 +106,53 @@ function RouteComponent() {
             if (error) throw error
 
             // Transform the data to match the existing UI structure
-            const transformedOrders = data?.map((order: any) => ({
-                id: `#${order.order_number}`,
-                orderId: order.order_id,
-                customerName: `${order.customer?.first_name || ''} ${order.customer?.last_name || ''}`.trim(),
-                assignedRider: order.delivery?.rider ? `${order.delivery.rider.first_name} ${order.delivery.rider.last_name}` : null,
-                assignedDate: new Date(order.created_at).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }),
-                assignedTime: new Date(order.created_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
-                price: `₱ ${parseFloat(order.total_price).toLocaleString()}`,
-                cancellationRequest: order.failed_delivery_reason ? 'Pending' : 'None',
-                status: order.order_status,
-                address: order.delivery?.address ?
-                    `${order.delivery.address.address_line_1 || ''} ${order.delivery.address.address_line_2 || ''}, ${order.delivery.address.city || ''}, ${order.delivery.address.province || ''}`.trim()
-                    : 'N/A',
-                deliveryTime: order.delivery?.delivery_time ?
-                    new Date(order.delivery.delivery_time).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) + ' To Be Delivered'
-                    : 'TBD',
-                contact: order.customer?.phone_number || 'N/A',
-                specialInstructions: order.additional_information || 'No special instructions',
-                fulfillmentType: order.order_type,
-                orderType: 'Today', // You can calculate this based on created_at vs current date
-                paymentPercentage: order.payment?.is_paid ? '100' : '0',
-                items: order.order_item?.map((item: any) => ({
-                    name: item.menu?.name || 'Unknown Item',
-                    addOns: item.order_item_add_on?.map((addon: any) => addon.add_on?.name).join(', ') || '',
-                    quantity: item.quantity,
-                    price: parseFloat(item.subtotal_price)
-                })) || [],
-                deliveryFee: order.delivery?.delivery_fee ? parseFloat(order.delivery.delivery_fee) : 0,
-                totalAmount: parseFloat(order.total_price),
-                deliveryId: order.delivery_id,
-                cancellationDetails: order.failed_delivery_reason ? {
-                    date: new Date(order.status_updated_at).toLocaleDateString('en-US'),
-                    time: new Date(order.status_updated_at).toLocaleTimeString('en-US'),
-                    requestedBy: order.delivery?.rider ? `${order.delivery.rider.first_name} ${order.delivery.rider.last_name}` : 'Unknown',
-                    reason: order.failed_delivery_reason
-                } : null
-            })) || []
+            const transformedOrders = data?.map((order: any) => {
+                const scheduleDate = order.schedule?.schedule_date
+                    ? new Date(order.schedule.schedule_date).toLocaleDateString('en-US', {
+                        year: 'numeric',
+                        month: 'short',
+                        day: 'numeric'
+                    })
+                    : 'TBD'
+
+                return {
+                    id: `#${order.order_number}`,
+                    orderId: order.order_id,
+                    customerName: `${order.customer?.first_name || ''} ${order.customer?.last_name || ''}`.trim(),
+                    assignedRider: order.delivery?.rider ? `${order.delivery.rider.first_name} ${order.delivery.rider.last_name}` : null,
+                    assignedDate: scheduleDate,
+                    assignedTime: order.schedule?.schedule_time || new Date(order.created_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
+                    price: `₱ ${parseFloat(order.total_price).toLocaleString()}`,
+                    cancellationRequest: order.failed_delivery_reason ? 'Pending' : 'None',
+                    status: order.order_status,
+                    address: order.delivery?.address ?
+                        `${order.delivery.address.address_line_1 || ''} ${order.delivery.address.address_line_2 || ''}, ${order.delivery.address.city || ''}, ${order.delivery.address.province || ''}`.trim()
+                        : 'N/A',
+                    deliveryTime: order.delivery?.delivery_time ?
+                        new Date(order.delivery.delivery_time).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) + ' To Be Delivered'
+                        : order.schedule?.schedule_time || 'TBD',
+                    contact: order.customer?.phone_number || 'N/A',
+                    specialInstructions: order.additional_information || 'No special instructions',
+                    fulfillmentType: order.order_type,
+                    orderType: 'Today', // You can calculate this based on created_at vs current date
+                    paymentPercentage: order.payment?.is_paid ? '100' : '0',
+                    items: order.order_item?.map((item: any) => ({
+                        name: item.menu?.name || 'Unknown Item',
+                        addOns: item.order_item_add_on?.map((addon: any) => addon.add_on?.name).join(', ') || '',
+                        quantity: item.quantity,
+                        price: parseFloat(item.subtotal_price)
+                    })) || [],
+                    deliveryFee: order.delivery?.delivery_fee ? parseFloat(order.delivery.delivery_fee) : 0,
+                    totalAmount: parseFloat(order.total_price),
+                    deliveryId: order.delivery_id,
+                    cancellationDetails: order.failed_delivery_reason ? {
+                        date: new Date(order.status_updated_at).toLocaleDateString('en-US'),
+                        time: new Date(order.status_updated_at).toLocaleTimeString('en-US'),
+                        requestedBy: order.delivery?.rider ? `${order.delivery.rider.first_name} ${order.delivery.rider.last_name}` : 'Unknown',
+                        reason: order.failed_delivery_reason
+                    } : null
+                }
+            }) || []
 
             setDeliveryOrders(transformedOrders)
         } catch (error) {
@@ -1164,7 +1175,7 @@ function RouteComponent() {
                                             </div>
                                             <div className="flex justify-between items-center text-xl font-bold border-t border-gray-200 pt-3">
                                                 <span>Total Amount</span>
-                                                <span>₱ {selectedOrder.totalAmount + (selectedOrder.deliveryFee)}</span>
+                                                <span>₱ {(selectedOrder.totalAmount + (selectedOrder.deliveryFee)).toFixed(2)}</span>
                                             </div>
                                         </div>
                                     </div>
