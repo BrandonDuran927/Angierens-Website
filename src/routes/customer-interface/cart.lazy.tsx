@@ -390,13 +390,6 @@ function RouteComponent() {
     const openEditModal = (item: CartItem) => {
         setSelectedItem(item);
         setOrderQuantity(item.quantity);
-
-        // Pre-populate existing add-ons
-        const existingAddOns: Record<string, number> = {};
-        item.addOns.forEach(addOn => {
-            existingAddOns[addOn.id] = addOn.quantity;
-        });
-        setAddOns(existingAddOns);
         setIsEditModalOpen(true);
     };
 
@@ -404,38 +397,15 @@ function RouteComponent() {
         setIsEditModalOpen(false);
         setSelectedItem(null);
         setOrderQuantity(1);
-        setAddOns({});
     };
 
-    const updateAddOnQuantity = (addOnId: string, quantity: number) => {
-        if (quantity <= 0) {
-            const newAddOns = { ...addOns };
-            delete newAddOns[addOnId];
-            setAddOns(newAddOns);
-        } else {
-            setAddOns(prev => ({ ...prev, [addOnId]: quantity }));
-        }
-    };
-
-    const calculateEditTotal = () => {
-        if (!selectedItem) return 0;
-        const numericPrice = parseFloat(String(selectedItem.price)) || 0;
-        const baseTotal = numericPrice * orderQuantity;
-
-        const addOnTotal = Object.entries(addOns).reduce((total, [addOnId, quantity]) => {
-            const addOn = addOnOptions.find(option => option.add_on === addOnId);
-            const addOnPrice = addOn ? (parseFloat(String(addOn.price)) || 0) : 0;
-            return total + (addOnPrice * quantity);
-        }, 0);
-
-        return baseTotal + addOnTotal;
-    };
+    // calculateEditTotal is no longer needed since we removed add-ons from edit modal
 
     const updateCartItem = async () => {
         if (!selectedItem) return;
 
         try {
-            // Update cart item quantity
+            // Update cart item quantity only
             const { error: updateError } = await supabase
                 .from('cart_item')
                 .update({ quantity: orderQuantity })
@@ -443,54 +413,12 @@ function RouteComponent() {
 
             if (updateError) throw updateError;
 
-            // Delete existing add-ons
-            await supabase
-                .from('cart_item_add_on')
-                .delete()
-                .eq('cart_item_id', selectedItem.cart_item_id);
-
-            // Insert new add-ons
-            if (Object.keys(addOns).length > 0) {
-                const addOnsToInsert = Object.entries(addOns)
-                    .filter(([_, quantity]) => quantity > 0)
-                    .map(([addOnId, quantity]) => {
-                        const addOn = addOnOptions.find(option => option.add_on === addOnId);
-                        return {
-                            cart_item_id: selectedItem.cart_item_id,
-                            add_on_id: addOnId,
-                            quantity: quantity,
-                            price: addOn ? Number(addOn.price) : 0
-                        };
-                    });
-
-                if (addOnsToInsert.length > 0) {
-                    const { error: addOnError } = await supabase
-                        .from('cart_item_add_on')
-                        .insert(addOnsToInsert);
-
-                    if (addOnError) throw addOnError;
-                }
-            }
-
-            // Update local state
-            const addOnsFormatted = Object.entries(addOns)
-                .filter(([_, quantity]) => quantity > 0)
-                .map(([addOnId, quantity]) => {
-                    const addOn = addOnOptions.find(option => option.add_on === addOnId);
-                    return {
-                        id: addOnId,
-                        name: addOn?.name || '',
-                        quantity: quantity,
-                        price: addOn ? Number(addOn.price) : 0
-                    };
-                });
-
+            // Update local state (keep existing add-ons unchanged)
             setCartItems(cartItems.map(item =>
                 item.cart_item_id === selectedItem.cart_item_id
                     ? {
                         ...item,
-                        quantity: orderQuantity,
-                        addOns: addOnsFormatted
+                        quantity: orderQuantity
                     }
                     : item
             ));
@@ -663,33 +591,34 @@ function RouteComponent() {
                 return;
             }
 
-            // Apply the same add-ons to all selected items
-            for (const item of selectedCartItems) {
-                // Delete existing add-ons
+            // Apply add-ons only to the FIRST selected item (not duplicated across all items)
+            // This means the add-ons are for the entire order, not per individual item
+            if (selectedCartItems.length > 0 && Object.keys(checkoutAddOns).length > 0) {
+                const firstItem = selectedCartItems[0];
+
+                // Delete existing add-ons from the first item only
                 await supabase
                     .from('cart_item_add_on')
                     .delete()
-                    .eq('cart_item_id', item.cart_item_id);
+                    .eq('cart_item_id', firstItem.cart_item_id);
 
-                // Insert new add-ons if any
-                if (Object.keys(checkoutAddOns).length > 0) {
-                    const addOnsToInsert = Object.entries(checkoutAddOns)
-                        .filter(([_, quantity]) => quantity > 0)
-                        .map(([addOnId, quantity]) => {
-                            const addOn = addOnOptions.find(option => option.add_on === addOnId);
-                            return {
-                                cart_item_id: item.cart_item_id,
-                                add_on_id: addOnId,
-                                quantity: quantity,
-                                price: addOn ? Number(addOn.price) : 0
-                            };
-                        });
+                // Insert new add-ons to the first item only
+                const addOnsToInsert = Object.entries(checkoutAddOns)
+                    .filter(([_, quantity]) => quantity > 0)
+                    .map(([addOnId, quantity]) => {
+                        const addOn = addOnOptions.find(option => option.add_on === addOnId);
+                        return {
+                            cart_item_id: firstItem.cart_item_id,
+                            add_on_id: addOnId,
+                            quantity: quantity,
+                            price: addOn ? Number(addOn.price) : 0
+                        };
+                    });
 
-                    if (addOnsToInsert.length > 0) {
-                        await supabase
-                            .from('cart_item_add_on')
-                            .insert(addOnsToInsert);
-                    }
+                if (addOnsToInsert.length > 0) {
+                    await supabase
+                        .from('cart_item_add_on')
+                        .insert(addOnsToInsert);
                 }
             }
 
@@ -1223,122 +1152,89 @@ function RouteComponent() {
                 {/* Edit Modal - Enhanced */}
                 {isEditModalOpen && selectedItem && (
                     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-in fade-in duration-200">
-                        <div className="bg-white rounded-3xl max-w-5xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">
-                            <div className="flex flex-col lg:flex-row">
-                                {/* Left side - Item details */}
-                                <div className="flex-1 p-6 lg:p-8">
-                                    <div className="flex justify-between items-start mb-6">
-                                        <div className="flex-1">
-                                            <div className="flex items-center gap-3 mb-3">
-                                                <div className="bg-gradient-to-br from-yellow-400 to-orange-400 p-2 rounded-xl">
-                                                    <Edit2 className="w-5 h-5 text-white" />
+                        <div className="bg-white rounded-3xl max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">
+                            <div className="p-6 lg:p-8">
+                                <div className="flex justify-between items-start mb-6">
+                                    <div className="flex-1">
+                                        <div className="flex items-center gap-3 mb-3">
+                                            <div className="bg-gradient-to-br from-yellow-400 to-orange-400 p-2 rounded-xl">
+                                                <Edit2 className="w-5 h-5 text-white" />
+                                            </div>
+                                            <h2 className="text-2xl lg:text-3xl font-bold text-gray-900">{selectedItem.name}</h2>
+                                        </div>
+                                        <p className="text-xl font-semibold text-yellow-600 mb-2">{formatPrice(selectedItem.price)}</p>
+                                        <p className="text-gray-600 leading-relaxed">{selectedItem.description}</p>
+                                    </div>
+                                    <button
+                                        onClick={closeEditModal}
+                                        className="text-gray-400 hover:text-gray-600 p-2 hover:bg-gray-100 rounded-xl transition-all ml-4"
+                                    >
+                                        <X className="h-6 w-6" />
+                                    </button>
+                                </div>
+
+                                {selectedItem.inclusions && selectedItem.inclusions.length > 0 && (
+                                    <div className="mb-6 bg-gradient-to-br from-yellow-50 to-orange-50 p-5 rounded-2xl border-2 border-yellow-200">
+                                        <h3 className="text-lg font-bold text-gray-800 mb-3 flex items-center gap-2">
+                                            <Package className="w-5 h-5 text-yellow-600" />
+                                            Inclusions:
+                                        </h3>
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                            {selectedItem.inclusions.map((inclusion: string, index: number) => (
+                                                <div key={index} className="flex items-center gap-2">
+                                                    <div className="w-2 h-2 bg-yellow-500 rounded-full"></div>
+                                                    <p className="text-gray-700 text-sm">{inclusion}</p>
                                                 </div>
-                                                <h2 className="text-2xl lg:text-3xl font-bold text-gray-900">{selectedItem.name}</h2>
-                                            </div>
-                                            <p className="text-gray-600 leading-relaxed">{selectedItem.description}</p>
+                                            ))}
                                         </div>
+                                    </div>
+                                )}
+
+                                {/* Quantity selector */}
+                                <div className="flex items-center gap-4 mb-6 bg-gray-50 p-5 rounded-2xl">
+                                    <span className="text-gray-800 font-bold text-lg">Quantity:</span>
+                                    <div className="flex items-center gap-3">
                                         <button
-                                            onClick={closeEditModal}
-                                            className="text-gray-400 hover:text-gray-600 p-2 hover:bg-gray-100 rounded-xl transition-all ml-4"
+                                            onClick={() => setOrderQuantity(Math.max(1, orderQuantity - 1))}
+                                            className="w-12 h-12 rounded-xl bg-gradient-to-br from-yellow-400 to-orange-400 hover:from-yellow-500 hover:to-orange-500 flex items-center justify-center shadow-md hover:shadow-lg transition-all"
                                         >
-                                            <X className="h-6 w-6" />
+                                            <Minus className="h-5 w-5 text-white" />
                                         </button>
-                                    </div>
-
-                                    {selectedItem.inclusions && selectedItem.inclusions.length > 0 && (
-                                        <div className="mb-6 bg-gradient-to-br from-yellow-50 to-orange-50 p-5 rounded-2xl border-2 border-yellow-200">
-                                            <h3 className="text-lg font-bold text-gray-800 mb-3 flex items-center gap-2">
-                                                <Package className="w-5 h-5 text-yellow-600" />
-                                                Inclusions:
-                                            </h3>
-                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                                                {selectedItem.inclusions.map((inclusion: string, index: number) => (
-                                                    <div key={index} className="flex items-center gap-2">
-                                                        <div className="w-2 h-2 bg-yellow-500 rounded-full"></div>
-                                                        <p className="text-gray-700 text-sm">{inclusion}</p>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        </div>
-                                    )}
-
-                                    {/* Quantity selector */}
-                                    <div className="flex items-center gap-4 mb-8 bg-gray-50 p-5 rounded-2xl">
-                                        <span className="text-gray-800 font-bold text-lg">Quantity:</span>
-                                        <div className="flex items-center gap-3">
-                                            <button
-                                                onClick={() => setOrderQuantity(Math.max(1, orderQuantity - 1))}
-                                                className="w-12 h-12 rounded-xl bg-gradient-to-br from-yellow-400 to-orange-400 hover:from-yellow-500 hover:to-orange-500 flex items-center justify-center shadow-md hover:shadow-lg transition-all"
-                                            >
-                                                <Minus className="h-5 w-5 text-white" />
-                                            </button>
-                                            <span className="text-2xl font-bold w-16 text-center text-gray-900">{orderQuantity}</span>
-                                            <button
-                                                onClick={() => setOrderQuantity(orderQuantity + 1)}
-                                                className="w-12 h-12 rounded-xl bg-gradient-to-br from-yellow-400 to-orange-400 hover:from-yellow-500 hover:to-orange-500 flex items-center justify-center shadow-md hover:shadow-lg transition-all"
-                                            >
-                                                <Plus className="h-5 w-5 text-white" />
-                                            </button>
-                                        </div>
-                                    </div>
-
-                                    {/* Total and Update Cart */}
-                                    <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-6 border-t-2 border-gray-200">
-                                        <div>
-                                            <div className="text-sm text-gray-600 mb-1">Total Amount</div>
-                                            <div className="text-3xl font-bold bg-gradient-to-r from-yellow-600 to-orange-600 bg-clip-text text-transparent">
-                                                ₱{calculateEditTotal().toLocaleString()}
-                                            </div>
-                                        </div>
+                                        <span className="text-2xl font-bold w-16 text-center text-gray-900">{orderQuantity}</span>
                                         <button
-                                            onClick={updateCartItem}
-                                            className="w-full sm:w-auto bg-gradient-to-r from-yellow-400 to-orange-400 hover:from-yellow-500 hover:to-orange-500 text-white px-8 py-4 rounded-2xl font-bold transition-all duration-300 shadow-xl hover:shadow-2xl transform hover:scale-105 flex items-center justify-center gap-2"
+                                            onClick={() => setOrderQuantity(orderQuantity + 1)}
+                                            className="w-12 h-12 rounded-xl bg-gradient-to-br from-yellow-400 to-orange-400 hover:from-yellow-500 hover:to-orange-500 flex items-center justify-center shadow-md hover:shadow-lg transition-all"
                                         >
-                                            Update Cart
-                                            <ArrowRight className="w-5 h-5" />
+                                            <Plus className="h-5 w-5 text-white" />
                                         </button>
                                     </div>
                                 </div>
 
-                                {/* Right side - Add-ons */}
-                                <div className="w-full lg:w-96 bg-gradient-to-br from-gray-50 to-gray-100 p-6 lg:p-8 border-t lg:border-t-0 lg:border-l-2 border-gray-200">
-                                    <h3 className="text-xl font-bold text-gray-900 mb-6 flex items-center gap-2">
-                                        <Tag className="w-5 h-5 text-yellow-600" />
-                                        Available Add-ons
-                                    </h3>
-                                    <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2">
-                                        {addOnOptions.length === 0 ? (
-                                            <p className="text-gray-500 text-center py-8">No add-ons available</p>
-                                        ) : (
-                                            addOnOptions.map((addOn) => (
-                                                <div key={addOn.add_on} className="bg-white rounded-xl p-4 shadow-sm hover:shadow-md transition-all border-2 border-transparent hover:border-yellow-400">
-                                                    <div className="flex items-center justify-between mb-3">
-                                                        <div className="flex-1">
-                                                            <span className="inline-block bg-gradient-to-r from-yellow-400 to-orange-400 text-white px-3 py-1.5 rounded-lg text-sm font-bold mb-2">
-                                                                {addOn.name}
-                                                            </span>
-                                                            <p className="text-sm font-bold text-gray-900">₱{Number(addOn.price).toLocaleString()}</p>
-                                                        </div>
-                                                    </div>
-                                                    <div className="flex items-center justify-center gap-2">
-                                                        <button
-                                                            onClick={() => updateAddOnQuantity(addOn.add_on, (addOns[addOn.add_on] || 0) - 1)}
-                                                            className="w-9 h-9 rounded-lg bg-gray-200 hover:bg-gray-300 flex items-center justify-center transition-colors"
-                                                        >
-                                                            <Minus className="h-4 w-4 text-gray-700" />
-                                                        </button>
-                                                        <span className="w-12 text-center font-bold text-lg text-gray-900">{addOns[addOn.add_on] || 0}</span>
-                                                        <button
-                                                            onClick={() => updateAddOnQuantity(addOn.add_on, (addOns[addOn.add_on] || 0) + 1)}
-                                                            className="w-9 h-9 rounded-lg bg-gradient-to-br from-yellow-400 to-orange-400 hover:from-yellow-500 hover:to-orange-500 flex items-center justify-center transition-all shadow-sm"
-                                                        >
-                                                            <Plus className="h-4 w-4 text-white" />
-                                                        </button>
-                                                    </div>
-                                                </div>
-                                            ))
-                                        )}
+                                {/* Info message about add-ons */}
+                                <div className="mb-6 bg-blue-50 border-2 border-blue-200 rounded-xl p-4">
+                                    <div className="flex items-start gap-3">
+                                        <Tag className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
+                                        <p className="text-sm text-blue-800">
+                                            <strong>Note:</strong> Add-ons can be selected for your entire order during checkout.
+                                        </p>
                                     </div>
+                                </div>
+
+                                {/* Total and Update Cart */}
+                                <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-6 border-t-2 border-gray-200">
+                                    <div>
+                                        <div className="text-sm text-gray-600 mb-1">Total Amount</div>
+                                        <div className="text-3xl font-bold bg-gradient-to-r from-yellow-600 to-orange-600 bg-clip-text text-transparent">
+                                            {formatPrice(selectedItem.price * orderQuantity)}
+                                        </div>
+                                    </div>
+                                    <button
+                                        onClick={updateCartItem}
+                                        className="w-full sm:w-auto bg-gradient-to-r from-yellow-400 to-orange-400 hover:from-yellow-500 hover:to-orange-500 text-white px-8 py-4 rounded-2xl font-bold transition-all duration-300 shadow-xl hover:shadow-2xl transform hover:scale-105 flex items-center justify-center gap-2"
+                                    >
+                                        Update Cart
+                                        <ArrowRight className="w-5 h-5" />
+                                    </button>
                                 </div>
                             </div>
                         </div>

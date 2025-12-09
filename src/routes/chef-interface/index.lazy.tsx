@@ -94,6 +94,7 @@ function RouteComponent() {
             setLoading(true)
 
             // Fetch orders with related data
+            // Order by created_at ascending (oldest first) for proper queue management
             const { data: ordersData, error: ordersError } = await supabase
                 .from('order')
                 .select(`
@@ -118,7 +119,7 @@ function RouteComponent() {
                     )
                 `)
                 .in('order_status', ['Queueing', 'Preparing', 'Cooking', 'Ready'])
-                .order('created_at', { ascending: false })
+                .order('created_at', { ascending: true })
 
             if (ordersError) throw ordersError
 

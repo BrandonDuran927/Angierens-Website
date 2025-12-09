@@ -534,13 +534,36 @@ function RouteComponent() {
     const formatPrice = (price: number) => `₱${price.toFixed(2)}`
 
     // Refund Modal Handlers
-    const handleOpenRefundModal = (orderId: string) => {
-        setCurrentOrderId(orderId)
-        setShowRefundModal(true)
-        setRefundStep(1)
-        setSelectedReason('')
-        setGcashNumber('')
-        setConfirmGcashNumber('')
+    const handleOpenRefundModal = async (orderId: string) => {
+        try {
+            // Verify current order status from database before allowing refund
+            const { data: orderData, error } = await supabase
+                .from('order')
+                .select('order_status')
+                .eq('order_id', orderId)
+                .single()
+
+            if (error) throw error
+
+            // Only allow refund for Pending or Queueing status
+            if (orderData.order_status !== 'Pending' && orderData.order_status !== 'Queueing') {
+                alert(`Cannot request refund. This order is already in "${orderData.order_status}" status and cannot be cancelled.`)
+                // Refresh orders to show current status
+                await fetchOrders()
+                return
+            }
+
+            // Proceed with refund modal
+            setCurrentOrderId(orderId)
+            setShowRefundModal(true)
+            setRefundStep(1)
+            setSelectedReason('')
+            setGcashNumber('')
+            setConfirmGcashNumber('')
+        } catch (error) {
+            console.error('Error checking order status:', error)
+            alert('Failed to verify order status. Please try again.')
+        }
     }
 
     const handleCloseRefundModal = () => {

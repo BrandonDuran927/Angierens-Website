@@ -733,18 +733,25 @@ function RouteComponent() {
             .filter(s => {
                 if (s.schedule_date !== dateString) return false;
 
-                // If it's today, filter out times that have already passed
+                // If it's today, filter out times that are too close (within 1 hour)
                 if (isToday) {
                     const [hours, minutes] = s.schedule_time.split(':');
                     const scheduleHour = parseInt(hours);
                     const scheduleMinute = parseInt(minutes);
 
+                    // Create schedule time in minutes from midnight
+                    const scheduleTimeInMinutes = scheduleHour * 60 + scheduleMinute;
+
+                    // Create current time in minutes from midnight, plus 60 minutes buffer
                     const currentHour = now.getHours();
                     const currentMinute = now.getMinutes();
+                    const currentTimeInMinutes = currentHour * 60 + currentMinute;
+                    const minimumAllowedTime = currentTimeInMinutes + 60; // 1 hour buffer
 
-                    // Compare time: if schedule time is before or equal to current time, filter it out
-                    if (scheduleHour < currentHour) return false;
-                    if (scheduleHour === currentHour && scheduleMinute <= currentMinute) return false;
+                    // Filter out if schedule time is less than current time + 1 hour
+                    if (scheduleTimeInMinutes < minimumAllowedTime) {
+                        return false;
+                    }
                 }
 
                 return true;
@@ -1735,7 +1742,7 @@ function RouteComponent() {
                                         {selectedCartItems.map((item) => (
                                             <div key={item.cart_item_id} className="mb-4 pb-4 border-b border-gray-200 last:border-b-0">
                                                 {/* Main Menu Item with Image */}
-                                                <div className="flex gap-3 mb-2">
+                                                <div className="flex gap-3">
                                                     {/* Item Image */}
                                                     {item.menu.image_url && (
                                                         <div className="w-16 h-16 flex-shrink-0 rounded-lg overflow-hidden bg-gray-100">
@@ -1753,46 +1760,54 @@ function RouteComponent() {
                                                             <div className="flex-1">
                                                                 <p className="font-medium text-gray-800 line-clamp-2">{item.menu.name}</p>
                                                                 <p className="text-xs text-gray-500 mt-0.5">
-                                                                    {/* FIX 1: Display item.price (size-adjusted price) */}
                                                                     {formatPrice(Number(item.price))} each
                                                                 </p>
                                                             </div>
                                                             <div className="text-right flex-shrink-0">
                                                                 <p className="text-sm text-gray-600 mb-1">×{item.quantity}</p>
                                                                 <p className="font-semibold text-gray-800">
-                                                                    {/* FIX 2: Calculate total using item.price */}
                                                                     {formatPrice(Number(item.price) * item.quantity)}
                                                                 </p>
                                                             </div>
                                                         </div>
                                                     </div>
                                                 </div>
+                                            </div>
+                                        ))}
 
-                                                {/* Add-ons */}
-                                                {item.cart_item_add_on && item.cart_item_add_on.length > 0 && (
-                                                    <div className="ml-4 pl-4 border-l-2 border-gray-200 space-y-1.5 mt-2">
-                                                        {item.cart_item_add_on.map((addOn, index) => (
+                                        {/* Shared Add-ons Section - Display separately */}
+                                        {selectedCartItems.some(item => item.cart_item_add_on && item.cart_item_add_on.length > 0) && (
+                                            <div className="mt-4 pt-4 border-t-2 border-amber-200 bg-amber-50/50 rounded-lg p-4">
+                                                <h3 className="text-sm font-semibold text-amber-900 mb-3 flex items-center gap-2">
+                                                    <span className="text-amber-600">+</span>
+                                                    Add-ons for Your Order
+                                                </h3>
+                                                <div className="space-y-2">
+                                                    {selectedCartItems
+                                                        .filter(item => item.cart_item_add_on && item.cart_item_add_on.length > 0)
+                                                        .flatMap(item => item.cart_item_add_on)
+                                                        .map((addOn, index) => (
                                                             <div key={index} className="flex justify-between items-center text-sm">
                                                                 <div className="flex-1">
-                                                                    <p className="text-gray-600">
-                                                                        <span className="text-amber-600">+</span> {addOn.add_on.name}
-                                                                    </p>
-                                                                    <p className="text-xs text-gray-400">
+                                                                    <p className="text-gray-700 font-medium">{addOn.add_on.name}</p>
+                                                                    <p className="text-xs text-gray-500">
                                                                         {formatPrice(addOn.price)} each
                                                                     </p>
                                                                 </div>
                                                                 <div className="text-right flex-shrink-0">
                                                                     <span className="text-gray-500 text-xs mr-2">×{addOn.quantity}</span>
-                                                                    <span className="text-gray-700 font-medium">
+                                                                    <span className="text-gray-700 font-semibold">
                                                                         {formatPrice(addOn.price * addOn.quantity)}
                                                                     </span>
                                                                 </div>
                                                             </div>
                                                         ))}
-                                                    </div>
-                                                )}
+                                                </div>
+                                                <p className="text-xs text-amber-700 mt-3 italic">
+                                                    * These add-ons apply to your entire order
+                                                </p>
                                             </div>
-                                        ))}
+                                        )}
                                     </div>
 
                                     {/* Summary Totals */}
@@ -1848,8 +1863,8 @@ function RouteComponent() {
                                         onClick={() => setIsUploadReceiptModalOpen(true)}
                                         disabled={isLoading}
                                         className={`w-full font-bold py-4 px-6 rounded-2xl transition-colors duration-200 shadow-md flex items-center justify-center gap-2 ${isLoading
-                                                ? 'bg-gray-400 cursor-not-allowed'
-                                                : 'bg-blue-600 hover:bg-blue-700 text-white'
+                                            ? 'bg-gray-400 cursor-not-allowed'
+                                            : 'bg-blue-600 hover:bg-blue-700 text-white'
                                             }`}
                                     >
                                         {isLoading ? (
@@ -1872,8 +1887,8 @@ function RouteComponent() {
                                         onClick={() => setIsUploadReceiptModalOpen(true)}
                                         disabled={isLoading}
                                         className={`w-full font-bold py-4 px-6 rounded-2xl transition-colors duration-200 shadow-md flex items-center justify-center gap-2 ${isLoading
-                                                ? 'bg-gray-400 cursor-not-allowed'
-                                                : 'bg-orange-600 hover:bg-orange-700 text-white'
+                                            ? 'bg-gray-400 cursor-not-allowed'
+                                            : 'bg-orange-600 hover:bg-orange-700 text-white'
                                             }`}
                                     >
                                         {isLoading ? (
@@ -2039,6 +2054,9 @@ function RouteComponent() {
                                                         onClick={() => {
                                                             setReceiptFile(null);
                                                             setReceiptPreview(null);
+                                                            // Reset the file input
+                                                            const fileInput = document.getElementById('receipt-upload') as HTMLInputElement;
+                                                            if (fileInput) fileInput.value = '';
                                                         }}
                                                         className="text-red-600 hover:text-red-700 text-sm font-medium"
                                                     >
@@ -2158,6 +2176,9 @@ function RouteComponent() {
                                                         onClick={() => {
                                                             setProofOfPaymentFile(null);
                                                             setProofOfPaymentPreview(null);
+                                                            // Reset the file input
+                                                            const fileInput = document.getElementById('proof-upload') as HTMLInputElement;
+                                                            if (fileInput) fileInput.value = '';
                                                         }}
                                                         className="text-red-600 hover:text-red-700 text-sm font-medium"
                                                     >
@@ -2294,6 +2315,68 @@ function RouteComponent() {
                             <p className="text-sm text-gray-600 mb-4">
                                 Click or drag the marker on the map to select your location. Address details will be automatically filled.
                             </p>
+
+                            {/* Use Current Location Button */}
+                            <button
+                                onClick={() => {
+                                    if (navigator.geolocation) {
+                                        navigator.geolocation.getCurrentPosition(
+                                            (position) => {
+                                                const lat = position.coords.latitude;
+                                                const lng = position.coords.longitude;
+
+                                                // Validate distance
+                                                const validation = validateLocationDistance(lat, lng);
+                                                if (!validation.valid) {
+                                                    setLocationError(
+                                                        `Your current location is ${validation.distance.toFixed(1)} km away from our store. ` +
+                                                        `We only deliver within ${MAX_DELIVERY_DISTANCE_KM} km. Please select a closer location.`
+                                                    );
+                                                    return;
+                                                }
+
+                                                setLocationError(null);
+                                                setSelectedLocation({ lat, lng });
+
+                                                // Update map and marker
+                                                if (mapRef.current && markerRef.current) {
+                                                    mapRef.current.setCenter({ lat, lng });
+                                                    markerRef.current.setPosition({ lat, lng });
+                                                }
+
+                                                // Fetch address from coordinates
+                                                fetchAddressFromCoordinates(lat, lng);
+                                            },
+                                            (error) => {
+                                                console.error('Geolocation error:', error);
+                                                let errorMessage = 'Unable to get your location. ';
+                                                if (error.code === error.PERMISSION_DENIED) {
+                                                    errorMessage += 'Please enable location permissions in your browser.';
+                                                } else if (error.code === error.POSITION_UNAVAILABLE) {
+                                                    errorMessage += 'Location information is unavailable.';
+                                                } else if (error.code === error.TIMEOUT) {
+                                                    errorMessage += 'Location request timed out.';
+                                                }
+                                                setLocationError(errorMessage);
+                                            },
+                                            {
+                                                enableHighAccuracy: true,
+                                                timeout: 10000,
+                                                maximumAge: 0
+                                            }
+                                        );
+                                    } else {
+                                        setLocationError('Geolocation is not supported by your browser.');
+                                    }
+                                }}
+                                className="w-full mb-4 bg-blue-600 hover:bg-blue-700 text-white py-3 px-4 rounded-lg flex items-center justify-center gap-2 transition-colors font-medium"
+                            >
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                                </svg>
+                                Use My Current Location
+                            </button>
 
                             {/* Distance Limit Warning */}
                             <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
