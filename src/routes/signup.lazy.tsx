@@ -878,8 +878,154 @@ function Signup() {
     return form.firstName && form.lastName && form.birthMonth && form.birthDay && form.birthYear && form.gender;
   };
 
+  const validateStep1 = () => {
+    const newErrors: { [key: string]: string } = {};
+
+    // First Name validation
+    const trimmedFirstName = form.firstName.trim();
+    if (!trimmedFirstName) {
+      newErrors.firstName = 'First name is required';
+    } else if (trimmedFirstName.length < 2) {
+      newErrors.firstName = 'First name must be at least 2 characters';
+    } else if (!/^[a-zA-ZÀ-ÿ\s'-]+$/.test(trimmedFirstName)) {
+      newErrors.firstName = 'First name can only contain letters, spaces, hyphens, and apostrophes';
+    }
+
+    // Middle Name validation (if provided)
+    const trimmedMiddleName = form.middleName.trim();
+    if (trimmedMiddleName && !/^[a-zA-ZÀ-ÿ\s'-]*$/.test(trimmedMiddleName)) {
+      newErrors.middleName = 'Middle name can only contain letters, spaces, hyphens, and apostrophes';
+    }
+
+    // Last Name validation
+    const trimmedLastName = form.lastName.trim();
+    if (!trimmedLastName) {
+      newErrors.lastName = 'Last name is required';
+    } else if (trimmedLastName.length < 2) {
+      newErrors.lastName = 'Last name must be at least 2 characters';
+    } else if (!/^[a-zA-ZÀ-ÿ\s'-]+$/.test(trimmedLastName)) {
+      newErrors.lastName = 'Last name can only contain letters, spaces, hyphens, and apostrophes';
+    }
+
+    // Birth Date validation
+    if (!form.birthMonth || !form.birthDay || !form.birthYear) {
+      newErrors.birthDate = 'Complete date of birth is required';
+    } else {
+      const month = parseInt(form.birthMonth);
+      const day = parseInt(form.birthDay);
+      const year = parseInt(form.birthYear);
+
+      // Validate month
+      if (month < 1 || month > 12) {
+        newErrors.birthDate = 'Please select a valid month';
+      }
+
+      // Validate day based on month
+      const daysInMonth = new Date(year, month, 0).getDate();
+      if (day < 1 || day > daysInMonth) {
+        newErrors.birthDate = `Day must be between 1 and ${daysInMonth} for the selected month`;
+      }
+
+      // Validate year
+      const currentYear = new Date().getFullYear();
+      if (year < currentYear - 120 || year > currentYear) {
+        newErrors.birthDate = 'Please enter a valid birth year';
+      }
+
+      // Validate age (must be 18+)
+      const birthDate = new Date(year, month - 1, day);
+      const today = new Date();
+      let age = today.getFullYear() - birthDate.getFullYear();
+      const monthDiff = today.getMonth() - birthDate.getMonth();
+      const dayDiff = today.getDate() - birthDate.getDate();
+      if (monthDiff < 0 || (monthDiff === 0 && dayDiff < 0)) {
+        age--;
+      }
+      if (age < 18) {
+        newErrors.birthDate = 'You must be at least 18 years old to create an account';
+      }
+    }
+
+    // Gender validation
+    if (!form.gender) {
+      newErrors.gender = 'Please select your gender';
+    }
+
+    setErrors(newErrors);
+    if (Object.keys(newErrors).length > 0) {
+      const firstError = Object.values(newErrors)[0];
+      setValidationMessage({ type: 'error', message: firstError });
+      return false;
+    }
+
+    setErrors({});
+    setValidationMessage(null);
+    return true;
+  };
+
   const isStep2Complete = () => {
     return form.postalCode && form.provinceCode && form.cityCode && form.barangayCode && form.address_line && form.phone_number;
+  };
+
+  const validateStep2 = () => {
+    const newErrors: { [key: string]: string } = {};
+
+    // Postal Code validation
+    const trimmedPostalCode = form.postalCode.trim();
+    if (!trimmedPostalCode) {
+      newErrors.postalCode = 'Postal code is required';
+    } else if (!/^\d{4}$/.test(trimmedPostalCode)) {
+      newErrors.postalCode = 'Postal code must be exactly 4 digits';
+    }
+
+    // Region/Province validation
+    if (!form.provinceCode) {
+      newErrors.province = 'Please select a region';
+    }
+
+    // City validation
+    if (!form.cityCode) {
+      newErrors.city = 'Please select a city/municipality';
+    }
+
+    // Barangay validation
+    if (!form.barangayCode) {
+      newErrors.barangay = 'Please select a barangay';
+    }
+
+    // Address Line validation
+    const trimmedAddressLine = form.address_line.trim();
+    if (!trimmedAddressLine) {
+      newErrors.address_line = 'Complete address is required';
+    } else if (trimmedAddressLine.length < 5) {
+      newErrors.address_line = 'Please provide a more complete address';
+    }
+
+    // Phone Number validation
+    const cleanedPhone = form.phone_number.replace(/\s+/g, '');
+    const phoneRegex = /^(09|\+639)\d{9}$/;
+    if (!cleanedPhone) {
+      newErrors.phone_number = 'Mobile number is required';
+    } else if (!phoneRegex.test(cleanedPhone)) {
+      newErrors.phone_number = 'Please enter a valid Philippine mobile number (09xxxxxxxxx or +639xxxxxxxxx)';
+    }
+
+    // Other Contact validation (optional)
+    const trimmedOtherContact = form.otherContact.trim();
+    if (trimmedOtherContact && trimmedOtherContact.length > 50) {
+      newErrors.otherContact = 'Alternate contact must not exceed 50 characters';
+    }
+
+    setErrors(newErrors);
+    if (Object.keys(newErrors).length > 0) {
+      const firstError = Object.values(newErrors)[0];
+      setValidationMessage({ type: 'error', message: firstError });
+      return false;
+    }
+
+    setErrors({});
+    setValidationMessage(null);
+    return true;
   };
 
 
@@ -1130,479 +1276,543 @@ function Signup() {
 
           <form onSubmit={handleSubmit} className="space-y-6">
             {/* STEP 1: Personal Information */}
-            <div className="bg-white rounded-2xl shadow-lg p-6 md:p-8 hover:shadow-xl transition-shadow">
-              <div className="flex items-center gap-3 mb-6">
-                <div className="w-10 h-10 rounded-full bg-[#964B00] text-yellow-400 flex items-center justify-center font-bold text-lg">
-                  1
-                </div>
-                <h2 className="text-2xl font-bold text-gray-800">Personal Information</h2>
-              </div>
-
-              <div className="space-y-5">
-                <div className="grid md:grid-cols-3 gap-4">
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">
-                      First Name <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      name="firstName"
-                      value={form.firstName}
-                      onChange={handleChange}
-                      maxLength={100}
-                      className={`w-full border-2 rounded-lg px-4 py-3 focus:ring-2 focus:ring-amber-200 transition-all outline-none ${errors.firstName ? 'border-red-500 focus:border-red-500' : 'border-gray-200 focus:border-[#964B00]'
-                        }`}
-                      placeholder='Juan'
-                      required
-                    />
-                    {errors.firstName && (
-                      <p className="text-red-500 text-xs mt-1">{errors.firstName}</p>
-                    )}
+            {currentStep === 1 && (
+              <div className="bg-white rounded-2xl shadow-lg p-6 md:p-8 hover:shadow-xl transition-shadow">
+                <div className="flex items-center gap-3 mb-6">
+                  <div className="w-10 h-10 rounded-full bg-[#964B00] text-yellow-400 flex items-center justify-center font-bold text-lg">
+                    1
                   </div>
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">
-                      Middle Name
-                    </label>
-                    <input
-                      type="text"
-                      name="middleName"
-                      value={form.middleName}
-                      onChange={handleChange}
-                      maxLength={100}
-                      className={`w-full border-2 rounded-lg px-4 py-3 focus:ring-2 focus:ring-amber-200 transition-all outline-none ${errors.middleName ? 'border-red-500 focus:border-red-500' : 'border-gray-200 focus:border-[#964B00]'
-                        }`}
-                      placeholder='Santos'
-                    />
-                    {errors.middleName && (
-                      <p className="text-red-500 text-xs mt-1">{errors.middleName}</p>
-                    )}
-                  </div>
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">
-                      Last Name <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      name="lastName"
-                      value={form.lastName}
-                      onChange={handleChange}
-                      maxLength={100}
-                      className={`w-full border-2 rounded-lg px-4 py-3 focus:ring-2 focus:ring-amber-200 transition-all outline-none ${errors.lastName ? 'border-red-500 focus:border-red-500' : 'border-gray-200 focus:border-[#964B00]'
-                        }`}
-                      placeholder='Dela Cruz'
-                      required
-                    />
-                    {errors.lastName && (
-                      <p className="text-red-500 text-xs mt-1">{errors.lastName}</p>
-                    )}
-                  </div>
+                  <h2 className="text-2xl font-bold text-gray-800">Personal Information</h2>
                 </div>
 
-                <div className="border-t pt-5">
-                  <h3 className="text-sm font-semibold text-gray-700 mb-3">Date of Birth <span className="text-red-500">*</span></h3>
-                  {errors.birthDate && (
-                    <p className="text-red-500 text-xs mb-2">{errors.birthDate}</p>
-                  )}
-                  <div className="grid md:grid-cols-4 gap-4">
+                <div className="space-y-5">
+                  <div className="grid md:grid-cols-3 gap-4">
                     <div>
-                      <select
-                        name="birthMonth"
-                        value={form.birthMonth}
-                        onChange={handleBirthChange}
-                        className="w-full border-2 border-gray-200 rounded-lg px-4 py-3 focus:border-[#964B00] focus:ring-2 focus:ring-amber-200 transition-all outline-none"
-                        required
-                      >
-                        <option value="">Month</option>
-                        {Array.from({ length: 12 }, (_, i) => (
-                          <option key={i} value={i + 1}>
-                            {new Date(0, i).toLocaleString('default', { month: 'long' })}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">
+                        First Name <span className="text-red-500">*</span>
+                      </label>
                       <input
-                        type="number"
-                        name="birthDay"
-                        value={form.birthDay}
-                        onChange={handleBirthChange}
-                        min="1"
-                        max="31"
-                        className="w-full border-2 border-gray-200 rounded-lg px-4 py-3 focus:border-[#964B00] focus:ring-2 focus:ring-amber-200 transition-all outline-none"
-                        placeholder='Day'
+                        type="text"
+                        name="firstName"
+                        value={form.firstName}
+                        onChange={handleChange}
+                        maxLength={100}
+                        className={`w-full border-2 rounded-lg px-4 py-3 focus:ring-2 focus:ring-amber-200 transition-all outline-none ${errors.firstName ? 'border-red-500 focus:border-red-500' : 'border-gray-200 focus:border-[#964B00]'
+                          }`}
+                        placeholder='Juan'
                         required
                       />
-                    </div>
-
-                    <div>
-                      <select
-                        name="birthYear"
-                        value={form.birthYear}
-                        onChange={handleBirthChange}
-                        className="w-full border-2 border-gray-200 rounded-lg px-4 py-3 focus:border-[#964B00] focus:ring-2 focus:ring-amber-200 transition-all outline-none"
-                        required>
-                        <option value="">Year</option>
-                        {Array.from({ length: 100 }, (_, i) => {
-                          const year = new Date().getFullYear() - i;
-                          return (
-                            <option key={year} value={year}>
-                              {year}
-                            </option>
-                          );
-                        })}
-                      </select>
+                      {errors.firstName && (
+                        <p className="text-red-500 text-xs mt-1">{errors.firstName}</p>
+                      )}
                     </div>
                     <div>
-                      <select
-                        name="gender"
-                        value={form.gender}
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">
+                        Middle Name
+                      </label>
+                      <input
+                        type="text"
+                        name="middleName"
+                        value={form.middleName}
                         onChange={handleChange}
-                        className={`w-full border-2 rounded-lg px-4 py-3 focus:ring-2 focus:ring-amber-200 transition-all outline-none ${errors.gender ? 'border-red-500 focus:border-red-500' : 'border-gray-200 focus:border-[#964B00]'
+                        maxLength={100}
+                        className={`w-full border-2 rounded-lg px-4 py-3 focus:ring-2 focus:ring-amber-200 transition-all outline-none ${errors.middleName ? 'border-red-500 focus:border-red-500' : 'border-gray-200 focus:border-[#964B00]'
                           }`}
+                        placeholder='Santos'
+                      />
+                      {errors.middleName && (
+                        <p className="text-red-500 text-xs mt-1">{errors.middleName}</p>
+                      )}
+                    </div>
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">
+                        Last Name <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        name="lastName"
+                        value={form.lastName}
+                        onChange={handleChange}
+                        maxLength={100}
+                        className={`w-full border-2 rounded-lg px-4 py-3 focus:ring-2 focus:ring-amber-200 transition-all outline-none ${errors.lastName ? 'border-red-500 focus:border-red-500' : 'border-gray-200 focus:border-[#964B00]'
+                          }`}
+                        placeholder='Dela Cruz'
                         required
-                      >
-                        <option value="">Sex</option>
-                        <option value="Male">Male</option>
-                        <option value="Female">Female</option>
-                        <option value="Other">Other</option>
-                      </select>
-                      {errors.gender && (
-                        <p className="text-red-500 text-xs mt-1">{errors.gender}</p>
+                      />
+                      {errors.lastName && (
+                        <p className="text-red-500 text-xs mt-1">{errors.lastName}</p>
                       )}
                     </div>
                   </div>
+
+                  <div className="border-t pt-5">
+                    <h3 className="text-sm font-semibold text-gray-700 mb-3">Date of Birth <span className="text-red-500">*</span></h3>
+                    {errors.birthDate && (
+                      <p className="text-red-500 text-xs mb-2">{errors.birthDate}</p>
+                    )}
+                    <div className="grid md:grid-cols-4 gap-4">
+                      <div>
+                        <select
+                          name="birthMonth"
+                          value={form.birthMonth}
+                          onChange={handleBirthChange}
+                          className="w-full border-2 border-gray-200 rounded-lg px-4 py-3 focus:border-[#964B00] focus:ring-2 focus:ring-amber-200 transition-all outline-none"
+                          required
+                        >
+                          <option value="">Month</option>
+                          {Array.from({ length: 12 }, (_, i) => (
+                            <option key={i} value={i + 1}>
+                              {new Date(0, i).toLocaleString('default', { month: 'long' })}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div>
+                        <input
+                          type="number"
+                          name="birthDay"
+                          value={form.birthDay}
+                          onChange={handleBirthChange}
+                          min="1"
+                          max="31"
+                          className="w-full border-2 border-gray-200 rounded-lg px-4 py-3 focus:border-[#964B00] focus:ring-2 focus:ring-amber-200 transition-all outline-none"
+                          placeholder='Day'
+                          required
+                        />
+                      </div>
+
+                      <div>
+                        <select
+                          name="birthYear"
+                          value={form.birthYear}
+                          onChange={handleBirthChange}
+                          className="w-full border-2 border-gray-200 rounded-lg px-4 py-3 focus:border-[#964B00] focus:ring-2 focus:ring-amber-200 transition-all outline-none"
+                          required>
+                          <option value="">Year</option>
+                          {Array.from({ length: 100 }, (_, i) => {
+                            const year = new Date().getFullYear() - i;
+                            return (
+                              <option key={year} value={year}>
+                                {year}
+                              </option>
+                            );
+                          })}
+                        </select>
+                      </div>
+                      <div>
+                        <select
+                          name="gender"
+                          value={form.gender}
+                          onChange={handleChange}
+                          className={`w-full border-2 rounded-lg px-4 py-3 focus:ring-2 focus:ring-amber-200 transition-all outline-none ${errors.gender ? 'border-red-500 focus:border-red-500' : 'border-gray-200 focus:border-[#964B00]'
+                            }`}
+                          required
+                        >
+                          <option value="">Sex</option>
+                          <option value="Male">Male</option>
+                          <option value="Female">Female</option>
+                          <option value="Other">Other</option>
+                        </select>
+                        {errors.gender && (
+                          <p className="text-red-500 text-xs mt-1">{errors.gender}</p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Navigation Buttons */}
+                <div className="flex justify-end mt-6">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (validateStep1()) {
+                        setCurrentStep(2);
+                        window.scrollTo({ top: 0, behavior: 'smooth' });
+                      }
+                    }}
+                    className="bg-gradient-to-r from-[#964B00] to-amber-700 hover:from-amber-700 hover:to-[#964B00] text-yellow-400 font-bold px-8 py-3 rounded-xl shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-200"
+                  >
+                    Next: Address →
+                  </button>
                 </div>
               </div>
-            </div>
+            )}
 
             {/* STEP 2: Address Information */}
-            <div className="bg-white rounded-2xl shadow-lg p-6 md:p-8 hover:shadow-xl transition-shadow">
-              <div className="flex items-center gap-3 mb-6">
-                <div className="w-10 h-10 rounded-full bg-[#964B00] text-yellow-400 flex items-center justify-center font-bold text-lg">
-                  2
-                </div>
-                <h2 className="text-2xl font-bold text-gray-800">Address</h2>
-              </div>
-
-              <div className="space-y-5">
-                <div className="grid md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">
-                      Country <span className="text-red-500">*</span>
-                    </label>
-                    <select
-                      name="country"
-                      value="Philippines"
-                      className="w-full border-2 border-gray-200 rounded-lg px-4 py-3 bg-gray-50 text-gray-600 cursor-not-allowed"
-                      disabled={true}
-                    >
-                      <option value="Philippines">Philippines</option>
-                    </select>
+            {currentStep === 2 && (
+              <div className="bg-white rounded-2xl shadow-lg p-6 md:p-8 hover:shadow-xl transition-shadow">
+                <div className="flex items-center gap-3 mb-6">
+                  <div className="w-10 h-10 rounded-full bg-[#964B00] text-yellow-400 flex items-center justify-center font-bold text-lg">
+                    2
                   </div>
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">
-                      Postal Code <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      name="postalCode"
-                      value={form.postalCode}
-                      onChange={handleChange}
-                      maxLength={4}
-                      className={`w-full border-2 rounded-lg px-4 py-3 focus:ring-2 focus:ring-amber-200 transition-all outline-none ${errors.postalCode ? 'border-red-500 focus:border-red-500' : 'border-gray-200 focus:border-[#964B00]'
-                        }`}
-                      placeholder='1234'
-                      required
-                    />
-                    {errors.postalCode && (
-                      <p className="text-red-500 text-xs mt-1">{errors.postalCode}</p>
-                    )}
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">
-                      Region <span className="text-red-500">*</span>
-                    </label>
-                    <select
-                      name="provinceCode"
-                      value={form.provinceCode}
-                      onChange={handleChange}
-                      required
-                      className={`w-full border-2 rounded-lg px-4 py-3 focus:ring-2 focus:ring-amber-200 transition-all outline-none ${errors.province ? 'border-red-500 focus:border-red-500' : 'border-gray-200 focus:border-[#964B00]'
-                        }`}
-                    >
-                      <option value="">Select Region</option>
-                      {provinces.map((region) => (
-                        <option key={region.code} value={region.code}>
-                          {region.name}
-                        </option>
-                      ))}
-                    </select>
-                    {errors.province && (
-                      <p className="text-red-500 text-xs mt-1">{errors.province}</p>
-                    )}
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">
-                      City/Municipality <span className="text-red-500">*</span>
-                    </label>
-                    <select
-                      name="cityCode"
-                      value={form.cityCode}
-                      onChange={handleChange}
-                      required
-                      className={`w-full border-2 rounded-lg px-4 py-3 focus:ring-2 focus:ring-amber-200 transition-all outline-none disabled:bg-gray-50 disabled:cursor-not-allowed ${errors.city ? 'border-red-500 focus:border-red-500' : 'border-gray-200 focus:border-[#964B00]'
-                        }`}
-                      disabled={!form.provinceCode}
-                    >
-                      <option value="">
-                        {form.provinceCode ? 'Select City/Municipality' : 'Select region first'}
-                      </option>
-                      {cities.map((city) => (
-                        <option key={city.code} value={city.code}>
-                          {city.name}
-                        </option>
-                      ))}
-                    </select>
-                    {errors.city && (
-                      <p className="text-red-500 text-xs mt-1">{errors.city}</p>
-                    )}
-                  </div>
-
-                  <div className="md:col-span-2">
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">
-                      Barangay <span className="text-red-500">*</span>
-                    </label>
-                    <select
-                      name="barangay"
-                      value={form.barangayCode}
-                      onChange={handleChange}
-                      className={`w-full border-2 rounded-lg px-4 py-3 focus:ring-2 focus:ring-amber-200 transition-all outline-none disabled:bg-gray-50 disabled:cursor-not-allowed ${errors.barangay ? 'border-red-500 focus:border-red-500' : 'border-gray-200 focus:border-[#964B00]'
-                        }`}
-                      required
-                      disabled={!form.cityCode}
-                    >
-                      <option value="">
-                        {form.cityCode ? 'Select your barangay' : 'Select city first'}
-                      </option>
-                      {barangays.map((barangay) => (
-                        <option key={barangay.code} value={barangay.code}>
-                          {barangay.name}
-                        </option>
-                      ))}
-                    </select>
-                    {errors.barangay && (
-                      <p className="text-red-500 text-xs mt-1">{errors.barangay}</p>
-                    )}
-                  </div>
-
-                  <div className="md:col-span-2">
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">
-                      Complete Address <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      name="address_line"
-                      value={form.address_line}
-                      onChange={handleChange}
-                      maxLength={255}
-                      placeholder="House/Unit/Floor No., Building Name, Street Name"
-                      className={`w-full border-2 rounded-lg px-4 py-3 focus:ring-2 focus:ring-amber-200 transition-all outline-none ${errors.address_line ? 'border-red-500 focus:border-red-500' : 'border-gray-200 focus:border-[#964B00]'
-                        }`}
-                      required
-                    />
-                    {errors.address_line && (
-                      <p className="text-red-500 text-xs mt-1">{errors.address_line}</p>
-                    )}
-                    <p className="text-xs text-gray-600 mt-2">
-                      💡 Your address will be automatically verified for accurate delivery service.
-                    </p>
-                  </div>
+                  <h2 className="text-2xl font-bold text-gray-800">Address</h2>
                 </div>
 
-                <div className="border-t pt-5">
-                  <h3 className="text-sm font-semibold text-gray-700 mb-3">Contact Information</h3>
+                <div className="space-y-5">
                   <div className="grid md:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-sm font-semibold text-gray-700 mb-2">
-                        Mobile Number <span className="text-red-500">*</span>
+                        Country <span className="text-red-500">*</span>
+                      </label>
+                      <select
+                        name="country"
+                        value="Philippines"
+                        className="w-full border-2 border-gray-200 rounded-lg px-4 py-3 bg-gray-50 text-gray-600 cursor-not-allowed"
+                        disabled={true}
+                      >
+                        <option value="Philippines">Philippines</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">
+                        Postal Code <span className="text-red-500">*</span>
                       </label>
                       <input
                         type="text"
-                        name="phone_number"
-                        value={form.phone_number}
+                        name="postalCode"
+                        value={form.postalCode}
                         onChange={handleChange}
-                        maxLength={13}
-                        placeholder="09xxxxxxxxx"
-                        className={`w-full border-2 rounded-lg px-4 py-3 focus:ring-2 focus:ring-amber-200 transition-all outline-none ${errors.phone_number ? 'border-red-500 focus:border-red-500' : 'border-gray-200 focus:border-[#964B00]'
+                        maxLength={4}
+                        className={`w-full border-2 rounded-lg px-4 py-3 focus:ring-2 focus:ring-amber-200 transition-all outline-none ${errors.postalCode ? 'border-red-500 focus:border-red-500' : 'border-gray-200 focus:border-[#964B00]'
+                          }`}
+                        placeholder='1234'
+                        required
+                      />
+                      {errors.postalCode && (
+                        <p className="text-red-500 text-xs mt-1">{errors.postalCode}</p>
+                      )}
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">
+                        Region <span className="text-red-500">*</span>
+                      </label>
+                      <select
+                        name="provinceCode"
+                        value={form.provinceCode}
+                        onChange={handleChange}
+                        required
+                        className={`w-full border-2 rounded-lg px-4 py-3 focus:ring-2 focus:ring-amber-200 transition-all outline-none ${errors.province ? 'border-red-500 focus:border-red-500' : 'border-gray-200 focus:border-[#964B00]'
+                          }`}
+                      >
+                        <option value="">Select Region</option>
+                        {provinces.map((region) => (
+                          <option key={region.code} value={region.code}>
+                            {region.name}
+                          </option>
+                        ))}
+                      </select>
+                      {errors.province && (
+                        <p className="text-red-500 text-xs mt-1">{errors.province}</p>
+                      )}
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">
+                        City/Municipality <span className="text-red-500">*</span>
+                      </label>
+                      <select
+                        name="cityCode"
+                        value={form.cityCode}
+                        onChange={handleChange}
+                        required
+                        className={`w-full border-2 rounded-lg px-4 py-3 focus:ring-2 focus:ring-amber-200 transition-all outline-none disabled:bg-gray-50 disabled:cursor-not-allowed ${errors.city ? 'border-red-500 focus:border-red-500' : 'border-gray-200 focus:border-[#964B00]'
+                          }`}
+                        disabled={!form.provinceCode}
+                      >
+                        <option value="">
+                          {form.provinceCode ? 'Select City/Municipality' : 'Select region first'}
+                        </option>
+                        {cities.map((city) => (
+                          <option key={city.code} value={city.code}>
+                            {city.name}
+                          </option>
+                        ))}
+                      </select>
+                      {errors.city && (
+                        <p className="text-red-500 text-xs mt-1">{errors.city}</p>
+                      )}
+                    </div>
+
+                    <div className="md:col-span-2">
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">
+                        Barangay <span className="text-red-500">*</span>
+                      </label>
+                      <select
+                        name="barangay"
+                        value={form.barangayCode}
+                        onChange={handleChange}
+                        className={`w-full border-2 rounded-lg px-4 py-3 focus:ring-2 focus:ring-amber-200 transition-all outline-none disabled:bg-gray-50 disabled:cursor-not-allowed ${errors.barangay ? 'border-red-500 focus:border-red-500' : 'border-gray-200 focus:border-[#964B00]'
+                          }`}
+                        required
+                        disabled={!form.cityCode}
+                      >
+                        <option value="">
+                          {form.cityCode ? 'Select your barangay' : 'Select city first'}
+                        </option>
+                        {barangays.map((barangay) => (
+                          <option key={barangay.code} value={barangay.code}>
+                            {barangay.name}
+                          </option>
+                        ))}
+                      </select>
+                      {errors.barangay && (
+                        <p className="text-red-500 text-xs mt-1">{errors.barangay}</p>
+                      )}
+                    </div>
+
+                    <div className="md:col-span-2">
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">
+                        Complete Address <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        name="address_line"
+                        value={form.address_line}
+                        onChange={handleChange}
+                        maxLength={255}
+                        placeholder="House/Unit/Floor No., Building Name, Street Name"
+                        className={`w-full border-2 rounded-lg px-4 py-3 focus:ring-2 focus:ring-amber-200 transition-all outline-none ${errors.address_line ? 'border-red-500 focus:border-red-500' : 'border-gray-200 focus:border-[#964B00]'
                           }`}
                         required
                       />
-                      {errors.phone_number && (
-                        <p className="text-red-500 text-xs mt-1">{errors.phone_number}</p>
+                      {errors.address_line && (
+                        <p className="text-red-500 text-xs mt-1">{errors.address_line}</p>
+                      )}
+                      <p className="text-xs text-gray-600 mt-2">
+                        💡 Your address will be automatically verified for accurate delivery service.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="border-t pt-5">
+                    <h3 className="text-sm font-semibold text-gray-700 mb-3">Contact Information</h3>
+                    <div className="grid md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-semibold text-gray-700 mb-2">
+                          Mobile Number <span className="text-red-500">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          name="phone_number"
+                          value={form.phone_number}
+                          onChange={handleChange}
+                          maxLength={13}
+                          placeholder="09xxxxxxxxx"
+                          className={`w-full border-2 rounded-lg px-4 py-3 focus:ring-2 focus:ring-amber-200 transition-all outline-none ${errors.phone_number ? 'border-red-500 focus:border-red-500' : 'border-gray-200 focus:border-[#964B00]'
+                            }`}
+                          required
+                        />
+                        {errors.phone_number && (
+                          <p className="text-red-500 text-xs mt-1">{errors.phone_number}</p>
+                        )}
+                      </div>
+                      <div>
+                        <label className="block text-sm font-semibold text-gray-700 mb-2">
+                          Alternate Contact
+                        </label>
+                        <input
+                          type="text"
+                          name="otherContact"
+                          value={form.otherContact}
+                          onChange={handleChange}
+                          maxLength={50}
+                          placeholder="8-xxxxxxx (Optional)"
+                          className={`w-full border-2 rounded-lg px-4 py-3 focus:ring-2 focus:ring-amber-200 transition-all outline-none ${errors.otherContact ? 'border-red-500 focus:border-red-500' : 'border-gray-200 focus:border-[#964B00]'
+                            }`}
+                        />
+                        {errors.otherContact && (
+                          <p className="text-red-500 text-xs mt-1">{errors.otherContact}</p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Navigation Buttons */}
+                <div className="flex justify-between mt-6">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCurrentStep(1);
+                      window.scrollTo({ top: 0, behavior: 'smooth' });
+                    }}
+                    className="bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold px-8 py-3 rounded-xl shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-200"
+                  >
+                    ← Back
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (validateStep2()) {
+                        setCurrentStep(3);
+                        window.scrollTo({ top: 0, behavior: 'smooth' });
+                      }
+                    }}
+                    className="bg-gradient-to-r from-[#964B00] to-amber-700 hover:from-amber-700 hover:to-[#964B00] text-yellow-400 font-bold px-8 py-3 rounded-xl shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-200"
+                  >
+                    Next: Account Setup →
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* STEP 3: Account Setup */}
+            {currentStep === 3 && (
+              <div className="bg-white rounded-2xl shadow-lg p-6 md:p-8 hover:shadow-xl transition-shadow">
+                <div className="flex items-center gap-3 mb-6">
+                  <div className="w-10 h-10 rounded-full bg-[#964B00] text-yellow-400 flex items-center justify-center font-bold text-lg">
+                    3
+                  </div>
+                  <h2 className="text-2xl font-bold text-gray-800">Account Setup</h2>
+                </div>
+
+                <div className="space-y-5">
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                      Email Address <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="email"
+                      name="email"
+                      value={form.email}
+                      onChange={handleChange}
+                      maxLength={255}
+                      className={`w-full border-2 rounded-lg px-4 py-3 focus:ring-2 focus:ring-amber-200 transition-all outline-none ${errors.email ? 'border-red-500 focus:border-red-500' : 'border-gray-200 focus:border-[#964B00]'
+                        }`}
+                      placeholder='your.email@example.com'
+                      required
+                    />
+                    {errors.email && (
+                      <p className="text-red-500 text-xs mt-1">{errors.email}</p>
+                    )}
+                  </div>
+
+                  <div className="grid md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">
+                        Password <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="password"
+                        name="password"
+                        value={form.password}
+                        onChange={handleChange}
+                        maxLength={72}
+                        className={`w-full border-2 rounded-lg px-4 py-3 focus:ring-2 focus:ring-amber-200 transition-all outline-none ${errors.password ? 'border-red-500 focus:border-red-500' : 'border-gray-200 focus:border-[#964B00]'
+                          }`}
+                        placeholder='••••••••'
+                        required
+                      />
+                      {errors.password ? (
+                        <p className="text-red-500 text-xs mt-2">{errors.password}</p>
+                      ) : (
+                        <p className="text-xs text-gray-500 mt-2 leading-relaxed">
+                          Must include: 8+ characters, uppercase, lowercase, number, special character (@$!%*?&)
+                        </p>
                       )}
                     </div>
                     <div>
                       <label className="block text-sm font-semibold text-gray-700 mb-2">
-                        Alternate Contact
+                        Confirm Password <span className="text-red-500">*</span>
                       </label>
                       <input
-                        type="text"
-                        name="otherContact"
-                        value={form.otherContact}
+                        type="password"
+                        name="confirmPassword"
+                        value={form.confirmPassword}
                         onChange={handleChange}
-                        maxLength={50}
-                        placeholder="8-xxxxxxx (Optional)"
-                        className={`w-full border-2 rounded-lg px-4 py-3 focus:ring-2 focus:ring-amber-200 transition-all outline-none ${errors.otherContact ? 'border-red-500 focus:border-red-500' : 'border-gray-200 focus:border-[#964B00]'
+                        maxLength={72}
+                        className={`w-full border-2 rounded-lg px-4 py-3 focus:ring-2 focus:ring-amber-200 transition-all outline-none ${errors.confirmPassword ? 'border-red-500 focus:border-red-500' : 'border-gray-200 focus:border-[#964B00]'
                           }`}
+                        placeholder='••••••••'
+                        required
                       />
-                      {errors.otherContact && (
-                        <p className="text-red-500 text-xs mt-1">{errors.otherContact}</p>
+                      {errors.confirmPassword && (
+                        <p className="text-red-500 text-xs mt-1">{errors.confirmPassword}</p>
                       )}
                     </div>
                   </div>
-                </div>
-              </div>
-            </div>
 
-            {/* STEP 3: Account Setup */}
-            <div className="bg-white rounded-2xl shadow-lg p-6 md:p-8 hover:shadow-xl transition-shadow">
-              <div className="flex items-center gap-3 mb-6">
-                <div className="w-10 h-10 rounded-full bg-[#964B00] text-yellow-400 flex items-center justify-center font-bold text-lg">
-                  3
-                </div>
-                <h2 className="text-2xl font-bold text-gray-800">Account Setup</h2>
-              </div>
-
-              <div className="space-y-5">
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Email Address <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="email"
-                    name="email"
-                    value={form.email}
-                    onChange={handleChange}
-                    maxLength={255}
-                    className={`w-full border-2 rounded-lg px-4 py-3 focus:ring-2 focus:ring-amber-200 transition-all outline-none ${errors.email ? 'border-red-500 focus:border-red-500' : 'border-gray-200 focus:border-[#964B00]'
-                      }`}
-                    placeholder='your.email@example.com'
-                    required
-                  />
-                  {errors.email && (
-                    <p className="text-red-500 text-xs mt-1">{errors.email}</p>
-                  )}
-                </div>
-
-                <div className="grid md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">
-                      Password <span className="text-red-500">*</span>
+                  <div className="border-t pt-5">
+                    <label className="flex items-start space-x-3 cursor-pointer group">
+                      <input
+                        type="checkbox"
+                        name="agree"
+                        checked={form.agree}
+                        onChange={handleChange}
+                        className={`mt-1 w-5 h-5 rounded border-2 text-[#964B00] focus:ring-2 focus:ring-amber-200 cursor-pointer ${errors.agree ? 'border-red-500' : 'border-gray-300'
+                          }`}
+                        required
+                      />
+                      <span className="text-sm text-gray-700 leading-relaxed">
+                        I confirm that I am at least 18 years old and agree to the{' '}
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.preventDefault()
+                            setShowTCModal(true)
+                          }}
+                          className="text-[#964B00] font-semibold underline hover:text-amber-700 transition-colors"
+                        >
+                          Terms and Conditions
+                        </button>
+                        {' '}and{' '}
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.preventDefault()
+                            setShowPrivacyModal(true)
+                          }}
+                          className="text-[#964B00] font-semibold underline hover:text-amber-700 transition-colors"
+                        >
+                          Privacy Policy
+                        </button>
+                        {' '}of Angieren's Lutong Bahay.
+                      </span>
                     </label>
-                    <input
-                      type="password"
-                      name="password"
-                      value={form.password}
-                      onChange={handleChange}
-                      maxLength={72}
-                      className={`w-full border-2 rounded-lg px-4 py-3 focus:ring-2 focus:ring-amber-200 transition-all outline-none ${errors.password ? 'border-red-500 focus:border-red-500' : 'border-gray-200 focus:border-[#964B00]'
-                        }`}
-                      placeholder='••••••••'
-                      required
-                    />
-                    {errors.password ? (
-                      <p className="text-red-500 text-xs mt-2">{errors.password}</p>
-                    ) : (
-                      <p className="text-xs text-gray-500 mt-2 leading-relaxed">
-                        Must include: 8+ characters, uppercase, lowercase, number, special character (@$!%*?&)
-                      </p>
-                    )}
-                  </div>
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">
-                      Confirm Password <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      type="password"
-                      name="confirmPassword"
-                      value={form.confirmPassword}
-                      onChange={handleChange}
-                      maxLength={72}
-                      className={`w-full border-2 rounded-lg px-4 py-3 focus:ring-2 focus:ring-amber-200 transition-all outline-none ${errors.confirmPassword ? 'border-red-500 focus:border-red-500' : 'border-gray-200 focus:border-[#964B00]'
-                        }`}
-                      placeholder='••••••••'
-                      required
-                    />
-                    {errors.confirmPassword && (
-                      <p className="text-red-500 text-xs mt-1">{errors.confirmPassword}</p>
+                    {errors.agree && (
+                      <p className="text-red-500 text-xs mt-2 ml-8">{errors.agree}</p>
                     )}
                   </div>
                 </div>
 
-                <div className="border-t pt-5">
-                  <label className="flex items-start space-x-3 cursor-pointer group">
-                    <input
-                      type="checkbox"
-                      name="agree"
-                      checked={form.agree}
-                      onChange={handleChange}
-                      className={`mt-1 w-5 h-5 rounded border-2 text-[#964B00] focus:ring-2 focus:ring-amber-200 cursor-pointer ${errors.agree ? 'border-red-500' : 'border-gray-300'
-                        }`}
-                      required
-                    />
-                    <span className="text-sm text-gray-700 leading-relaxed">
-                      I confirm that I am at least 18 years old and agree to the{' '}
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.preventDefault()
-                          setShowTCModal(true)
-                        }}
-                        className="text-[#964B00] font-semibold underline hover:text-amber-700 transition-colors"
-                      >
-                        Terms and Conditions
-                      </button>
-                      {' '}and{' '}
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.preventDefault()
-                          setShowPrivacyModal(true)
-                        }}
-                        className="text-[#964B00] font-semibold underline hover:text-amber-700 transition-colors"
-                      >
-                        Privacy Policy
-                      </button>
-                      {' '}of Angieren's Lutong Bahay.
-                    </span>
-                  </label>
-                  {errors.agree && (
-                    <p className="text-red-500 text-xs mt-2 ml-8">{errors.agree}</p>
-                  )}
+                {/* Navigation Buttons */}
+                <div className="flex justify-between mt-6">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCurrentStep(2);
+                      window.scrollTo({ top: 0, behavior: 'smooth' });
+                    }}
+                    className="bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold px-8 py-3 rounded-xl shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-200"
+                  >
+                    ← Back
+                  </button>
                 </div>
               </div>
-            </div>
+            )}
 
             {/* Submit Section */}
-            <div className="bg-white rounded-2xl shadow-lg p-6 md:p-8">
-              <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-                <p className="text-sm text-gray-600">
-                  Already have an account?{' '}
-                  <Link to="/login" className="text-[#964B00] font-semibold hover:underline">
-                    Sign in here
-                  </Link>
-                </p>
-                <button
-                  type="submit"
-                  className="w-full sm:w-auto bg-gradient-to-r from-[#964B00] to-amber-700 hover:from-amber-700 hover:to-[#964B00] text-yellow-400 font-bold px-12 py-4 rounded-xl shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-200"
-                >
-                  CREATE ACCOUNT
-                </button>
+            {currentStep === 3 && (
+              <div className="bg-white rounded-2xl shadow-lg p-6 md:p-8">
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+                  <p className="text-sm text-gray-600">
+                    Already have an account?{' '}
+                    <Link to="/login" className="text-[#964B00] font-semibold hover:underline">
+                      Sign in here
+                    </Link>
+                  </p>
+                  <button
+                    type="submit"
+                    className="w-full sm:w-auto bg-gradient-to-r from-[#964B00] to-amber-700 hover:from-amber-700 hover:to-[#964B00] text-yellow-400 font-bold px-12 py-4 rounded-xl shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-200"
+                  >
+                    CREATE ACCOUNT
+                  </button>
+                </div>
               </div>
-            </div>
+            )}
           </form>
         </div>
       </div>
