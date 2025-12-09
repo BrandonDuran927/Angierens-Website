@@ -231,7 +231,7 @@ function RouteComponent() {
         if (payment && payment.payment_method === 'GCash') {
           const totalAmount = priceOfFood + deliveryFee
           const percentage = totalAmount > 0 ? ((amountPaid / totalAmount) * 100).toFixed(0) : '0'
-          paymentMethodDisplay = `GCash ${percentage}%`
+          paymentMethodDisplay = `GCash`
         }
 
         // Format dates and times

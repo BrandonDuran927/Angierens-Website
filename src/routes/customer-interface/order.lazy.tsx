@@ -152,6 +152,9 @@ function RouteComponent() {
                 .select(`
                     *,
                     payment (*),
+                    delivery (
+                        delivery_fee
+                    ),
                     order_item (
                         *,
                         menu (*),
@@ -256,6 +259,11 @@ function RouteComponent() {
                     ? firstItem.menu.inclusion.split(',').map((i: string) => i.trim())
                     : []
 
+                // Calculate total amount including delivery fee
+                const subtotal = Number(order.total_price)
+                const deliveryFee = order.delivery?.delivery_fee ? Number(order.delivery.delivery_fee) : 0
+                const totalWithDelivery = subtotal + deliveryFee
+
                 return {
                     id: order.order_id,
                     orderNumber: `#${String(order.order_number).padStart(2, '0')}`,
@@ -267,7 +275,7 @@ function RouteComponent() {
                     status: uiStatus,
                     deliveryStatus: deliveryStatus,
                     image: displayImage,
-                    totalAmount: Number(order.total_price),
+                    totalAmount: totalWithDelivery,
                     createdAt: order.created_at,
                     proofOfPaymentUrl: order.payment?.proof_of_payment_url,
                     order_items: orderItems
@@ -523,7 +531,7 @@ function RouteComponent() {
         return matchesTab && matchesSearch && matchesDate && matchesCategory
     })
 
-    const formatPrice = (price: number) => `₱${price.toLocaleString()}`
+    const formatPrice = (price: number) => `₱${price.toFixed(2)}`
 
     // Refund Modal Handlers
     const handleOpenRefundModal = (orderId: string) => {

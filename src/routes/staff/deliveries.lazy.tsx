@@ -101,7 +101,7 @@ function RouteComponent() {
                     )
                 `)
                 .eq('order_type', 'Delivery')
-                .order('created_at', { ascending: false })
+                .order('created_at', { ascending: true })
 
             if (error) throw error
 
@@ -122,7 +122,7 @@ function RouteComponent() {
                     assignedRider: order.delivery?.rider ? `${order.delivery.rider.first_name} ${order.delivery.rider.last_name}` : null,
                     assignedDate: scheduleDate,
                     assignedTime: order.schedule?.schedule_time || new Date(order.created_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
-                    price: `₱ ${parseFloat(order.total_price).toLocaleString()}`,
+                    price: `₱ ${parseFloat(order.total_price).toFixed(2)}`,
                     cancellationRequest: order.failed_delivery_reason ? 'Pending' : 'None',
                     status: order.order_status,
                     address: order.delivery?.address ?
@@ -787,48 +787,55 @@ function RouteComponent() {
                                     ) : (
                                         <>
                                             <tbody className="bg-white divide-y divide-gray-200">
-                                                {currentOrders.map((order) => (
-                                                    <tr key={order.id} className="hover:bg-gray-50">
-                                                        <td className="px-3 sm:px-4 lg:px-6 py-4 whitespace-nowrap">{order.id}</td>
-                                                        <td className="px-3 sm:px-4 lg:px-6 py-4 whitespace-nowrap">{order.customerName}</td>
-                                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                                            {order.assignedRider ? (
-                                                                order.assignedRider
-                                                            ) : (
-                                                                <div className="flex items-center gap-2">
-                                                                    <span className="text-gray-500">N/A</span>
-                                                                    <button
-                                                                        onClick={() => {
-                                                                            setSelectedOrderForAssign(order)
-                                                                            setIsAssignModalOpen(true)
-                                                                        }}
-                                                                        className="px-3 py-1 text-xs bg-blue-100 text-blue-800 rounded-full hover:bg-blue-200 transition-colors"
-                                                                    >
-                                                                        + Rider
-                                                                    </button>
-                                                                </div>
-                                                            )}
-                                                        </td>
-                                                        {/* Copy paste the remaining <td> elements from old code */}
-                                                        <td className="px-3 sm:px-4 lg:px-6 py-4 whitespace-nowrap">{order.assignedDate}</td>
-                                                        <td className="px-3 sm:px-4 lg:px-6 py-4 whitespace-nowrap">{order.assignedTime}</td>
-                                                        <td className="px-3 sm:px-4 lg:px-6 py-4 whitespace-nowrap font-semibold">{order.price}</td>
-                                                        <td className="px-3 sm:px-4 lg:px-6 py-4 whitespace-nowrap">{order.cancellationRequest}</td>
-                                                        <td className="px-3 sm:px-4 lg:px-6 py-4 whitespace-nowrap">
-                                                            <span className={`px-2 py-1 text-xs font-medium rounded-full ${getStatusColor(order.status)}`}>
-                                                                {order.status}
-                                                            </span>
-                                                        </td>
-                                                        <td className="px-3 sm:px-4 lg:px-6 py-4 whitespace-nowrap">
-                                                            <button
-                                                                onClick={() => openOrderDetails(order)}
-                                                                className="text-gray-600 hover:text-gray-800 transition-colors"
-                                                            >
-                                                                <Eye className="h-4 w-4" />
-                                                            </button>
-                                                        </td>
-                                                    </tr>
-                                                ))}
+                                                {currentOrders.map((order) => {
+                                                    // Check if order can have a rider assigned
+                                                    const canAssignRider = !['Cancelled', 'Refunding', 'Rejected', 'Refund', 'Completed'].includes(order.status);
+
+                                                    return (
+                                                        <tr key={order.id} className="hover:bg-gray-50">
+                                                            <td className="px-3 sm:px-4 lg:px-6 py-4 whitespace-nowrap">{order.id}</td>
+                                                            <td className="px-3 sm:px-4 lg:px-6 py-4 whitespace-nowrap">{order.customerName}</td>
+                                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                                                {order.assignedRider ? (
+                                                                    order.assignedRider
+                                                                ) : (
+                                                                    <div className="flex items-center gap-2">
+                                                                        <span className="text-gray-500">N/A</span>
+                                                                        {canAssignRider && (
+                                                                            <button
+                                                                                onClick={() => {
+                                                                                    setSelectedOrderForAssign(order)
+                                                                                    setIsAssignModalOpen(true)
+                                                                                }}
+                                                                                className="px-3 py-1 text-xs bg-blue-100 text-blue-800 rounded-full hover:bg-blue-200 transition-colors"
+                                                                            >
+                                                                                + Rider
+                                                                            </button>
+                                                                        )}
+                                                                    </div>
+                                                                )}
+                                                            </td>
+                                                            {/* Copy paste the remaining <td> elements from old code */}
+                                                            <td className="px-3 sm:px-4 lg:px-6 py-4 whitespace-nowrap">{order.assignedDate}</td>
+                                                            <td className="px-3 sm:px-4 lg:px-6 py-4 whitespace-nowrap">{order.assignedTime}</td>
+                                                            <td className="px-3 sm:px-4 lg:px-6 py-4 whitespace-nowrap font-semibold">{order.price}</td>
+                                                            <td className="px-3 sm:px-4 lg:px-6 py-4 whitespace-nowrap">{order.cancellationRequest}</td>
+                                                            <td className="px-3 sm:px-4 lg:px-6 py-4 whitespace-nowrap">
+                                                                <span className={`px-2 py-1 text-xs font-medium rounded-full ${getStatusColor(order.status)}`}>
+                                                                    {order.status}
+                                                                </span>
+                                                            </td>
+                                                            <td className="px-3 sm:px-4 lg:px-6 py-4 whitespace-nowrap">
+                                                                <button
+                                                                    onClick={() => openOrderDetails(order)}
+                                                                    className="text-gray-600 hover:text-gray-800 transition-colors"
+                                                                >
+                                                                    <Eye className="h-4 w-4" />
+                                                                </button>
+                                                            </td>
+                                                        </tr>
+                                                    );
+                                                })}
                                             </tbody>
                                         </>
                                     )}
@@ -1148,7 +1155,7 @@ function RouteComponent() {
                                                             )}
                                                         </div>
                                                         <div className="text-center font-medium">{item.quantity}</div>
-                                                        <div className="text-right font-bold">₱ {item.price.toLocaleString()}</div>
+                                                        <div className="text-right font-bold">₱ {item.price.toFixed(2)}</div>
                                                     </div>
                                                 )) : (
                                                     <div className="grid grid-cols-3 gap-4 items-start">

@@ -1,13 +1,12 @@
 import { createLazyFileRoute, Link } from '@tanstack/react-router'
 import { ShoppingCart, Bell, ChevronDown, ArrowLeft, X, Menu, Calendar, Heart, Star, MessageSquare, Upload, Check, Trash2 } from 'lucide-react'
 import { ProtectedRoute } from '@/components/ProtectedRoute'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useUser } from '@/context/UserContext'
 import { useNavigate } from '@tanstack/react-router'
 import { supabase } from '@/lib/supabaseClient'
 import { useSearch } from '@tanstack/react-router'
-import L from "leaflet";
-import { MapContainer, TileLayer, Marker, useMapEvents } from "react-leaflet";
+import { loadGoogleMapsScript } from '@/utils/loadGoogleMaps'
 
 
 export const Route = createLazyFileRoute('/customer-interface/payment')({
@@ -110,6 +109,12 @@ function RouteComponent() {
         lat: 14.706297,
         lng: 121.045708,
     });
+    const mapRef = useRef<google.maps.Map | null>(null);
+    const markerRef = useRef<google.maps.Marker | null>(null);
+    const [isMapLoaded, setIsMapLoaded] = useState(false);
+    const [locationError, setLocationError] = useState<string | null>(null);
+    const STORE_LOCATION = { lat: 14.818589037203248, lng: 121.05753223366108 };
+    const MAX_DELIVERY_DISTANCE_KM = 100;
     const pickupInfo = {
         name: "Angieren's Lutong Bahay",
         street: "R395+F22, Kaypian Rd",
@@ -247,45 +252,176 @@ function RouteComponent() {
     };
 
 
-    function LocationPicker() {
-        useMapEvents({
-            click(e) {
-                setSelectedLocation({
-                    lat: e.latlng.lat,
-                    lng: e.latlng.lng,
-                });
-                fetchAddressFromCoordinates(e.latlng.lat, e.latlng.lng);
-            },
-        });
-
-        return null;
-    }
+    // Validate if location is within delivery range
+    const validateLocationDistance = (lat: number, lng: number): { valid: boolean; distance: number } => {
+        const distance = calculateDistance(
+            STORE_LOCATION.lat,
+            STORE_LOCATION.lng,
+            lat,
+            lng
+        );
+        return {
+            valid: distance <= MAX_DELIVERY_DISTANCE_KM,
+            distance: distance
+        };
+    };
 
     const fetchAddressFromCoordinates = async (lat: number, lng: number) => {
         try {
-            const response = await fetch(
-                `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&addressdetails=1`
-            );
+            // Validate distance first
+            const validation = validateLocationDistance(lat, lng);
+            if (!validation.valid) {
+                setLocationError(
+                    `This location is ${validation.distance.toFixed(1)} km away from our store. ` +
+                    `We only deliver within ${MAX_DELIVERY_DISTANCE_KM} km. Please select a closer location.`
+                );
+                return;
+            }
+
+            setLocationError(null);
+
+            const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001';
+            const geocodeUrl = `${backendUrl}/api/geocode?address=${encodeURIComponent(`${lat},${lng}`)}`;
+
+            console.log('Calling geocode API:', geocodeUrl);
+
+            // Format coordinates as "lat,lng" for reverse geocoding
+            const response = await fetch(geocodeUrl);
+
+            console.log('Geocode response status:', response.status);
+
+            if (!response.ok) {
+                const errorText = await response.text();
+                console.error('Geocode error response:', errorText);
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+
             const data = await response.json();
 
-            if (data && data.address) {
-                const addr = data.address;
+            if (data.results && data.results[0]) {
+                const addressComponents = data.results[0].address_components;
+                const formattedAddress = data.results[0].formatted_address;
 
-                // Map OSM address components to your form
+                // Extract address components
+                let street = '';
+                let barangay = '';
+                let city = '';
+                let region = '';
+                let postalCode = '';
+
+                addressComponents.forEach((component: any) => {
+                    if (component.types.includes('route') || component.types.includes('street_address')) {
+                        street = component.long_name;
+                    }
+                    if (component.types.includes('sublocality') || component.types.includes('neighborhood')) {
+                        barangay = component.long_name;
+                    }
+                    if (component.types.includes('locality') || component.types.includes('administrative_area_level_2')) {
+                        city = component.long_name;
+                    }
+                    if (component.types.includes('administrative_area_level_1')) {
+                        region = component.long_name;
+                    }
+                    if (component.types.includes('postal_code')) {
+                        postalCode = component.long_name;
+                    }
+                });
+
                 setNewAddressForm({
                     ...newAddressForm,
-                    address_line: `${addr.house_number || ''} ${addr.road || addr.street || ''}`.trim() ||
-                        addr.neighbourhood || addr.suburb || '',
-                    region: addr.region || addr.state || 'Metro Manila',
-                    city: addr.city || addr.town || addr.municipality || addr.county || '',
-                    barangay: addr.suburb || addr.village || addr.neighbourhood || '',
-                    postal_code: addr.postcode || '0000'
+                    address_line: street || formattedAddress.split(',')[0],
+                    region: region || 'Metro Manila',
+                    city: city || '',
+                    barangay: barangay || '',
+                    postal_code: postalCode || '0000'
                 });
             }
         } catch (error) {
             console.error('Error fetching address:', error);
+            setLocationError('Failed to fetch address. Please enter manually.');
         }
     };
+
+    // Initialize Google Map
+    useEffect(() => {
+        if (!isAddAddressModalOpen) return;
+
+        const initMap = async () => {
+            try {
+                const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
+                if (!apiKey) {
+                    console.error('Google Maps API key not found in environment');
+                    setLocationError('Map configuration error. Please contact support.');
+                    return;
+                }
+                await loadGoogleMapsScript(apiKey);
+                setIsMapLoaded(true);
+            } catch (error) {
+                console.error('Error loading Google Maps:', error);
+                setLocationError('Failed to load map. Please try again.');
+            }
+        };
+
+        initMap();
+    }, [isAddAddressModalOpen]);
+
+    // Setup map after Google Maps loads
+    useEffect(() => {
+        if (!isMapLoaded || !isAddAddressModalOpen) return;
+
+        const mapElement = document.getElementById('google-map');
+        if (!mapElement) return;
+
+        // Initialize map
+        const map = new google.maps.Map(mapElement, {
+            center: selectedLocation,
+            zoom: 15,
+            mapTypeControl: false,
+        });
+
+        mapRef.current = map;
+
+        // Initialize marker
+        const marker = new google.maps.Marker({
+            position: selectedLocation,
+            map: map,
+            draggable: true,
+            title: 'Delivery Location'
+        });
+
+        markerRef.current = marker;
+
+        // Handle marker drag
+        marker.addListener('dragend', () => {
+            const position = marker.getPosition();
+            if (position) {
+                const lat = position.lat();
+                const lng = position.lng();
+                setSelectedLocation({ lat, lng });
+                fetchAddressFromCoordinates(lat, lng);
+            }
+        });
+
+        // Handle map click
+        map.addListener('click', (e: google.maps.MapMouseEvent) => {
+            if (e.latLng) {
+                const lat = e.latLng.lat();
+                const lng = e.latLng.lng();
+                setSelectedLocation({ lat, lng });
+                marker.setPosition({ lat, lng });
+                fetchAddressFromCoordinates(lat, lng);
+            }
+        });
+
+        return () => {
+            if (markerRef.current) {
+                google.maps.event.clearInstanceListeners(markerRef.current);
+            }
+            if (mapRef.current) {
+                google.maps.event.clearInstanceListeners(mapRef.current);
+            }
+        };
+    }, [isMapLoaded, isAddAddressModalOpen]);
 
 
     // Navigation items with their corresponding routes
@@ -296,13 +432,6 @@ function RouteComponent() {
         { name: 'FEEDBACK', route: '/customer-interface/feedback', active: false },
         { name: 'MY INFO', route: '/customer-interface/my-info', active: false },
     ];
-
-    const markerIcon = L.icon({
-        iconUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png",
-        shadowUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png",
-        iconSize: [25, 41],
-        iconAnchor: [12, 41],
-    });
 
 
     const [notifications, setNotifications] = useState<Notification[]>([
@@ -1063,6 +1192,16 @@ function RouteComponent() {
             return;
         }
 
+        // Validate distance before saving
+        const validation = validateLocationDistance(selectedLocation.lat, selectedLocation.lng);
+        if (!validation.valid) {
+            alert(
+                `This location is ${validation.distance.toFixed(1)} km away from our store. ` +
+                `We only deliver within ${MAX_DELIVERY_DISTANCE_KM} km. Please select a closer location.`
+            );
+            return;
+        }
+
         try {
             const { data, error } = await supabase
                 .from('address')
@@ -1104,11 +1243,6 @@ function RouteComponent() {
             console.error('Error saving address:', error);
             alert('Failed to save address. Please try again.');
         }
-
-        const newAddress = {
-            lat: selectedLocation.lat,
-            lng: selectedLocation.lng,
-        };
 
         setAutocompleteInput('');
         setIsAddAddressModalOpen(false);
@@ -1712,10 +1846,23 @@ function RouteComponent() {
                                 {paymentMethod === 'GCash' && (
                                     <button
                                         onClick={() => setIsUploadReceiptModalOpen(true)}
-                                        className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 px-6 rounded-2xl transition-colors duration-200 shadow-md flex items-center justify-center gap-2"
+                                        disabled={isLoading}
+                                        className={`w-full font-bold py-4 px-6 rounded-2xl transition-colors duration-200 shadow-md flex items-center justify-center gap-2 ${isLoading
+                                                ? 'bg-gray-400 cursor-not-allowed'
+                                                : 'bg-blue-600 hover:bg-blue-700 text-white'
+                                            }`}
                                     >
-                                        <Upload className="w-5 h-5" />
-                                        Upload Payment Receipt
+                                        {isLoading ? (
+                                            <>
+                                                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                                                Calculating delivery fee...
+                                            </>
+                                        ) : (
+                                            <>
+                                                <Upload className="w-5 h-5" />
+                                                Upload Payment Receipt
+                                            </>
+                                        )}
                                     </button>
                                 )}
 
@@ -1723,10 +1870,23 @@ function RouteComponent() {
                                 {paymentMethod === 'onsite' && (
                                     <button
                                         onClick={() => setIsUploadReceiptModalOpen(true)}
-                                        className="w-full bg-orange-600 hover:bg-orange-700 text-white font-bold py-4 px-6 rounded-2xl transition-colors duration-200 shadow-md flex items-center justify-center gap-2"
+                                        disabled={isLoading}
+                                        className={`w-full font-bold py-4 px-6 rounded-2xl transition-colors duration-200 shadow-md flex items-center justify-center gap-2 ${isLoading
+                                                ? 'bg-gray-400 cursor-not-allowed'
+                                                : 'bg-orange-600 hover:bg-orange-700 text-white'
+                                            }`}
                                     >
-                                        <Upload className="w-5 h-5" />
-                                        Upload Proof of Payment
+                                        {isLoading ? (
+                                            <>
+                                                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                                                Calculating delivery fee...
+                                            </>
+                                        ) : (
+                                            <>
+                                                <Upload className="w-5 h-5" />
+                                                Upload Proof of Payment
+                                            </>
+                                        )}
                                     </button>
                                 )}
                             </div>
@@ -2135,34 +2295,23 @@ function RouteComponent() {
                                 Click or drag the marker on the map to select your location. Address details will be automatically filled.
                             </p>
 
+                            {/* Distance Limit Warning */}
+                            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
+                                <p className="text-sm text-blue-800">
+                                    📍 Maximum delivery distance: <strong>{MAX_DELIVERY_DISTANCE_KM} km</strong> from our store
+                                </p>
+                            </div>
+
+                            {/* Location Error Message */}
+                            {locationError && (
+                                <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-4">
+                                    <p className="text-sm text-red-800">{locationError}</p>
+                                </div>
+                            )}
+
                             {/* Map Picker */}
                             <div className="w-full h-64 rounded-lg overflow-hidden mb-4 border-2 border-gray-300">
-                                <MapContainer
-                                    center={[selectedLocation.lat, selectedLocation.lng]}
-                                    zoom={16}
-                                    style={{ height: "100%", width: "100%" }}
-                                >
-                                    <TileLayer
-                                        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                                        attribution="© OpenStreetMap"
-                                    />
-
-                                    <Marker
-                                        position={[selectedLocation.lat, selectedLocation.lng]}
-                                        icon={markerIcon}
-                                        draggable={true}
-                                        eventHandlers={{
-                                            dragend: (e) => {
-                                                const marker = e.target;
-                                                const { lat, lng } = marker.getLatLng();
-                                                setSelectedLocation({ lat, lng });
-                                                fetchAddressFromCoordinates(lat, lng);
-                                            },
-                                        }}
-                                    />
-
-                                    <LocationPicker />
-                                </MapContainer>
+                                <div id="google-map" style={{ height: "100%", width: "100%" }}></div>
                             </div>
 
                             <p className="text-xs text-gray-500 mb-4">

@@ -145,13 +145,13 @@ function RouteComponent() {
   const getDisplayPrice = (item: MenuItem): string => {
     const prices = parsePrices(item.price)
 
-    if (prices.length === 0) return '0'
-    if (prices.length === 1) return prices[0].toLocaleString()
+    if (prices.length === 0) return '0.00'
+    if (prices.length === 1) return prices[0].toFixed(2)
 
     // For multiple prices, show range
     const minPrice = Math.min(...prices)
     const maxPrice = Math.max(...prices)
-    return `${minPrice.toLocaleString()} - ${maxPrice.toLocaleString()}`
+    return `${minPrice.toFixed(2)} - ${maxPrice.toFixed(2)}`
   }
 
   const openOrderAddOnsModal = () => {
@@ -573,6 +573,25 @@ function RouteComponent() {
       height: 140px !important;
     }
   }
+
+  /* Custom scrollbar styling */
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 8px;
+  }
+  
+  .custom-scrollbar::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 10px;
+  }
+  
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    background: #fbbf24;
+    border-radius: 10px;
+  }
+  
+  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: #f59e0b;
+  }
 `;
 
   // Add this helper function near the top of your component, after the state declarations
@@ -831,69 +850,71 @@ function RouteComponent() {
           </div>
         ) : (
           <>
-            {/* Menu Items Grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-4 md:gap-6 lg:gap-8">
-              {filteredItems.map((item) => {
-                const inclusions = parseInclusions(item.inclusion)
-                return (
-                  <div key={item.menu_id} className="bg-white rounded-2xl shadow-lg overflow-hidden hover:shadow-xl transition-shadow duration-300">
-                    {/* Price Tag */}
-                    <div className="relative">
-                      <div className="absolute top-4 left-4 bg-yellow-400 text-black px-3 sm:px-4 py-1 sm:py-2 rounded-full font-bold text-base sm:text-lg z-10">
-                        ₱ {getDisplayPrice(item)}
-                      </div>
-
-                      {/* Food Image Container */}
-                      <div className="relative h-48 sm:h-64 overflow-hidden">
-                        <img
-                          src={getImageUrl(item.image_url)}
-                          alt={item.name}
-                          className="w-full h-full object-cover"
-                        />
-                        <div className="absolute inset-0 bg-black/10"></div>
-                      </div>
-                    </div>
-
-                    {/* Content */}
-                    <div className="p-4 sm:p-6">
-                      <h3 className="text-lg sm:text-xl font-bold text-gray-900 mb-3">{item.name}</h3>
-
-                      {/* Description */}
-                      {item.description && (
-                        <p className="text-sm text-gray-600 mb-3">{item.description}</p>
-                      )}
-
-                      {/* Inclusions */}
-                      {inclusions.length > 0 && (
-                        <div className="mb-4">
-                          <p className="text-sm font-semibold text-gray-700 mb-2">Inclusion:</p>
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-1 text-xs text-gray-600">
-                            {inclusions.map((inclusion, index) => (
-                              <p key={index}>{inclusion}</p>
-                            ))}
-                          </div>
+            {/* Menu Items Grid with max height and scroll */}
+            <div className="max-h-[calc(100vh-250px)] overflow-y-auto pr-2 custom-scrollbar">
+              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-4 md:gap-6 lg:gap-8">
+                {filteredItems.map((item) => {
+                  const inclusions = parseInclusions(item.inclusion)
+                  return (
+                    <div key={item.menu_id} className="bg-white rounded-2xl shadow-lg overflow-hidden hover:shadow-xl transition-shadow duration-300">
+                      {/* Price Tag */}
+                      <div className="relative">
+                        <div className="absolute top-4 left-4 bg-yellow-400 text-black px-3 sm:px-4 py-1 sm:py-2 rounded-full font-bold text-base sm:text-lg z-10">
+                          ₱ {getDisplayPrice(item)}
                         </div>
-                      )}
 
-                      {/* Order Button */}
-                      <button
-                        onClick={() => openOrderModal(item)}
-                        className="w-full bg-yellow-400 text-black px-4 sm:px-6 py-2 sm:py-3 rounded-lg font-bold hover:bg-yellow-500 transition-colors duration-200 shadow-md text-sm sm:text-base"
-                      >
-                        ORDER NOW
-                      </button>
+                        {/* Food Image Container */}
+                        <div className="relative h-48 sm:h-64 overflow-hidden">
+                          <img
+                            src={getImageUrl(item.image_url)}
+                            alt={item.name}
+                            className="w-full h-full object-cover"
+                          />
+                          <div className="absolute inset-0 bg-black/10"></div>
+                        </div>
+                      </div>
+
+                      {/* Content */}
+                      <div className="p-4 sm:p-6">
+                        <h3 className="text-lg sm:text-xl font-bold text-gray-900 mb-3">{item.name}</h3>
+
+                        {/* Description */}
+                        {item.description && (
+                          <p className="text-sm text-gray-600 mb-3">{item.description}</p>
+                        )}
+
+                        {/* Inclusions */}
+                        {inclusions.length > 0 && (
+                          <div className="mb-4">
+                            <p className="text-sm font-semibold text-gray-700 mb-2">Inclusion:</p>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-1 text-xs text-gray-600">
+                              {inclusions.map((inclusion, index) => (
+                                <p key={index}>{inclusion}</p>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Order Button */}
+                        <button
+                          onClick={() => openOrderModal(item)}
+                          className="w-full bg-yellow-400 text-black px-4 sm:px-6 py-2 sm:py-3 rounded-lg font-bold hover:bg-yellow-500 transition-colors duration-200 shadow-md text-sm sm:text-base"
+                        >
+                          ORDER NOW
+                        </button>
+                      </div>
                     </div>
-                  </div>
-                )
-              })}
-            </div>
-
-            {/* No Results */}
-            {filteredItems.length === 0 && (
-              <div className="text-center py-12">
-                <p className="text-gray-500 text-lg">No items found matching your search.</p>
+                  )
+                })}
               </div>
-            )}
+
+              {/* No Results */}
+              {filteredItems.length === 0 && (
+                <div className="text-center py-12">
+                  <p className="text-gray-500 text-lg">No items found matching your search.</p>
+                </div>
+              )}
+            </div>
           </>
         )}
       </main>
@@ -950,7 +971,7 @@ function RouteComponent() {
                             }`}
                         >
                           <div className="font-semibold">{size}</div>
-                          <div className="text-sm text-gray-600">₱{price.toLocaleString()}</div>
+                          <div className="text-sm text-gray-600">₱{price.toFixed(2)}</div>
                         </button>
                       )
                     })}
@@ -986,7 +1007,7 @@ function RouteComponent() {
                 <div className="text-center">
                   <p className="text-sm text-gray-500 mb-1">Total Price</p>
                   <p className="text-3xl font-bold text-gray-900">
-                    ₱{calculateTotal().toLocaleString()}
+                    ₱{calculateTotal().toFixed(2)}
                   </p>
                 </div>
                 <div className="flex flex-col sm:flex-row gap-3">
@@ -1051,12 +1072,12 @@ function RouteComponent() {
                   <div className="flex-1">
                     <h4 className="font-bold text-gray-900">{selectedItem.name}</h4>
                     <p className="text-sm text-gray-600">
-                      Qty: {orderQuantity} × ₱{getPriceForSize(selectedItem, selectedSize).toLocaleString()}
+                      Qty: {orderQuantity} × ₱{getPriceForSize(selectedItem, selectedSize).toFixed(2)}
                       {selectedSize && ` (${selectedSize})`}
                     </p>
                   </div>
                   <p className="font-bold text-gray-900">
-                    ₱{(getPriceForSize(selectedItem, selectedSize) * orderQuantity).toLocaleString()}
+                    ₱{(getPriceForSize(selectedItem, selectedSize) * orderQuantity).toFixed(2)}
                   </p>
                 </div>
               </div>
@@ -1079,7 +1100,7 @@ function RouteComponent() {
                             <span className="inline-block bg-gradient-to-r from-yellow-400 to-orange-400 text-white px-3 py-1.5 rounded-lg text-sm font-bold mb-2">
                               {addOn.name}
                             </span>
-                            <p className="text-sm font-bold text-gray-900">₱{Number(addOn.price).toLocaleString()} each</p>
+                            <p className="text-sm font-bold text-gray-900">₱{Number(addOn.price).toFixed(2)} each</p>
                           </div>
                         </div>
                         <div className="flex items-center justify-center gap-3 bg-white rounded-lg p-2">
@@ -1113,7 +1134,7 @@ function RouteComponent() {
                     ₱{(getPriceForSize(selectedItem, selectedSize) * orderQuantity + Object.entries(orderAddOns).reduce((sum, [addOnId, qty]) => {
                       const addOn = addOnOptions.find(a => a.add_on === addOnId);
                       return sum + (addOn ? Number(addOn.price) * qty : 0);
-                    }, 0)).toLocaleString()}
+                    }, 0)).toFixed(2)}
                   </div>
                 </div>
                 <div className="flex gap-3 w-full lg:w-auto">

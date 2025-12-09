@@ -1,9 +1,10 @@
 import { createLazyFileRoute, Link } from '@tanstack/react-router'
 import { useState, useEffect } from 'react'
-import { Search, ShoppingCart, Bell, Heart, Star, MessageSquare, X, Menu } from 'lucide-react'
+import { ShoppingCart, Bell, Heart, Star, MessageSquare, X, Menu } from 'lucide-react'
 import { useUser } from '@/context/UserContext'
 import { ProtectedRoute } from '@/components/ProtectedRoute'
 import { useNavigate } from '@tanstack/react-router'
+import { supabase } from '@/lib/supabaseClient'
 
 export const Route = createLazyFileRoute('/customer-interface/home')({
   component: RouteComponent,
@@ -16,6 +17,34 @@ interface Notification {
   time: string
   icon: 'heart' | 'message' | 'star'
   read: boolean
+}
+
+interface Review {
+  review_id: string
+  review_type: 'delivery' | 'staff' | 'food' | 'service' | 'overall'
+  rating: number
+  comment: string
+  order_id: string
+  is_hidden: boolean
+  order?: Array<{
+    customer_uid: string
+    users?: Array<{
+      first_name: string
+      middle_name: string | null
+      last_name: string
+    }> | null
+  }> | null
+}
+
+interface MenuItem {
+  menu_id: string
+  name: string
+  description: string
+  price: string
+  image_url: string | null
+  category: string | null
+  size: string | null
+  is_available: boolean
 }
 
 function RouteComponent() {
@@ -34,10 +63,14 @@ function RouteComponent() {
 
   const [isNotificationOpen, setIsNotificationOpen] = useState(false)
   const [isReviewsModalOpen, setIsReviewsModalOpen] = useState(false);
-  const [isOrderDropdownOpen, setIsOrderDropdownOpen] = useState(false);
-  const [cartCount, setCartCount] = useState(0);
-  const [notificationCount, setNotificationCount] = useState(3);
+  const [cartCount] = useState(0);
+  const [notificationCount] = useState(3);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
+  const [reviews, setReviews] = useState<Review[]>([])
+  const [featuredMenuItems, setFeaturedMenuItems] = useState<MenuItem[]>([])
+  const [isLoadingReviews, setIsLoadingReviews] = useState(true)
+  const [isLoadingMenu, setIsLoadingMenu] = useState(true)
+  const [reviewFilter, setReviewFilter] = useState<string>('all')
 
   const [notifications, setNotifications] = useState<Notification[]>([
     {
@@ -82,6 +115,89 @@ function RouteComponent() {
     }
   ])
 
+  // Fetch reviews from Supabase
+  useEffect(() => {
+    const fetchReviews = async () => {
+      try {
+        setIsLoadingReviews(true)
+        const { data, error } = await supabase
+          .from('review')
+          .select(`
+            review_id,
+            review_type,
+            rating,
+            comment,
+            order_id,
+            is_hidden,
+            order (
+              customer_uid,
+              users (
+                first_name,
+                middle_name,
+                last_name
+              )
+            )
+          `)
+          .eq('is_hidden', false)
+          .limit(10)
+
+        if (error) {
+          console.error('Error fetching reviews:', error)
+          throw error
+        }
+        console.log('Fetched reviews:', data)
+        setReviews(data || [])
+      } catch (error) {
+        console.error('Error fetching reviews:', error)
+      } finally {
+        setIsLoadingReviews(false)
+      }
+    }
+
+    fetchReviews()
+  }, [])
+
+  // Fetch top 4 most expensive menu items
+  useEffect(() => {
+    const fetchFeaturedMenu = async () => {
+      try {
+        setIsLoadingMenu(true)
+        // Fetch all available menu items
+        const { data, error } = await supabase
+          .from('menu')
+          .select('*')
+          .eq('is_available', true)
+
+        if (error) throw error
+
+        // Sort by price descending (convert string prices to numbers for accurate sorting)
+        const sortedData = (data || []).sort((a, b) => {
+          // Helper function to get the maximum price from a price string
+          const getMaxPrice = (priceString: string) => {
+            const cleanPrice = priceString.replace(/₱/g, '').trim()
+            if (cleanPrice.includes(',')) {
+              const prices = cleanPrice.split(',').map(p => parseFloat(p.trim()) || 0)
+              return Math.max(...prices)
+            }
+            return parseFloat(cleanPrice || '0')
+          }
+
+          const priceA = getMaxPrice(a.price)
+          const priceB = getMaxPrice(b.price)
+          return priceB - priceA
+        }).slice(0, 4) // Take only the top 4
+
+        setFeaturedMenuItems(sortedData)
+      } catch (error) {
+        console.error('Error fetching menu items:', error)
+      } finally {
+        setIsLoadingMenu(false)
+      }
+    }
+
+    fetchFeaturedMenu()
+  }, [])
+
   const markAllAsRead = () => {
     setNotifications(prev => prev.map(notif => ({ ...notif, read: true })))
   }
@@ -99,59 +215,103 @@ function RouteComponent() {
     }
   }
 
-  // Sample reviews data
-  const reviews = [
-    {
-      id: 1,
-      name: "Joshua Rivera",
-      type: "Delivery Review",
-      rating: 5,
-      date: "May 14, 2025",
-      time: "11:20 AM",
-      comment: "Delivery was on time and the food arrived safely packed. There was just a slight delay due to traffic, but I appreciated being able to track the rider on the website.",
-      likes: 20
-    },
-    {
-      id: 2,
-      name: "Camille Santos",
-      type: "Staff Review",
-      rating: 5,
-      date: "May 13, 2025",
-      time: "4:50 PM",
-      comment: "The staff was friendly and accommodating when I had to update my order. They responded quickly and made sure everything was correct before sending it out.",
-      likes: 15
-    },
-    {
-      id: 3,
-      name: "Maria Dela Cruz",
-      type: "Food Review",
-      rating: 5,
-      date: "May 12, 2025",
-      time: "2:30 PM",
-      comment: "Amazing bilao! The food was fresh, hot, and delicious. Perfect for our family gathering. Will definitely order again!",
-      likes: 25
-    },
-    {
-      id: 4,
-      name: "Juan Mendoza",
-      type: "Service Review",
-      rating: 4,
-      date: "May 11, 2025",
-      time: "6:15 PM",
-      comment: "Great service and authentic Filipino taste. The portions were generous and worth the price. Only minor issue was the packaging could be improved.",
-      likes: 12
-    },
-    {
-      id: 5,
-      name: "Ana Reyes",
-      type: "Overall Experience",
-      rating: 5,
-      date: "May 10, 2025",
-      time: "12:45 PM",
-      comment: "Exceeded our expectations! The food reminded me of my grandmother's cooking. The bilao presentation was beautiful and the taste was incredible.",
-      likes: 30
+  // Helper functions for formatting
+  const formatReviewType = (type: string) => {
+    const typeMap: { [key: string]: string } = {
+      'delivery': 'Delivery Review',
+      'staff': 'Staff Review',
+      'food': 'Food Review',
+      'service': 'Service Review',
+      'overall': 'Overall Experience'
     }
-  ];
+    return typeMap[type] || type
+  }
+
+  const getMenuDescription = (itemName: string): string => {
+    const name = itemName.toLowerCase()
+
+    if (name.includes('pansit') || name.includes('pancit')) {
+      return 'Delicious stir-fried noodles with savory flavors, vegetables, and meat - a Filipino favorite for any celebration.'
+    } else if (name.includes('lumpia')) {
+      return 'Crispy golden spring rolls filled with seasoned vegetables and meat, perfect as an appetizer or party snack.'
+    } else if (name.includes('lechon')) {
+      return 'Tender, flavorful roasted pork with crispy skin - the centerpiece of Filipino feasts and celebrations.'
+    } else if (name.includes('menudo')) {
+      return 'Hearty tomato-based stew with pork, liver, and vegetables in a rich, savory sauce.'
+    } else if (name.includes('caldereta') || name.includes('kaldereta')) {
+      return 'Rich and spicy beef stew slow-cooked with tomatoes, bell peppers, and liver spread for depth of flavor.'
+    } else if (name.includes('adobo')) {
+      return 'Classic Filipino dish of tender meat marinated and simmered in soy sauce, vinegar, and garlic.'
+    } else if (name.includes('kare-kare') || name.includes('kare kare')) {
+      return 'Traditional oxtail and vegetable stew in rich peanut sauce, served with bagoong for authentic flavor.'
+    } else if (name.includes('sinigang')) {
+      return 'Tangy and savory tamarind-based soup with tender meat and fresh vegetables - comfort in a bowl.'
+    } else if (name.includes('sisig')) {
+      return 'Sizzling chopped pork with onions and peppers, served hot and crispy - a true Filipino bar favorite.'
+    } else if (name.includes('dinuguan')) {
+      return 'Savory pork blood stew cooked with vinegar and spices - a bold and traditional Filipino delicacy.'
+    } else if (name.includes('mechado')) {
+      return 'Tender beef stew in tomato sauce with potatoes and vegetables, infused with citrus flavor.'
+    } else if (name.includes('afritada')) {
+      return 'Hearty tomato-based stew with chicken or pork, potatoes, carrots, and bell peppers in savory sauce.'
+    } else if (name.includes('bicol express')) {
+      return 'Spicy and creamy pork dish cooked in coconut milk with chili peppers - a fiery Bicolano specialty.'
+    } else if (name.includes('laing')) {
+      return 'Taro leaves slow-cooked in rich coconut milk with shrimp paste and spices - a Bicolano delicacy.'
+    } else if (name.includes('pinakbet') || name.includes('pakbet')) {
+      return 'Healthy mixed vegetable dish with eggplant, squash, and okra in savory shrimp paste sauce.'
+    } else if (name.includes('bbq') || name.includes('barbecue')) {
+      return 'Grilled marinated meat skewers with sweet and savory glaze - perfect for sharing and celebrations.'
+    } else {
+      return 'A hearty and flavorful authentic Filipino dish, perfectly prepared for sharing with family and friends.'
+    }
+  }
+
+  const formatPrice = (price: string) => {
+    // Remove ₱ symbol if present
+    const cleanPrice = price.replace(/₱/g, '').trim()
+
+    // Check if price contains comma (multiple prices for different sizes)
+    if (cleanPrice.includes(',')) {
+      const prices = cleanPrice.split(',').map(p => parseFloat(p.trim()) || 0)
+      const minPrice = Math.min(...prices)
+      const maxPrice = Math.max(...prices)
+
+      // If all prices are the same, show single price
+      if (minPrice === maxPrice) {
+        return `₱${minPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+      }
+
+      // Show price range
+      return `₱${minPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} - ₱${maxPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+    }
+
+    // Single price
+    const numPrice = parseFloat(cleanPrice || '0')
+    return `₱${numPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+  }
+
+  const getImageUrl = (imageUrl: string | null): string => {
+    if (!imageUrl) return '/home-page menu-img/1.png'
+
+    // If it's already a full URL, return it
+    if (imageUrl.startsWith('http://') || imageUrl.startsWith('https://')) {
+      return imageUrl
+    }
+
+    // Construct the Supabase storage URL
+    // Encode the filename to handle spaces and special characters
+    const encodedFileName = encodeURIComponent(imageUrl)
+    return `https://tvuawpgcpmqhsmwbwypy.supabase.co/storage/v1/object/public/menu-images/${encodedFileName}`
+  }
+
+  const renderStars = (rating: number) => {
+    return [...Array(5)].map((_, i) => (
+      <span key={i} className={`text-xl ${i < rating ? 'text-yellow-400' : 'text-gray-300'}`}>
+        ★
+      </span>
+    ));
+  };
 
   // Navigation items with their corresponding routes
   const navigationItems = [
@@ -161,15 +321,6 @@ function RouteComponent() {
     { name: 'REVIEW', route: '/customer-interface/feedback', active: false },
     { name: 'MY INFO', route: '/customer-interface/my-info', active: false },
   ];
-
-
-  const renderStars = (rating: number) => {
-    return [...Array(5)].map((_, i) => (
-      <span key={i} className={`text-xl ${i < rating ? 'text-yellow-400' : 'text-gray-300'}`}>
-        ★
-      </span>
-    ));
-  };
 
   const logoStyle: React.CSSProperties = {
     width: '140px', // equivalent to w-35 (35 * 4px = 140px)
@@ -429,20 +580,18 @@ function RouteComponent() {
 
                 <div className="flex flex-col sm:flex-row gap-4 mb-6 justify-center lg:justify-start">
                   <Link
-                    to="/"
+                    to="/customer-interface"
                     className="bg-white text-amber-800 px-6 py-2 rounded font-semibold hover:bg-gray-100 no-underline"
                   >
                     VIEW MENU
                   </Link>
                   <Link
-                    to="/"
+                    to="/customer-interface"
                     className="bg-yellow-400 text-black px-6 py-2 rounded font-semibold hover:bg-yellow-500 no-underline"
                   >
                     PLACE ORDER NOW
                   </Link>
-                </div>
-
-                <button
+                </div>                <button
                   onClick={() => setIsReviewsModalOpen(true)}
                   className="block cursor-pointer hover:scale-105 transition-transform duration-200 bg-transparent border-none p-0 text-left mx-auto lg:mx-0"
                 >
@@ -484,11 +633,15 @@ function RouteComponent() {
                 {/* Filter Dropdown */}
                 <div className="pl-4 sm:pl-6 pt-4 sm:pt-6">
                   <div className="relative inline-block">
-                    <select className="bg-yellow-400 text-black px-4 py-2 pr-10 rounded font-semibold appearance-none cursor-pointer">
-                      <option>All Reviews</option>
-                      <option>Delivery Reviews</option>
-                      <option>Staff Reviews</option>
-                      <option>Food Reviews</option>
+                    <select
+                      value={reviewFilter}
+                      onChange={(e) => setReviewFilter(e.target.value)}
+                      className="bg-yellow-400 text-black px-4 py-2 pr-10 rounded font-semibold appearance-none cursor-pointer"
+                    >
+                      <option value="all">All Reviews</option>
+                      <option value="Delivery">Delivery Reviews</option>
+                      <option value="Staff">Staff Reviews</option>
+                      <option value="Food">Food Reviews</option>
                     </select>
                     <div className="absolute inset-y-0 right-0 flex items-center px-2 pointer-events-none">
                       <svg className="w-4 h-4 text-black" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -500,33 +653,42 @@ function RouteComponent() {
 
                 {/* Reviews List */}
                 <div className="p-4 sm:p-6 overflow-y-auto max-h-[60vh]">
-                  <div className="space-y-4 sm:space-y-6">
-                    {reviews.map((review) => (
-                      <div key={review.id} className="bg-amber-800 rounded-2xl sm:rounded-4xl p-4 sm:p-6 text-white">
-                        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between mb-4">
-                          <div className="mb-2 sm:mb-0">
-                            <h3 className="font-bold text-base sm:text-lg">{review.name}</h3>
-                            <p className="text-amber-200 text-sm">{review.type}: {renderStars(review.rating)}</p>
-                          </div>
-                          <div className="text-left sm:text-right text-sm text-amber-200">
-                            <p>{review.date}</p>
-                            <p>{review.time}</p>
-                          </div>
-                        </div>
+                  {isLoadingReviews ? (
+                    <div className="flex items-center justify-center py-12">
+                      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-amber-800"></div>
+                    </div>
+                  ) : reviews.filter(review => reviewFilter === 'all' || review.review_type === reviewFilter).length === 0 ? (
+                    <div className="text-center py-12 text-gray-500">
+                      <p>No reviews available for this category.</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-4 sm:space-y-6">
+                      {reviews.filter(review => reviewFilter === 'all' || review.review_type === reviewFilter).map((review) => {
+                        const order = review.order ? review.order[0] : null
+                        const user = order?.users ? order.users[0] : null
+                        const userName = user
+                          ? `${user.first_name} ${user.middle_name ? user.middle_name + ' ' : ''}${user.last_name}`.trim()
+                          : 'Anonymous'
 
-                        <div className="bg-yellow-400 text-black p-3 sm:p-4 rounded-lg mb-4">
-                          <p className="text-sm leading-relaxed">{review.comment}</p>
-                        </div>
-
-                        <div className="flex items-center justify-end">
-                          <div className="flex items-center gap-2">
-                            <span className="text-xl">👍</span>
-                            <span className="text-sm">{review.likes}</span>
+                        return (
+                          <div key={review.review_id} className="bg-amber-800 rounded-2xl sm:rounded-4xl p-4 sm:p-6 text-white">
+                            <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between mb-3 sm:mb-4">
+                              <div className="mb-2 sm:mb-0">
+                                <h3 className="text-lg sm:text-xl font-bold">{userName}</h3>
+                                <p className="text-sm text-yellow-200">{formatReviewType(review.review_type)}</p>
+                              </div>
+                              <div className="flex items-center gap-1">
+                                {renderStars(review.rating)}
+                              </div>
+                            </div>
+                            <div className="bg-yellow-400 text-black p-3 sm:p-4 rounded-xl">
+                              <p className="text-sm sm:text-base leading-relaxed">{review.comment}</p>
+                            </div>
                           </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
+                        )
+                      })}
+                    </div>
+                  )}
                 </div>
 
                 {/* Modal Footer */}
@@ -548,33 +710,38 @@ function RouteComponent() {
             </div>
 
             <div className="bg-amber-800 mx-3 sm:mx-4 rounded-lg p-4 sm:p-6">
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
-                {[
-                  { title: "3 in 1 Bilao Bilao (Panlasang)", price: "₱999", src: "/home-page menu-img/1.png" },
-                  { title: "4 in 1 Bilao Bilao (Panlasang)", price: "₱1,299", src: "/home-page menu-img/2.png" },
-                  { title: "5 in 1 Bilao Bilao (Panlasang)", price: "₱1,599", src: "/home-page menu-img/3.png" },
-                  { title: "6 in 1 Bilao Bilao (Panlasang)", price: "₱1,899", src: "/home-page menu-img/4.png" }
-                ].map((item, index) => (
-                  <div key={index} className="bg-white rounded-lg p-4 text-center">
-                    <img
-                      src={item.src}
-                      alt={item.title}
-                      className="w-16 h-16 sm:w-20 sm:h-20 lg:w-24 lg:h-24 rounded-full mx-auto mb-3 sm:mb-4 object-cover"
-                    />
-                    <h3 className="font-semibold text-sm mb-2">{item.title}</h3>
-                    <p className="text-xs text-gray-600 mb-2">
-                      A hearty and flavorful blend of authentic Filipino dishes, perfectly portioned for sharing and celebrating with family and friends.
-                    </p>
-                    <p className="font-bold text-lg mb-3">{item.price}</p>
-                    <Link
-                      to="/"
-                      className="bg-yellow-400 text-black px-4 py-2 rounded text-sm font-semibold hover:bg-yellow-500 w-full block text-center no-underline"
-                    >
-                      ORDER NOW
-                    </Link>
-                  </div>
-                ))}
-              </div>
+              {isLoadingMenu ? (
+                <div className="flex items-center justify-center py-12">
+                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white"></div>
+                </div>
+              ) : featuredMenuItems.length === 0 ? (
+                <div className="text-center py-12 text-white">
+                  <p>No menu items available at the moment.</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+                  {featuredMenuItems.map((item) => (
+                    <div key={item.menu_id} className="bg-white rounded-lg p-4 text-center">
+                      <img
+                        src={getImageUrl(item.image_url)}
+                        alt={item.name}
+                        className="w-16 h-16 sm:w-20 sm:h-20 lg:w-24 lg:h-24 rounded-full mx-auto mb-3 sm:mb-4 object-cover"
+                      />
+                      <h3 className="font-semibold text-sm mb-2">{item.name}</h3>
+                      <p className="text-xs text-gray-600 mb-2">
+                        {getMenuDescription(item.name)}
+                      </p>
+                      <p className="font-bold text-lg mb-3">{formatPrice(item.price)}</p>
+                      <Link
+                        to="/customer-interface"
+                        className="bg-yellow-400 text-black px-4 py-2 rounded text-sm font-semibold hover:bg-yellow-500 w-full block text-center no-underline"
+                      >
+                        ORDER NOW
+                      </Link>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
 

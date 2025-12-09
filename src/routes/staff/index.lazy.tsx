@@ -160,11 +160,17 @@ function RouteComponent() {
     const handleRejectDone = async () => {
         if (!selectedOrder?.orderData) return
 
+        // Validate that return payment proof is uploaded
+        if (!returnPaymentProof) {
+            alert('Please upload return payment proof before rejecting the order. This is required to show proof that the customer\'s payment has been returned.');
+            return;
+        }
+
         try {
             const { error } = await supabase
                 .from('order')
                 .update({
-                    order_status: 'Cancelled',  // ✅ Use actual database value (or 'Refund' if appropriate)
+                    order_status: 'Rejected',
                     status_updated_at: new Date().toISOString()
                 })
                 .eq('order_id', selectedOrder.orderData.order_id)
@@ -248,29 +254,43 @@ function RouteComponent() {
             setLoading(true)
             const data = await fetchOrders()
 
-            const formattedOrders: OrderDisplay[] = data.map(order => ({
-                id: `#${order.order_number}`,
-                customerName: order.user.customer_name,
-                time: order.time,
-                date: new Date(order.date).toLocaleDateString('en-US', {
-                    year: 'numeric',
-                    month: 'long',
-                    day: 'numeric'
-                }),
-                scheduledDate: new Date(order.schedule.schedule_date).toLocaleDateString('en-US', {
-                    year: 'numeric',
-                    month: 'long',
-                    day: 'numeric'
-                }),
-                scheduledTime: order.schedule.schedule_time,
-                price: `₱ ${Number(order.total_price).toLocaleString()}`,
-                fulfillmentType: order.order_type,
-                paymentMethod: order.payment.paymentMethod || 'On-Site Payment',
-                order_status: order.order_status,
-                statusUpdatedAt: order.status_updated_at || null,
-                orderData: order,
-                proofOfPaymentUrl: order.payment.proof_of_payment_url || null
-            }))
+            // Sort orders by created_at ascending (earliest first)
+            const sortedData = data.sort((a, b) => {
+                const dateA = new Date(a.date).getTime()
+                const dateB = new Date(b.date).getTime()
+                return dateA - dateB
+            })
+
+            const formattedOrders: OrderDisplay[] = sortedData.map(order => {
+                // Calculate total including delivery fee
+                const subtotal = Number(order.total_price)
+                const deliveryFee = order.delivery?.delivery_fee ? Number(order.delivery.delivery_fee) : 0
+                const totalWithDelivery = subtotal + deliveryFee
+
+                return {
+                    id: `#${order.order_number}`,
+                    customerName: order.user.customer_name,
+                    time: order.time,
+                    date: new Date(order.date).toLocaleDateString('en-US', {
+                        year: 'numeric',
+                        month: 'long',
+                        day: 'numeric'
+                    }),
+                    scheduledDate: new Date(order.schedule.schedule_date).toLocaleDateString('en-US', {
+                        year: 'numeric',
+                        month: 'long',
+                        day: 'numeric'
+                    }),
+                    scheduledTime: order.schedule.schedule_time,
+                    price: `₱ ${totalWithDelivery.toFixed(2)}`,
+                    fulfillmentType: order.order_type,
+                    paymentMethod: order.payment.paymentMethod || 'On-Site Payment',
+                    order_status: order.order_status,
+                    statusUpdatedAt: order.status_updated_at || null,
+                    orderData: order,
+                    proofOfPaymentUrl: order.payment.proof_of_payment_url || null
+                }
+            })
 
             console.log('Loaded orders:', formattedOrders)
             setOrders(formattedOrders)
@@ -744,7 +764,8 @@ function RouteComponent() {
                     order_status: 'Queueing',
                     order_type: orderForm.fulfillmentType === 'pickup' ? 'Pick-up' : 'Delivery',
                     total_price: totalPrice,
-                    additional_information: 'Walk-in customer order'
+                    additional_information: 'Walk-in customer order',
+                    is_manual: true
                 })
                 .select()
                 .single()
@@ -1645,14 +1666,14 @@ function RouteComponent() {
                                                                 <span>
                                                                     • {item.name} {item.size && `(${item.size})`} (x{item.quantity})
                                                                 </span>
-                                                                <span className="font-semibold">₱ {(item.price * item.quantity).toLocaleString()}</span>
+                                                                <span className="font-semibold">₱ {(item.price * item.quantity).toFixed(2)}</span>
                                                             </div>
                                                         ))}
                                                     </div>
                                                     <div className="border-t border-gray-300 pt-2 mt-2">
                                                         <div className="flex justify-between items-center font-semibold">
                                                             <span>Subtotal</span>
-                                                            <span className="text-lg">₱ {calculateOrderTotal().toLocaleString()}</span>
+                                                            <span className="text-lg">₱ {calculateOrderTotal().toFixed(2)}</span>
                                                         </div>
                                                     </div>
                                                 </div>
@@ -1682,7 +1703,7 @@ function RouteComponent() {
 
                                                                             {/* Price variants */}
                                                                             {prices.length === 1 ? (
-                                                                                <p className="text-sm opacity-90 mt-1">₱ {prices[0].toLocaleString()}</p>
+                                                                                <p className="text-sm opacity-90 mt-1">₱ {prices[0].toFixed(2)}</p>
                                                                             ) : (
                                                                                 <div className="mt-2 space-y-1">
                                                                                     <p className="text-xs opacity-75">Select size & price:</p>
@@ -1725,7 +1746,7 @@ function RouteComponent() {
                                                                                                         : 'bg-amber-500 hover:bg-amber-400'
                                                                                                         }`}
                                                                                                 >
-                                                                                                    {size}: ₱{price.toLocaleString()}
+                                                                                                    {size}: ₱{price.toFixed(2)}
                                                                                                 </button>
                                                                                             )
                                                                                         })}
@@ -1829,7 +1850,7 @@ function RouteComponent() {
                                                             <span className="bg-amber-200 text-amber-800 px-3 py-1 rounded-full text-sm font-medium">
                                                                 {addon.name}
                                                             </span>
-                                                            <span className="text-sm text-gray-600 ml-2">₱ {Number(addon.price).toLocaleString()}</span>
+                                                            <span className="text-sm text-gray-600 ml-2">₱ {Number(addon.price).toFixed(2)}</span>
                                                         </div>
                                                         <div className="flex items-center gap-2">
                                                             <button
@@ -1872,7 +1893,7 @@ function RouteComponent() {
                                                     <span className="font-semibold">
                                                         ₱ {orderForm.selectedMenuItems.reduce(
                                                             (sum, item) => sum + (item.price * item.quantity), 0
-                                                        ).toLocaleString()}
+                                                        ).toFixed(2)}
                                                     </span>
                                                 </div>
                                                 <div className="flex justify-between">
@@ -1883,13 +1904,13 @@ function RouteComponent() {
                                                                 const addOn = addOns.find(a => a.add_on === addOnId)
                                                                 return sum + (addOn ? Number(addOn.price) * quantity : 0)
                                                             }, 0
-                                                        ).toLocaleString()}
+                                                        ).toFixed(2)}
                                                     </span>
                                                 </div>
                                                 <div className="border-t border-yellow-400 pt-2 mt-2">
                                                     <div className="flex justify-between text-lg font-bold">
                                                         <span>Total:</span>
-                                                        <span>₱ {calculateOrderTotal().toLocaleString()}</span>
+                                                        <span>₱ {calculateOrderTotal().toFixed(2)}</span>
                                                     </div>
                                                 </div>
                                             </div>
@@ -2022,7 +2043,7 @@ function RouteComponent() {
                                                                             <p className="text-sm text-gray-600">+ {addon.add_on.name} (x{addon.quantity})</p>
                                                                         </div>
                                                                         <div className="text-center text-sm text-gray-600"></div>
-                                                                        <div className="text-right text-sm font-semibold text-gray-600">₱ {Number(addon.subtotal_price).toLocaleString()}</div>
+                                                                        <div className="text-right text-sm font-semibold text-gray-600">₱ {Number(addon.subtotal_price).toFixed(2)}</div>
                                                                     </div>
                                                                 ))}
                                                             </div>
@@ -2040,20 +2061,20 @@ function RouteComponent() {
                                 <div className="border-t border-gray-200 pt-4 space-y-3">
                                     <div className="flex justify-between items-center">
                                         <span className="text-lg font-medium">Subtotal</span>
-                                        <span className="text-lg font-bold">₱ {orderPrice?.toLocaleString()}</span>
+                                        <span className="text-lg font-bold">₱ {orderPrice?.toFixed(2)}</span>
                                     </div>
                                     {selectedOrder.orderData.delivery && (
                                         <div className="flex justify-between items-center">
                                             <span className="text-lg font-medium">Delivery fee</span>
                                             <span className="text-lg font-bold">
-                                                ₱ {Number(selectedOrder.orderData.delivery.delivery_fee || 0).toLocaleString()}
+                                                ₱ {Number(selectedOrder.orderData.delivery.delivery_fee || 0).toFixed(2)}
                                             </span>
                                         </div>
                                     )}
                                     <div className="flex justify-between items-center border-t-2 border-gray-300 pt-3">
                                         <span className="text-xl font-bold">Total</span>
                                         <span className="text-2xl font-bold text-amber-600">
-                                            ₱ {(orderPrice + (selectedOrder.orderData.delivery ? Number(selectedOrder.orderData.delivery.delivery_fee || 0) : 0)).toLocaleString()}
+                                            ₱ {(orderPrice + (selectedOrder.orderData.delivery ? Number(selectedOrder.orderData.delivery.delivery_fee || 0) : 0)).toFixed(2)}
                                         </span>
                                     </div>
                                 </div>
@@ -2244,7 +2265,7 @@ function RouteComponent() {
 
                                 <div className="mb-4">
                                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                                        Upload Return Payment Proof (Optional)
+                                        Upload Return Payment Proof <span className="text-red-500">*</span>
                                     </label>
                                     <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center hover:border-amber-500 transition-colors cursor-pointer">
                                         <input
@@ -2257,7 +2278,7 @@ function RouteComponent() {
                                         <label htmlFor="returnPaymentProof" className="cursor-pointer">
                                             <Upload className="h-8 w-8 text-gray-400 mx-auto mb-2" />
                                             <p className="text-sm text-gray-600">
-                                                {returnPaymentProof ? returnPaymentProof.name : 'Click to upload payment proof'}
+                                                {returnPaymentProof ? returnPaymentProof.name : 'Click to upload payment proof (Required)'}
                                             </p>
                                         </label>
                                     </div>

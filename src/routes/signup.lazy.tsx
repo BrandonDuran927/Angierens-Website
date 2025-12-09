@@ -28,10 +28,11 @@ function Signup() {
   const [otpCode, setOtpCode] = useState('')
   const [sentCode, setSentCode] = useState('')
   const [isLoading, setIsLoading] = useState(false);
+  const [isSendingOtp, setIsSendingOtp] = useState(false);
+  const [otpSent, setOtpSent] = useState(false);
+  const [otpError, setOtpError] = useState('');
   const [currentStep, setCurrentStep] = useState(1);
   const { setUser, user } = useUser();
-  const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
-  const [isRequestingLocation, setIsRequestingLocation] = useState(false);
 
 
 
@@ -73,8 +74,7 @@ function Signup() {
   const [barangays, setBarangays] = useState<any[]>([]);
   const ALLOWED_REGIONS = {
     'NCR': '130000000',
-    'Region III': '030000000',
-    'Region IV-A': '040000000'
+    'Region III': '030000000'
   };
 
   const LoadingSpinner = () => (
@@ -200,69 +200,59 @@ function Signup() {
     }
   }
 
-  const requestUserLocation = () => {
-    setIsRequestingLocation(true);
+  // Geocode address to get coordinates
+  const geocodeAddress = async (): Promise<{ lat: number; lng: number } | null> => {
+    try {
+      const fullAddress = `${form.address_line}, ${form.barangay}, ${form.city}, ${form.province}, Philippines ${form.postalCode}`;
 
-    if (!navigator.geolocation) {
-      setValidationMessage({
-        type: 'error',
-        message: 'Geolocation is not supported by your browser. Please use a modern browser like Chrome, Firefox, or Safari.'
-      });
-      setIsRequestingLocation(false);
-      return;
-    }
+      const response = await fetch(
+        `http://localhost:3001/api/geocode?address=${encodeURIComponent(fullAddress)}`
+      );
 
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        setUserLocation({
-          lat: position.coords.latitude,
-          lng: position.coords.longitude
-        });
-        setIsRequestingLocation(false);
-
-        if (errors.location) {
-          setErrors(prev => ({ ...prev, location: '' }));
-        }
-        if (validationMessage) {
-          setValidationMessage(null);
-        }
-
-        setValidationMessage({
-          type: 'success',
-          message: 'Location captured successfully!'
-        });
-
-        setTimeout(() => {
-          setValidationMessage(null);
-        }, 3000);
-      },
-      (error) => {
-        console.error('Error getting location:', error);
-        let errorMessage = '';
-
-        switch (error.code) {
-          case error.PERMISSION_DENIED:
-            errorMessage = 'Location access denied. Please enable location permissions in your browser settings and try again.';
-            break;
-          case error.POSITION_UNAVAILABLE:
-            errorMessage = 'Location information is unavailable. Please check your device settings and try again.';
-            break;
-          case error.TIMEOUT:
-            errorMessage = 'Location request timed out. Please try again.';
-            break;
-          default:
-            errorMessage = 'An error occurred while getting your location. Please try again.';
-        }
-
-        setValidationMessage({ type: 'error', message: errorMessage });
-        setIsRequestingLocation(false);
-      },
-      {
-        enableHighAccuracy: true,
-        timeout: 10000,
-        maximumAge: 0
+      if (!response.ok) {
+        console.error('Geocoding failed:', await response.text());
+        return null;
       }
-    );
+
+      const data = await response.json();
+
+      if (data.results && data.results.length > 0) {
+        const location = data.results[0].geometry.location;
+        console.log('Geocoded location:', location);
+
+        // Validate distance from store (100 km limit)
+        const STORE_LOCATION = { lat: 14.818589037203248, lng: 121.05753223366108 };
+        const MAX_DELIVERY_DISTANCE_KM = 100;
+
+        // Calculate distance using Haversine formula
+        const R = 6371; // Earth's radius in km
+        const dLat = (location.lat - STORE_LOCATION.lat) * Math.PI / 180;
+        const dLon = (location.lng - STORE_LOCATION.lng) * Math.PI / 180;
+        const a =
+          Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+          Math.cos(STORE_LOCATION.lat * Math.PI / 180) * Math.cos(location.lat * Math.PI / 180) *
+          Math.sin(dLon / 2) * Math.sin(dLon / 2);
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        const distance = R * c;
+
+        console.log(`Address distance from store: ${distance.toFixed(2)} km`);
+
+        if (distance > MAX_DELIVERY_DISTANCE_KM) {
+          setValidationMessage({
+            type: 'error',
+            message: `Your delivery address is ${distance.toFixed(1)} km away from our store. We only deliver within ${MAX_DELIVERY_DISTANCE_KM} km. Please provide an address closer to our location.`
+          });
+          return null;
+        }
+
+        return { lat: location.lat, lng: location.lng };
+      }
+
+      return null;
+    } catch (error) {
+      console.error('Error geocoding address:', error);
+      return null;
+    }
   };
 
   useEffect(() => {
@@ -562,10 +552,6 @@ function Signup() {
       newErrors.address_line = 'Address must not exceed 255 characters';
     }
 
-    if (!userLocation) {
-      newErrors.location = 'Please provide your location by clicking "Capture My Location"';
-    }
-
     // Phone Number validation
     const cleanedPhone = form.phone_number.replace(/\s+/g, '');
     const phoneRegex = /^(09|\+639)\d{9}$/;
@@ -678,25 +664,97 @@ function Signup() {
       return;
     }
 
-    setShowOtpModal(true)
+    // Show OTP modal and automatically send OTP
+    setShowOtpModal(true);
+    // Send OTP after modal is shown
+    setTimeout(() => {
+      sendOtp();
+    }, 100);
   }
 
   const closeOtpModal = () => {
     setShowOtpModal(false)
     setSentCode('')
     setOtpCode('')
+    setOtpSent(false)
+    setOtpError('')
+  }
+
+  const sendOtp = async () => {
+    try {
+      setIsSendingOtp(true)
+      setOtpError('')
+
+      // Format phone number to E.164 format
+      const formattedPhone = formatPhoneNumber(form.phone_number)
+
+      const { data, error } = await supabase.functions.invoke('send-otp', {
+        body: { phoneNumber: formattedPhone }
+      })
+
+      if (error) {
+        console.error('Error sending OTP:', error)
+        setOtpError('Failed to send OTP. Please try again.')
+        return
+      }
+
+      if (data.status === 'pending') {
+        setOtpSent(true)
+        setValidationMessage({ type: 'success', message: `OTP sent to ${formattedPhone}` })
+      } else {
+        setOtpError(data.message || 'Failed to send OTP. Please check your phone number.')
+      }
+    } catch (err) {
+      console.error('Error in sendOtp:', err)
+      setOtpError('An error occurred while sending OTP. Please try again.')
+    } finally {
+      setIsSendingOtp(false)
+    }
   }
 
   const verifyOtp = async () => {
     try {
       setIsLoading(true);
-      await signUpNewUser()
-      closeOtpModal()
-      navigate({ to: "/login" })
+      setOtpError('');
+
+      // Validate OTP code
+      if (!otpCode || otpCode.length !== 6) {
+        setOtpError('Please enter a valid 6-digit OTP code');
+        setIsLoading(false);
+        return;
+      }
+
+      // Format phone number to E.164 format
+      const formattedPhone = formatPhoneNumber(form.phone_number);
+
+      // Verify OTP with Twilio via Supabase Edge Function
+      const { data, error } = await supabase.functions.invoke('verify-otp', {
+        body: {
+          phoneNumber: formattedPhone,
+          otpCode: otpCode
+        }
+      });
+
+      if (error) {
+        console.error('Error verifying OTP:', error);
+        setOtpError('Failed to verify OTP. Please try again.');
+        setIsLoading(false);
+        return;
+      }
+
+      // Check if verification was successful
+      if (data.status === 'approved') {
+        // OTP verified successfully, proceed with user registration
+        await signUpNewUser();
+        closeOtpModal();
+        navigate({ to: "/login" });
+      } else {
+        setOtpError(data.message || 'Invalid OTP code. Please try again.');
+        setIsLoading(false);
+      }
     } catch (error) {
-      console.error('Error verifying OTP or signing up:', error)
-      // Error message is already set in signUpNewUser
-    } finally {
+      console.error('Error verifying OTP or signing up:', error);
+      setOtpError('An error occurred. Please try again.');
       setIsLoading(false);
     }
   }
@@ -772,7 +830,20 @@ function Signup() {
 
       const userId = userData[0].user_uid
 
-      // FIX: Use form.province (the name) instead of form.provinceCode
+      // Geocode the address to get coordinates
+      const coordinates = await geocodeAddress();
+
+      if (!coordinates) {
+        console.warn('Could not geocode address, using default coordinates');
+        // You can either throw an error or use default coordinates
+        setValidationMessage({
+          type: 'error',
+          message: 'Unable to verify your address location. Please check that your address is complete and accurate.'
+        });
+        throw new Error('Geocoding failed');
+      }
+
+      // Use form.province (the name) instead of form.provinceCode
       const { error: addressError } = await supabase.from("address").insert([
         {
           address_type: "Primary",
@@ -782,8 +853,8 @@ function Signup() {
           barangay: form.barangay,
           postal_code: sanitizedPostalCode,
           customer_id: userId,
-          latitude: userLocation!.lat,
-          longitude: userLocation!.lng
+          latitude: coordinates.lat,
+          longitude: coordinates.lng
         },
       ])
 
@@ -808,7 +879,7 @@ function Signup() {
   };
 
   const isStep2Complete = () => {
-    return form.postalCode && form.provinceCode && form.cityCode && form.barangayCode && form.address_line && form.phone_number && userLocation;
+    return form.postalCode && form.provinceCode && form.cityCode && form.barangayCode && form.address_line && form.phone_number;
   };
 
 
@@ -1211,7 +1282,7 @@ function Signup() {
                 <div className="w-10 h-10 rounded-full bg-[#964B00] text-yellow-400 flex items-center justify-center font-bold text-lg">
                   2
                 </div>
-                <h2 className="text-2xl font-bold text-gray-800">Delivery Address</h2>
+                <h2 className="text-2xl font-bold text-gray-800">Address</h2>
               </div>
 
               <div className="space-y-5">
@@ -1345,70 +1416,9 @@ function Signup() {
                     {errors.address_line && (
                       <p className="text-red-500 text-xs mt-1">{errors.address_line}</p>
                     )}
-                  </div>
-
-                  {/* Add this after the "Complete Address" field */}
-                  <div className="md:col-span-2">
-                    <div className="border-t pt-5">
-                      <h3 className="text-sm font-semibold text-gray-700 mb-3">
-                        Location Information <span className="text-red-500">*</span>
-                      </h3>
-                      <p className="text-xs text-gray-600 mb-3">
-                        We need your exact location to calculate accurate delivery fees and ensure smooth delivery service.
-                      </p>
-
-                      <button
-                        type="button"
-                        onClick={requestUserLocation}
-                        disabled={isRequestingLocation}
-                        className={`w-full md:w-auto px-6 py-3 rounded-lg font-semibold transition-all flex items-center justify-center gap-2 ${userLocation
-                          ? 'bg-green-100 text-green-700 border-2 border-green-500'
-                          : errors.location
-                            ? 'bg-red-50 text-red-700 border-2 border-red-500 hover:bg-red-100'
-                            : 'bg-amber-100 text-amber-700 border-2 border-amber-500 hover:bg-amber-200'
-                          } ${isRequestingLocation ? 'opacity-50 cursor-not-allowed' : ''}`}
-                      >
-                        {isRequestingLocation ? (
-                          <>
-                            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-amber-700"></div>
-                            Getting Location...
-                          </>
-                        ) : userLocation ? (
-                          <>
-                            <CheckCircle2 className="h-5 w-5" />
-                            Location Captured ✓
-                          </>
-                        ) : (
-                          <>
-                            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                            </svg>
-                            Capture My Location
-                          </>
-                        )}
-                      </button>
-
-                      {errors.location && (
-                        <p className="text-red-500 text-xs mt-2">{errors.location}</p>
-                      )}
-
-                      {userLocation && (
-                        <div className="mt-3 p-3 bg-green-50 border border-green-200 rounded-lg">
-                          <p className="text-xs text-green-700 font-medium mb-1">
-                            ✓ Location captured successfully
-                          </p>
-                        </div>
-                      )}
-
-                      {!userLocation && (
-                        <div className="mt-3 p-3 bg-amber-50 border border-amber-200 rounded-lg">
-                          <p className="text-xs text-amber-700">
-                            <strong>Tip:</strong> Make sure to allow location access when prompted by your browser. This helps us serve you better!
-                          </p>
-                        </div>
-                      )}
-                    </div>
+                    <p className="text-xs text-gray-600 mt-2">
+                      💡 Your address will be automatically verified for accurate delivery service.
+                    </p>
                   </div>
                 </div>
 
@@ -1652,42 +1662,74 @@ function Signup() {
               </div>
               <h2 className="text-2xl font-bold text-gray-800 mb-2">Verify Your Number</h2>
               <p className="text-gray-600 text-sm">
-                We've sent a 6-digit code to your mobile number
+                {otpSent
+                  ? `Code sent to ${formatPhoneNumber(form.phone_number)}`
+                  : 'We will send a 6-digit code to your phone'}
               </p>
             </div>
 
-            <div className="mb-6">
-              <label className="block text-sm font-semibold text-gray-700 mb-3 text-center">Enter OTP Code</label>
-              <input
-                type="text"
-                value={otpCode}
-                onChange={(e) => setOtpCode(e.target.value)}
-                className="w-full px-4 py-4 border-2 border-gray-200 rounded-xl focus:border-[#964B00] focus:ring-2 focus:ring-amber-200 transition-all outline-none text-center text-2xl tracking-[0.5em] font-bold"
-                placeholder="000000"
-                maxLength={6}
-                onKeyDown={(e) => e.key === 'Enter' && verifyOtp()}
-              />
-            </div>
+            {otpError && (
+              <div className="mb-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded-lg text-sm flex items-start gap-2">
+                <AlertCircle className="h-5 w-5 flex-shrink-0 mt-0.5" />
+                <span>{otpError}</span>
+              </div>
+            )}
 
-            <div className="text-center mb-6">
-              <button className="text-[#964B00] text-sm font-semibold hover:underline transition-colors">
-                Didn't receive the code? Resend
+            {!otpSent ? (
+              <button
+                onClick={sendOtp}
+                disabled={isSendingOtp}
+                className="w-full px-6 py-3 bg-gradient-to-r from-[#964B00] to-amber-700 text-yellow-400 rounded-xl hover:from-amber-700 hover:to-[#964B00] transition-all font-semibold shadow-lg disabled:opacity-50 disabled:cursor-not-allowed mb-4"
+              >
+                {isSendingOtp ? 'Sending OTP...' : 'Send OTP'}
               </button>
-            </div>
+            ) : (
+              <>
+                <div className="mb-6">
+                  <label className="block text-sm font-semibold text-gray-700 mb-3 text-center">Enter OTP Code</label>
+                  <input
+                    type="text"
+                    value={otpCode}
+                    onChange={(e) => {
+                      setOtpCode(e.target.value.replace(/\D/g, '').slice(0, 6));
+                      setOtpError('');
+                    }}
+                    className="w-full px-4 py-4 border-2 border-gray-200 rounded-xl focus:border-[#964B00] focus:ring-2 focus:ring-amber-200 transition-all outline-none text-center text-2xl tracking-[0.5em] font-bold"
+                    placeholder="000000"
+                    maxLength={6}
+                    onKeyDown={(e) => e.key === 'Enter' && otpCode.length === 6 && verifyOtp()}
+                  />
+                </div>
+
+                <div className="text-center mb-6">
+                  <button
+                    onClick={sendOtp}
+                    disabled={isSendingOtp}
+                    className="text-[#964B00] text-sm font-semibold hover:underline transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {isSendingOtp ? 'Sending...' : "Didn't receive the code? Resend"}
+                  </button>
+                </div>
+              </>
+            )}
 
             <div className="flex gap-3">
               <button
                 onClick={closeOtpModal}
-                className="flex-1 px-6 py-3 text-gray-700 bg-gray-100 rounded-xl hover:bg-gray-200 transition-colors font-semibold"
+                disabled={isLoading}
+                className="flex-1 px-6 py-3 text-gray-700 bg-gray-100 rounded-xl hover:bg-gray-200 transition-colors font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Cancel
               </button>
-              <button
-                onClick={verifyOtp}
-                className="flex-1 px-6 py-3 bg-gradient-to-r from-[#964B00] to-amber-700 text-yellow-400 rounded-xl hover:from-amber-700 hover:to-[#964B00] transition-all font-semibold shadow-lg"
-              >
-                Verify
-              </button>
+              {otpSent && (
+                <button
+                  onClick={verifyOtp}
+                  disabled={isLoading || otpCode.length !== 6}
+                  className="flex-1 px-6 py-3 bg-gradient-to-r from-[#964B00] to-amber-700 text-yellow-400 rounded-xl hover:from-amber-700 hover:to-[#964B00] transition-all font-semibold shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isLoading ? 'Verifying...' : 'Verify'}
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -1747,7 +1789,7 @@ function Signup() {
                   <ul className="list-disc pl-6 space-y-2">
                     <li>Delivery is available within Metro Manila (NCR) only</li>
                     <li>Delivery times are estimates and may vary due to traffic or other factors</li>
-                    <li>You must provide accurate delivery address information</li>
+                    <li>You must provide accurate address information</li>
                     <li>Additional delivery charges may apply based on location</li>
                   </ul>
                 </section>
@@ -1822,7 +1864,7 @@ function Signup() {
                   <p className="mb-2">We collect the following types of information:</p>
                   <ul className="list-disc pl-6 space-y-2">
                     <li><strong>Personal Information:</strong> Name, email address, phone number, date of birth, gender</li>
-                    <li><strong>Address Information:</strong> Delivery address including barangay, city, and postal code</li>
+                    <li><strong>Address Information:</strong> Address including barangay, city, and postal code</li>
                     <li><strong>Order Information:</strong> Order history, preferences, and payment details</li>
                     <li><strong>Usage Information:</strong> How you interact with our platform</li>
                   </ul>
@@ -1845,7 +1887,7 @@ function Signup() {
                   <h3 className="text-lg font-semibold mb-2">3. Information Sharing</h3>
                   <p className="mb-2">We may share your information with:</p>
                   <ul className="list-disc pl-6 space-y-2">
-                    <li><strong>Delivery Riders:</strong> Name, phone number, and delivery address to facilitate delivery</li>
+                    <li><strong>Delivery Riders:</strong> Name, phone number, and address to facilitate delivery</li>
                     <li><strong>Kitchen Staff:</strong> Order details to prepare your food</li>
                     <li><strong>Payment Processors:</strong> Payment information for transaction processing</li>
                     <li><strong>Legal Authorities:</strong> When required by law or to protect our rights</li>

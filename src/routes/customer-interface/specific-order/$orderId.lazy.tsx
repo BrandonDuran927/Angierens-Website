@@ -428,7 +428,7 @@ function SpecificOrder() {
     return steps
   }
 
-  const formatPrice = (price: number) => `₱${price.toLocaleString()}`
+  const formatPrice = (price: number) => `₱${price.toFixed(2)}`
 
   const handleRefundClick = () => {
     setShowRefundModal(true)
@@ -678,52 +678,52 @@ function SpecificOrder() {
         // Fetch and draw routes
         const fetchAndDrawRoutes = async () => {
           try {
-            // Fetch store to customer route
-            const storeToCustomerResponse = await fetch(
-              `http://localhost:3001/api/directions?origin=${storeLocation.lat},${storeLocation.lng}&destination=${customerLocation.lat},${customerLocation.lng}`
-            )
-            const storeToCustomerData = await storeToCustomerResponse.json()
-
-            if (storeToCustomerData.routes && storeToCustomerData.routes.length > 0) {
-              const storeToCustomerPolyline = storeToCustomerData.routes[0].overview_polyline.points
-              const decodedStoreToCustomer = google.maps.geometry.encoding.decodePath(storeToCustomerPolyline)
-
-              // Draw store to customer route (orange dashed)
-              new google.maps.Polyline({
-                path: decodedStoreToCustomer,
-                geodesic: true,
-                strokeColor: '#FF8C00',
-                strokeOpacity: 0.8,
-                strokeWeight: 4,
-                map: newMap,
-                icons: [{
-                  icon: { path: 'M 0,-1 0,1', strokeOpacity: 1, scale: 3 },
-                  offset: '0',
-                  repeat: '20px'
-                }]
-              })
-            }
-
-            // Fetch store to rider route if rider location exists
+            // If rider location exists, show rider to customer route
             if (riderLocation) {
               const riderLoc = { lat: riderLocation.latitude, lng: riderLocation.longitude }
-              const storeToRiderResponse = await fetch(
-                `http://localhost:3001/api/directions?origin=${storeLocation.lat},${storeLocation.lng}&destination=${riderLoc.lat},${riderLoc.lng}`
+              const riderToCustomerResponse = await fetch(
+                `http://localhost:3001/api/directions?origin=${riderLoc.lat},${riderLoc.lng}&destination=${customerLocation.lat},${customerLocation.lng}`
               )
-              const storeToRiderData = await storeToRiderResponse.json()
+              const riderToCustomerData = await riderToCustomerResponse.json()
 
-              if (storeToRiderData.routes && storeToRiderData.routes.length > 0) {
-                const storeToRiderPolyline = storeToRiderData.routes[0].overview_polyline.points
-                const decodedStoreToRider = google.maps.geometry.encoding.decodePath(storeToRiderPolyline)
+              if (riderToCustomerData.routes && riderToCustomerData.routes.length > 0) {
+                const riderToCustomerPolyline = riderToCustomerData.routes[0].overview_polyline.points
+                const decodedRiderToCustomer = google.maps.geometry.encoding.decodePath(riderToCustomerPolyline)
 
-                // Draw store to rider route (blue solid)
+                // Draw rider to customer route (blue solid line)
                 new google.maps.Polyline({
-                  path: decodedStoreToRider,
+                  path: decodedRiderToCustomer,
                   geodesic: true,
                   strokeColor: '#4285F4',
                   strokeOpacity: 0.9,
                   strokeWeight: 5,
                   map: newMap
+                })
+              }
+            } else {
+              // If no rider location yet, show the planned store to customer route
+              const storeToCustomerResponse = await fetch(
+                `http://localhost:3001/api/directions?origin=${storeLocation.lat},${storeLocation.lng}&destination=${customerLocation.lat},${customerLocation.lng}`
+              )
+              const storeToCustomerData = await storeToCustomerResponse.json()
+
+              if (storeToCustomerData.routes && storeToCustomerData.routes.length > 0) {
+                const storeToCustomerPolyline = storeToCustomerData.routes[0].overview_polyline.points
+                const decodedStoreToCustomer = google.maps.geometry.encoding.decodePath(storeToCustomerPolyline)
+
+                // Draw store to customer route (orange dashed - planned route)
+                new google.maps.Polyline({
+                  path: decodedStoreToCustomer,
+                  geodesic: true,
+                  strokeColor: '#FF8C00',
+                  strokeOpacity: 0.8,
+                  strokeWeight: 4,
+                  map: newMap,
+                  icons: [{
+                    icon: { path: 'M 0,-1 0,1', strokeOpacity: 1, scale: 3 },
+                    offset: '0',
+                    repeat: '20px'
+                  }]
                 })
               }
             }

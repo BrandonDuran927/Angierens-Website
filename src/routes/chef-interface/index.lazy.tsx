@@ -101,6 +101,8 @@ function RouteComponent() {
                     users!order_customer_uid_fkey(first_name, last_name, phone_number),
                     schedule(schedule_date, schedule_time),
                     delivery(
+                        delivery_id,
+                        delivery_fee,
                         address(
                             *
                         )
@@ -120,8 +122,17 @@ function RouteComponent() {
 
             if (ordersError) throw ordersError
 
+            // Filter out Ready orders that have been assigned to a rider (have delivery_id)
+            const filteredOrdersData = ordersData?.filter(order => {
+                // If order status is Ready and it has a delivery_id, exclude it
+                if (order.order_status === 'Ready' && order.delivery?.delivery_id) {
+                    return false
+                }
+                return true
+            })
+
             // Transform data to match UI structure
-            const transformedOrders: Order[] = ordersData?.map(order => {
+            const transformedOrders: Order[] = filteredOrdersData?.map(order => {
                 // Group items by menu
                 const productMap = new Map<string, Product>()
 
@@ -175,6 +186,11 @@ function RouteComponent() {
                     hour12: true
                 })
 
+                // Calculate total including delivery fee
+                const subtotal = Number(order.total_price)
+                const deliveryFee = order.delivery?.delivery_fee ? Number(order.delivery.delivery_fee) : 0
+                const totalWithDelivery = subtotal + deliveryFee
+
                 return {
                     id: order.order_id,
                     orderNumber: `#${String(order.order_number).padStart(2, '0')}`,
@@ -184,7 +200,7 @@ function RouteComponent() {
                     date: scheduleDate,
                     time: orderTime,
                     products: Array.from(productMap.values()),
-                    totalAmount: Number(order.total_price),
+                    totalAmount: totalWithDelivery,
                     phoneNumber: order.users?.phone_number,
                     deliveryOption: order.order_type,
                     paymentMethod: order.payment?.payment_method,
@@ -785,7 +801,7 @@ function RouteComponent() {
                                                                 <div>
                                                                     <p className="text-xs md:text-sm text-gray-600">Total Amount</p>
                                                                     <p className="text-lg md:text-xl font-bold text-black">
-                                                                        ₱ {order.totalAmount.toLocaleString()}
+                                                                        ₱ {order.totalAmount.toFixed(2)}
                                                                     </p>
                                                                 </div>
                                                                 <button

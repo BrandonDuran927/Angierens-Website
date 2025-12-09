@@ -19,6 +19,9 @@ interface FeedbackItem {
   time: string
   completedDate: string | null
   feedback: string
+  hasReview: boolean
+  reviewType?: string
+  rating?: number
 }
 
 interface Notification {
@@ -118,9 +121,19 @@ function RouteComponent() {
         setIsLoading(true)
 
         // Fetch orders for the current user where status is 'Completed'
+        // Join with review table to get review data
         const { data, error } = await supabase
           .from('order')
-          .select('*')
+          .select(`
+            *,
+            review (
+              review_id,
+              review_type,
+              rating,
+              comment,
+              is_hidden
+            )
+          `)
           .eq('customer_uid', user.id)
           .eq('order_status', 'Completed')
           .order('completed_date', { ascending: false })
@@ -135,6 +148,10 @@ function RouteComponent() {
           const transformedData: FeedbackItem[] = data.map(order => {
             const createdDate = new Date(order.created_at)
             const completedDateTime = order.completed_date ? new Date(order.completed_date) : null
+
+            // Get review data if it exists
+            const review = Array.isArray(order.review) && order.review.length > 0 ? order.review[0] : null
+            const hasReview = review !== null && !review.is_hidden
 
             return {
               id: order.order_id,
@@ -161,7 +178,10 @@ function RouteComponent() {
                 second: '2-digit',
                 hour12: false
               }) : 'N/A',
-              feedback: 'N/A' // You can add a feedback field to your order table or create a separate feedback table
+              feedback: hasReview ? review.comment : 'No review yet',
+              hasReview: hasReview,
+              reviewType: hasReview ? review.review_type : undefined,
+              rating: hasReview ? review.rating : undefined
             }
           })
 
@@ -510,7 +530,24 @@ function RouteComponent() {
                         <div className="text-gray-700">{item.date}</div>
                         <div className="text-gray-700">{item.time}</div>
                         <div className="text-gray-700">{item.completedDate}</div>
-                        <div className="text-gray-700 truncate">{item.feedback}</div>
+                        <div className="text-gray-700">
+                          {item.hasReview ? (
+                            <div className="flex flex-col items-center gap-1">
+                              <span className="text-xs text-gray-500 capitalize">{item.reviewType}</span>
+                              <div className="flex items-center gap-1">
+                                {[...Array(5)].map((_, i) => (
+                                  <Star
+                                    key={i}
+                                    className={`h-3 w-3 ${i < (item.rating || 0) ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300'}`}
+                                  />
+                                ))}
+                              </div>
+                              <span className="text-xs truncate max-w-[150px]" title={item.feedback}>{item.feedback}</span>
+                            </div>
+                          ) : (
+                            <span className="text-gray-400 italic">No review yet</span>
+                          )}
+                        </div>
                         <div className="flex gap-2 justify-center">
                           <Link
                             to="/customer-interface/feedback/$feedbackId"
@@ -589,9 +626,31 @@ function RouteComponent() {
 
                         <div>
                           <span className="font-medium text-gray-600">Feedback:</span>
-                          <div className="mt-1 text-gray-700 bg-gray-50 p-2 rounded text-sm">
-                            {item.feedback}
-                          </div>
+                          {item.hasReview ? (
+                            <div className="mt-1 space-y-2">
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs text-gray-500 capitalize bg-gray-100 px-2 py-1 rounded">
+                                  {item.reviewType}
+                                </span>
+                                <div className="flex items-center gap-1">
+                                  {[...Array(5)].map((_, i) => (
+                                    <Star
+                                      key={i}
+                                      className={`h-4 w-4 ${i < (item.rating || 0) ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300'}`}
+                                    />
+                                  ))}
+                                  <span className="text-sm text-gray-600 ml-1">({item.rating}/5)</span>
+                                </div>
+                              </div>
+                              <div className="text-gray-700 bg-gray-50 p-2 rounded text-sm">
+                                {item.feedback}
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="mt-1 text-gray-400 italic bg-gray-50 p-2 rounded text-sm">
+                              No review yet
+                            </div>
+                          )}
                         </div>
                       </div>
                     </div>

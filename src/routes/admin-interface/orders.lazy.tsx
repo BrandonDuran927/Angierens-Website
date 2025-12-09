@@ -43,8 +43,8 @@ function AdminOrdersInterface() {
     }
 
 
-    type TabType = 'New Orders' | 'In Process' | 'Completed'
-    const tabs: TabType[] = ['New Orders', 'In Process', 'Completed']
+    type TabType = 'New Orders' | 'In Process' | 'Completed' | 'Refund' | 'Rejected'
+    const tabs: TabType[] = ['New Orders', 'In Process', 'Completed', 'Refund', 'Rejected']
     const [activeTab, setActiveTab] = useState<TabType>('New Orders')
 
 
@@ -74,7 +74,9 @@ function AdminOrdersInterface() {
     const statusGroups = {
         'New Orders': ['Pending'],
         'In Process': ['Queueing', 'Preparing', 'Cooking', 'Ready', 'Refunding', 'On Delivery', 'Claim Order'],
-        'Completed': ['Completed', 'Cancelled', 'Refund']
+        'Completed': ['Completed'],
+        'Refund': ['Refund'],
+        'Rejected': ['Rejected']
     };
 
 
@@ -235,9 +237,11 @@ function AdminOrdersInterface() {
         }
     }
 
-    const filteredOrdersTab = orders.filter((order) =>
-        statusGroups[activeTab]?.includes(order.order_status)
-    );
+    const filteredOrdersTab = orders
+        .filter((order) =>
+            statusGroups[activeTab]?.includes(order.order_status)
+        )
+        .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
     // Filter orders based on search query
     const filteredOrders = orders.filter(order =>
