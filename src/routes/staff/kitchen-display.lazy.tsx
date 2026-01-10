@@ -68,6 +68,42 @@ function KitchenDisplay() {
     const [lastRefresh, setLastRefresh] = useState<Date>(new Date())
     const [autoRefreshInterval, setAutoRefreshInterval] = useState(15) // seconds
     const [soundEnabled, setSoundEnabled] = useState(true)
+    // Local state for tracking checked items in Cooking status (Order ID -> Check Key -> Boolean)
+    const [checkedState, setCheckedState] = useState<Record<string, Record<string, boolean>>>({})
+
+    // Helper to toggle check for any key (item index or specific sub-item key)
+    const handleCheckToggle = (orderId: string, key: string) => {
+        setCheckedState(prev => {
+            const orderChecks = prev[orderId] || {}
+            return {
+                ...prev,
+                [orderId]: {
+                    ...orderChecks,
+                    [key]: !orderChecks[key]
+                }
+            }
+        })
+    }
+
+    // Helper to update order status
+    const updateOrderStatus = async (orderId: string, newStatus: string) => {
+        try {
+            const { error } = await supabase
+                .from('order')
+                .update({ 
+                    order_status: newStatus,
+                    status_updated_at: new Date().toISOString()
+                })
+                .eq('order_id', orderId)
+
+            if (error) throw error
+            
+            fetchKitchenOrders()
+        } catch (error) {
+            console.error('Error updating status:', error)
+            alert('Failed to update status')
+        }
+    }
 
     const getCurrentDate = () => {
         const now = new Date()
@@ -355,7 +391,28 @@ function KitchenDisplay() {
     const cookingOrders = orders.filter(o => o.order_status === 'Cooking')
     const readyOrders = orders.filter(o => o.order_status === 'Ready')
 
-    const OrderCard = ({ order }: { order: KitchenOrder }) => (
+    const OrderCard = ({ order }: { order: KitchenOrder }) => {
+        const isCooking = order.order_status === 'Cooking'
+        const orderChecks = checkedState[order.order_id] || {}
+
+        // Check if all items AND their includes/add-ons are checked
+        const allItemsChecked = order.items.length > 0 && order.items.every((item, idx) => {
+            const mainKey = `item-${idx}`
+            const isMainChecked = !!orderChecks[mainKey]
+            
+            const areIncludesChecked = item.inclusions.every((_, incIdx) => 
+                !!orderChecks[`${mainKey}-inc-${incIdx}`]
+            )
+
+            // Assuming add-ons should also be checked if they exist
+            const areAddonsChecked = item.addOns.every((_, aoIdx) => 
+                !!orderChecks[`${mainKey}-ao-${aoIdx}`]
+            )
+
+            return isMainChecked && areIncludesChecked && areAddonsChecked
+        })
+
+        return (
         <div className={`rounded-2xl border-4 p-4 shadow-lg transition-all ${getUrgencyColor(order.created_at)}`}>
             {/* Order Header */}
             <div className="flex items-center justify-between mb-3">
@@ -386,28 +443,121 @@ function KitchenDisplay() {
 
             {/* Order Items */}
             <div className="space-y-2">
-                {order.items.map((item, idx) => (
-                    <div key={idx} className="bg-white rounded-lg p-3 border border-gray-200">
-                        <div className="flex items-start justify-between">
+                {order.items.map((item, idx) => {
+                    const mainKey = `item-${idx}`
+                    const isMainChecked = !!orderChecks[mainKey]
+                    
+                    return (
+                        <div 
+                        key={idx} 
+                        className={`bg-white rounded-lg p-3 border transition-colors ${
+                            isCooking && isMainChecked ? 'border-green-500 bg-green-50' : 'border-gray-200'
+                        }`}
+                        >
+                        <div className="flex items-start gap-3">
+                            {/* Checkbox for Main Item */}
+                            {isCooking && (
+                                <div className="mt-1 flex-shrink-0 cursor-pointer" onClick={() => handleCheckToggle(order.order_id, mainKey)}>
+                                    <div className={`w-8 h-8 rounded border-2 flex items-center justify-center transition-colors ${
+                                        isMainChecked 
+                                            ? 'bg-green-500 border-green-600 text-white' 
+                                            : 'bg-white border-gray-300 hover:border-green-400'
+                                    }`}>
+                                        {isMainChecked && <CheckCircle className="w-6 h-6" />}
+                                    </div>
+                                </div>
+                            )}
+
                             <div className="flex-1">
                                 <div className="flex items-center gap-2">
                                     <span className="text-2xl font-bold text-amber-600">{item.quantity}x</span>
-                                    <span className="text-lg font-semibold text-gray-900">{item.name}</span>
+                                    <span className={`text-lg font-semibold ${isCooking && isMainChecked ? 'text-gray-500 line-through' : 'text-gray-900'}`}>
+                                        {item.name}
+                                    </span>
                                 </div>
+
+                                {/* Includes with Checkboxes */}
                                 {item.inclusions.length > 0 && (
-                                    <p className="text-sm text-gray-600 mt-1">
-                                        <span className="font-medium">Includes:</span> {item.inclusions.join(', ')}
-                                    </p>
+                                    <div className="mt-2">
+                                        <span className="text-sm font-medium text-amber-800 block mb-1">Includes:</span>
+                                        <div className="space-y-1 ml-1">
+                                            {item.inclusions.map((inc, i) => {
+                                                const incKey = `${mainKey}-inc-${i}`
+                                                const isIncChecked = !!orderChecks[incKey]
+                                                
+                                                return (
+                                                    <div 
+                                                        key={i} 
+                                                        className="flex items-center gap-2 cursor-pointer"
+                                                        onClick={(e) => {
+                                                            e.stopPropagation()
+                                                            if (isCooking) handleCheckToggle(order.order_id, incKey)
+                                                        }}
+                                                    >
+                                                         {isCooking ? (
+                                                            <div className={`w-5 h-5 rounded border flex items-center justify-center transition-colors flex-shrink-0 ${
+                                                                isIncChecked 
+                                                                    ? 'bg-green-500 border-green-600 text-white' 
+                                                                    : 'bg-white border-gray-300'
+                                                            }`}>
+                                                                {isIncChecked && <CheckCircle className="w-3.5 h-3.5" />}
+                                                            </div>
+                                                         ) : (
+                                                             <div className="w-1.5 h-1.5 rounded-full bg-gray-400" />
+                                                         )}
+                                                        <span className={`text-sm ${isCooking && isIncChecked ? 'text-gray-400 line-through' : 'text-gray-700'}`}>
+                                                            {inc}
+                                                        </span>
+                                                    </div>
+                                                )
+                                            })}
+                                        </div>
+                                    </div>
                                 )}
+                                
+                                {/* Add-ons with Checkboxes */}
                                 {item.addOns.length > 0 && (
-                                    <p className="text-sm text-amber-700 mt-1">
-                                        <span className="font-medium">Add-ons:</span> {item.addOns.join(', ')}
-                                    </p>
+                                    <div className="mt-2">
+                                        <span className="text-sm font-medium text-amber-700 block mb-1">Add-ons:</span>
+                                        <div className="space-y-1 ml-1">
+                                            {item.addOns.map((addon, i) => {
+                                                const aoKey = `${mainKey}-ao-${i}`
+                                                const isAoChecked = !!orderChecks[aoKey]
+                                                const addonText = addon.replace('Add-on', '').trim() || addon
+
+                                                return (
+                                                    <div 
+                                                        key={i} 
+                                                        className="flex items-center gap-2 cursor-pointer"
+                                                        onClick={(e) => {
+                                                            e.stopPropagation()
+                                                            if (isCooking) handleCheckToggle(order.order_id, aoKey)
+                                                        }}
+                                                    >
+                                                        {isCooking ? (
+                                                            <div className={`w-5 h-5 rounded border flex items-center justify-center transition-colors flex-shrink-0 ${
+                                                                isAoChecked 
+                                                                    ? 'bg-green-500 border-green-600 text-white' 
+                                                                    : 'bg-white border-gray-300'
+                                                            }`}>
+                                                                {isAoChecked && <CheckCircle className="w-3.5 h-3.5" />}
+                                                            </div>
+                                                        ) : (
+                                                            <div className="w-1.5 h-1.5 rounded-full bg-amber-600" />
+                                                        )}
+                                                        <span className={`text-sm ${isCooking && isAoChecked ? 'text-gray-400 line-through' : 'text-amber-900'}`}>
+                                                            {addonText}
+                                                        </span>
+                                                    </div>
+                                                )
+                                            })}
+                                        </div>
+                                    </div>
                                 )}
                             </div>
                         </div>
                     </div>
-                ))}
+                )})}
             </div>
 
             {/* Special Instructions */}
@@ -422,8 +572,32 @@ function KitchenDisplay() {
                     </div>
                 </div>
             )}
+
+            {/* Actions for Cooking Orders */}
+            {isCooking && (
+                <div className="mt-4 pt-4 border-t border-gray-200">
+                    <button
+                        onClick={(e) => {
+                            e.stopPropagation()
+                            if (allItemsChecked) {
+                                updateOrderStatus(order.order_id, 'Ready')
+                            }
+                        }}
+                        disabled={!allItemsChecked}
+                        className={`w-full py-3 rounded-xl font-bold text-lg flex items-center justify-center gap-2 transition-all ${
+                            allItemsChecked
+                                ? 'bg-green-600 text-white shadow-lg hover:bg-green-700 hover:scale-[1.02]'
+                                : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                        }`}
+                    >
+                        <CheckCircle className="w-6 h-6" />
+                        {allItemsChecked ? 'Mark as Ready' : 'Check All Items First'}
+                    </button>
+                </div>
+            )}
         </div>
     )
+    }
 
     const OrderColumn = ({ title, orders, icon, bgColor }: {
         title: string
