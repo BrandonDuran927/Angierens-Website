@@ -69,8 +69,17 @@ function RouteComponent() {
     const [selectedOrder, setSelectedOrder] = useState<Order | null>(null)
     const [isOrderDetailsModalOpen, setIsOrderDetailsModalOpen] = useState(false)
     const orderPrice = selectedOrder?.order_item.reduce((sum, item) => {
-        return sum + Number(item.subtotal_price);
-    }, 0);
+        let itemTotal = Number(item.subtotal_price);
+
+        if (item.order_item_add_on && item.order_item_add_on.length > 0) {
+            const addOnsTotal = item.order_item_add_on.reduce((addOnSum: number, addon: any) => {
+                return addOnSum + Number(addon.subtotal_price);
+            }, 0);
+            itemTotal += addOnsTotal;
+        }
+
+        return sum + itemTotal;
+    }, 0) || 0;
     const [showOrderBackView, setShowOrderBackView] = useState(false)
     const [revenueFilter, setRevenueFilter] = useState<number>(12)
     const [ordersFilter, setOrdersFilter] = useState<number>(6)
@@ -255,6 +264,14 @@ function RouteComponent() {
         }
     }
 
+    const [showViewReceiptModal, setShowViewReceiptModal] = useState(false)
+    const [viewReceiptUrl, setViewReceiptUrl] = useState<string>('')
+
+    const handleOpenViewReceipt = (receiptUrl: string) => {
+        setViewReceiptUrl(receiptUrl)
+        setShowViewReceiptModal(true)
+    }
+
     // Sample data for charts
     const revenueData = [
         { month: 'Jan', value: 40000 },
@@ -328,6 +345,11 @@ function RouteComponent() {
             </div>
         </div>
     );
+
+    const handleCloseViewReceipt = () => {
+        setShowViewReceiptModal(false)
+        setViewReceiptUrl('')
+    }
 
     return (
         <ProtectedRoute allowedRoles={['owner']}>
@@ -528,7 +550,7 @@ function RouteComponent() {
                                 </div>
                             </div>
 
-                            <button className="bg-white rounded-xl p-6 shadow-sm border border-gray-200 hover:shadow-md hover:border-gray-300 transition-all duration-200 w-full text-left cursor-pointer">
+                            {/* <button className="bg-white rounded-xl p-6 shadow-sm border border-gray-200 hover:shadow-md hover:border-gray-300 transition-all duration-200 w-full text-left cursor-pointer">
                                 <div className="flex items-center gap-4">
                                     <div className="w-12 h-12 bg-amber-100 rounded-lg flex items-center justify-center">
                                         <Download className="h-6 w-6 text-amber-600" />
@@ -537,10 +559,9 @@ function RouteComponent() {
                                         <p className="text-gray-600 text-sm">Download Report</p>
                                     </div>
                                 </div>
-                            </button>
+                            </button> */}
                         </div>
 
-                        {/* Charts */}
                         {/* Charts */}
                         <div className="grid grid-cols-1 xl:grid-cols-2 gap-3 sm:gap-4 lg:gap-6 mb-4 sm:mb-6 lg:mb-8">
                             {/* Revenue Chart */}
@@ -932,43 +953,49 @@ function RouteComponent() {
 
                                 <div className="space-y-3">
                                     {selectedOrder?.order_item?.length ? (
-                                        selectedOrder.order_item.map((item) => (
-                                            <div key={item.order_item_id} className="grid grid-cols-3 gap-4 items-start">
-                                                <div>
-                                                    <p className="font-medium text-gray-800">{item.menu.name} (₱ {item.menu.price})</p>
-                                                    {item.menu.inclusion && (
-                                                        <p className="text-sm text-gray-600 mb-1.5">inclusions: {item.menu.inclusion}</p>
-                                                    )}
-                                                    {/* 
-                                                                // TODO: Implement add-ons
-                                                                {item.menu.add_ons && (
-                                                                    <p className="text-sm text-gray-600">add-ons: {item.menu.add_ons}</p>
-                                                                )} */}
-                                                </div>
-                                                <div className="text-center font-medium">{item.quantity}</div>
-                                                <div className="text-right font-bold">₱ {(item.subtotal_price * item.quantity).toLocaleString()}</div>
+                                        <>
+                                            {selectedOrder.order_item.map((item) => (
+                                                <div key={item.order_item_id}>
+                                                    {/* Main menu item */}
+                                                    <div className="grid grid-cols-3 gap-4 items-start">
+                                                        <div>
+                                                            <p className="font-medium text-gray-800">{item.menu.name} (₱ {item.menu.price})</p>
+                                                            {item.menu.inclusion && (
+                                                                <p className="text-sm text-gray-600 mb-1.5">inclusions: {item.menu.inclusion}</p>
+                                                            )}
+                                                        </div>
+                                                        <div className="text-center font-medium">{item.quantity}</div>
+                                                        <div className="text-right font-bold">₱ {Number(item.subtotal_price).toFixed(2)}</div>
+                                                    </div>
 
-                                            </div>
-                                        ))
+                                                    {/* Add-ons for this item */}
+                                                    {item.order_item_add_on && item.order_item_add_on.length > 0 && (
+                                                        <div className="ml-6 mt-2 space-y-2">
+                                                            {item.order_item_add_on.map((addon: any) => (
+                                                                <div key={addon.order_item_add_on_id} className="grid grid-cols-3 gap-4 items-start">
+                                                                    <div>
+                                                                        <p className="text-sm text-gray-600">+ {addon.add_on.name} (₱ {addon.add_on.price})</p>
+                                                                    </div>
+                                                                    <div className="text-center text-sm text-gray-600">{addon.quantity}</div>
+                                                                    <div className="text-right text-sm font-semibold text-gray-600">₱ {Number(addon.subtotal_price).toFixed(2)}</div>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            ))}
+                                        </>
                                     ) : (
                                         <p className="text-gray-500 text-center italic">No items found.</p>
                                     )}
-                                    {/* <div className="grid grid-cols-3 gap-4 items-start">
-                                                    <div>
-                                                        <p className="font-medium text-gray-800">{selectedOrder.}</p>
-                                                        <p className="text-sm text-gray-600">add-ons: 20 pcs. Puto</p>
-                                                    </div>
-                                                    <div className="text-center font-medium">2</div>
-                                                    <div className="text-right font-bold">₱ 4,100</div>
-                                                </div> */}
                                 </div>
                             </div>
 
                             {/* Pricing Summary */}
                             <div className="border-t border-gray-200 pt-4 space-y-3">
                                 <div className="flex justify-between items-center">
-                                    <span className="text-lg font-medium">Price</span>
-                                    <span className="text-lg font-bold">₱ {orderPrice}</span>
+                                    <span className="text-lg font-medium">Subtotal</span>
+                                    <span className="text-lg font-bold">₱ {orderPrice?.toFixed(2)}</span>
                                 </div>
                                 {selectedOrder.delivery && (
                                     <div className="flex justify-between items-center">
@@ -976,10 +1003,37 @@ function RouteComponent() {
                                         <span className="text-lg font-bold">₱ {Number(selectedOrder.delivery.delivery_fee).toFixed(2)}</span>
                                     </div>
                                 )}
-                                <div className="flex justify-between items-center text-xl font-bold border-t border-gray-200 pt-3">
-                                    <span>Total</span>
-                                    <span>₱ {Number(orderPrice + selectedOrder.delivery.delivery_fee).toFixed(2)}</span>
+                                <div className="flex justify-between items-center border-t-2 border-gray-300 pt-3">
+                                    <span className="text-xl font-bold">Total</span>
+                                    <span className="text-2xl font-bold text-amber-600">
+                                        ₱ {(orderPrice + (selectedOrder.delivery ? Number(selectedOrder.delivery.delivery_fee || 0) : 0)).toFixed(2)}
+                                    </span>
                                 </div>
+                            </div>
+
+                            {/* Payment Method */}
+                            <div className="bg-gray-50 p-4 rounded-lg">
+                                <div className="flex items-center gap-2 mb-2">
+                                    <CreditCard className="h-5 w-5 text-gray-600" />
+                                    <span className="font-medium text-gray-700">Payment Method</span>
+                                </div>
+                                <p className="text-lg font-semibold text-gray-800 mb-3">
+                                    {selectedOrder.payment?.paymentMethod || 'N/A'}
+                                </p>
+                                {selectedOrder.payment?.proof_of_payment_url && (
+                                    <button
+                                        onClick={(e) => {
+                                            e.preventDefault();
+                                            e.stopPropagation();
+                                            if (selectedOrder.payment?.proof_of_payment_url) {
+                                                handleOpenViewReceipt(selectedOrder.payment.proof_of_payment_url);
+                                            }
+                                        }}
+                                        className="px-3 sm:px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 text-sm sm:text-base whitespace-nowrap"
+                                    >
+                                        View Receipt
+                                    </button>
+                                )}
                             </div>
                         </div>
 
@@ -1068,6 +1122,40 @@ function RouteComponent() {
                                 className="px-6 py-3 border-2 border-gray-800 text-gray-800 rounded-lg font-medium hover:bg-gray-100 transition-colors"
                             >
                                 Go back
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* View Receipt Modal */}
+            {showViewReceiptModal && (
+                <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-hidden">
+                        <div className="p-4 border-b border-gray-200 flex items-center justify-between">
+                            <h2 className="text-xl font-bold text-black">Payment Receipt</h2>
+                            <button
+                                onClick={handleCloseViewReceipt}
+                                className="text-gray-500 hover:text-gray-700 text-2xl font-bold"
+                            >
+                                ×
+                            </button>
+                        </div>
+
+                        <div className="p-4 overflow-auto max-h-[calc(90vh-120px)]">
+                            <img
+                                src={viewReceiptUrl}
+                                alt="Payment Receipt"
+                                className="w-full h-auto rounded-lg"
+                            />
+                        </div>
+
+                        <div className="p-4 border-t border-gray-200 flex justify-end">
+                            <button
+                                onClick={handleCloseViewReceipt}
+                                className="bg-gray-300 hover:bg-gray-400 text-gray-800 font-medium py-2 px-6 rounded-lg transition-colors"
+                            >
+                                Close
                             </button>
                         </div>
                     </div>

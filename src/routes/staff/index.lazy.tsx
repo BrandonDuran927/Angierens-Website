@@ -46,6 +46,8 @@ interface OrderDisplay {
     statusUpdatedAt: string | null
     orderData?: Order
     proofOfPaymentUrl?: string | null
+    rejectionReason?: string | null
+    returnPaymentProofUrl?: string | null
 }
 
 interface OrderForm {
@@ -132,6 +134,7 @@ function RouteComponent() {
     const [selectedOrder, setSelectedOrder] = useState<OrderDisplay | null>(null)
     const [isRejectModalOpen, setIsRejectModalOpen] = useState(false)
     const [returnPaymentProof, setReturnPaymentProof] = useState<File | null>(null)
+    const [rejectionReason, setRejectionReason] = useState('')
     const [orders, setOrders] = useState<OrderDisplay[]>([])
     const [loading, setLoading] = useState(true)
     const [menuItems, setMenuItems] = useState<MenuItem[]>([])
@@ -139,6 +142,7 @@ function RouteComponent() {
     const [menuSearchQuery, setMenuSearchQuery] = useState('')
     const [showViewReceiptModal, setShowViewReceiptModal] = useState(false)
     const [viewReceiptUrl, setViewReceiptUrl] = useState<string>('')
+    const [showRejectionDetailsModal, setShowRejectionDetailsModal] = useState(false)
     const [availableSchedules, setAvailableSchedules] = useState<any[]>([])
     const [selectedScheduleId, setSelectedScheduleId] = useState<string>('')
 
@@ -148,7 +152,7 @@ function RouteComponent() {
         'In Process': ['Queueing', 'Preparing', 'Cooking', 'Ready', 'On Delivery', 'Claim Order'],
         'Completed': ['Completed', 'Refund'],
         'Refund': ['Refunding', 'Refund'],
-        'Cancelled': ['Cancelled']
+        'Cancelled': ['Cancelled', 'Rejected']
     }
 
     const handleReturnPaymentProofUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -166,22 +170,88 @@ function RouteComponent() {
             return;
         }
 
+        // Validate that rejection reason is provided
+        if (!rejectionReason.trim()) {
+            alert('Please provide a reason for rejecting the order.');
+            return;
+        }
+
         try {
+            // Upload return payment proof to Supabase storage
+            const fileExt = returnPaymentProof.name.split('.').pop()
+            const fileName = `return-payment-${selectedOrder.orderData.order_id}-${Date.now()}.${fileExt}`
+            const filePath = `refund-proofs/${fileName}`
+
+            console.log('Uploading return payment proof:', {
+                bucket: 'payment-receipts',
+                filePath,
+                fileName: returnPaymentProof.name,
+                fileSize: returnPaymentProof.size,
+                fileType: returnPaymentProof.type
+            })
+
+            const { data: uploadData, error: uploadError } = await supabase.storage
+                .from('payment-receipts')
+                .upload(filePath, returnPaymentProof)
+
+            if (uploadError) {
+                console.error('Upload error:', uploadError)
+                throw uploadError
+            }
+
+            console.log('Upload successful:', uploadData)
+
+            // Get the public URL
+            const { data: urlData } = supabase.storage
+                .from('payment-receipts')
+                .getPublicUrl(filePath)
+
+            const returnPaymentProofUrl = urlData.publicUrl
+            console.log('Generated public URL:', returnPaymentProofUrl)
+
+            // Update the payment record with the return payment proof URL
+            // Get payment_id from the payment object, not directly from order
+            const paymentId = selectedOrder.orderData.payment?.payment_id
+            console.log('Payment ID to update:', paymentId)
+
+            if (paymentId) {
+                const { data: paymentUpdateData, error: paymentError } = await supabase
+                    .from('payment')
+                    .update({
+                        return_payment_proof_url: returnPaymentProofUrl
+                    })
+                    .eq('payment_id', paymentId)
+                    .select()
+
+                if (paymentError) {
+                    console.error('Payment update error:', paymentError)
+                    throw paymentError
+                }
+
+                console.log('Payment updated successfully:', paymentUpdateData)
+            } else {
+                console.warn('No payment_id found on order, cannot update return payment proof URL')
+            }
+
+            // Update the order status and rejection reason
             const { error } = await supabase
                 .from('order')
                 .update({
                     order_status: 'Rejected',
-                    status_updated_at: new Date().toISOString()
+                    status_updated_at: new Date().toISOString(),
+                    rejection_reason: rejectionReason.trim()
                 })
                 .eq('order_id', selectedOrder.orderData.order_id)
 
             if (error) throw error
 
-            console.log('Order rejected with proof:', returnPaymentProof)
+            console.log('Order rejected with proof:', returnPaymentProofUrl)
             setIsRejectModalOpen(false)
             setReturnPaymentProof(null)
+            setRejectionReason('')
             setIsOrderDetailsModalOpen(false)
             loadOrders()
+            alert('Order rejected successfully!')
         } catch (error) {
             console.error('Error rejecting order:', error)
             alert('Failed to reject order')
@@ -191,6 +261,7 @@ function RouteComponent() {
     const handleRejectCancel = () => {
         setIsRejectModalOpen(false)
         setReturnPaymentProof(null)
+        setRejectionReason('')
     }
 
     const notificationCount = 1
@@ -288,7 +359,9 @@ function RouteComponent() {
                     order_status: order.order_status,
                     statusUpdatedAt: order.status_updated_at || null,
                     orderData: order,
-                    proofOfPaymentUrl: order.payment.proof_of_payment_url || null
+                    proofOfPaymentUrl: order.payment.proof_of_payment_url || null,
+                    rejectionReason: order.rejection_reason || null,
+                    returnPaymentProofUrl: order.payment.return_payment_proof_url || null
                 }
             })
 
@@ -2031,7 +2104,7 @@ function RouteComponent() {
                                                                 )}
                                                             </div>
                                                             <div className="text-center font-medium">{item.quantity}</div>
-                                                            <div className="text-right font-bold">₱ {Number(item.subtotal_price).toLocaleString()}</div>
+                                                            <div className="text-right font-bold">₱ {Number(item.subtotal_price).toFixed(2)}</div>
                                                         </div>
 
                                                         {/* Add-ons for this item */}
@@ -2156,6 +2229,24 @@ function RouteComponent() {
                                             Notify Customer
                                         </button>
                                     )}
+                                    {selectedOrder.order_status === 'Rejected' && (
+                                        <button
+                                            onClick={() => {
+                                                // Get fresh order data from the orders array
+                                                const freshOrder = orders.find(o => o.id === selectedOrder.id)
+                                                if (freshOrder) {
+                                                    setSelectedOrder(freshOrder)
+                                                    console.log('Opening rejection details for order:', freshOrder.id)
+                                                    console.log('Rejection reason:', freshOrder.rejectionReason)
+                                                    console.log('Return payment proof URL:', freshOrder.returnPaymentProofUrl)
+                                                }
+                                                setShowRejectionDetailsModal(true)
+                                            }}
+                                            className="px-6 py-2.5 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors font-medium"
+                                        >
+                                            View Rejection Details
+                                        </button>
+                                    )}
                                 </div>
                             </div>
                         </div>
@@ -2262,6 +2353,19 @@ function RouteComponent() {
                                 <p className="text-gray-600 mb-4">
                                     Are you sure you want to reject order {selectedOrder.id}?
                                 </p>
+
+                                <div className="mb-4">
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                                        Reason for Rejection <span className="text-red-500">*</span>
+                                    </label>
+                                    <textarea
+                                        value={rejectionReason}
+                                        onChange={(e) => setRejectionReason(e.target.value)}
+                                        placeholder="Please provide a reason for rejecting this order..."
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500 resize-none"
+                                        rows={3}
+                                    />
+                                </div>
 
                                 <div className="mb-4">
                                     <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -2418,6 +2522,68 @@ function RouteComponent() {
                             <div className="p-4 border-t border-gray-200 flex justify-end">
                                 <button
                                     onClick={handleCloseViewReceipt}
+                                    className="bg-gray-300 hover:bg-gray-400 text-gray-800 font-medium py-2 px-6 rounded-lg transition-colors"
+                                >
+                                    Close
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* Rejection Details Modal */}
+                {showRejectionDetailsModal && selectedOrder && (
+                    <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
+                        <div className="bg-white rounded-xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-hidden">
+                            <div className="p-4 border-b border-red-400 bg-red-50 flex items-center justify-between">
+                                <h2 className="text-xl font-bold text-red-800">Order Rejected - {selectedOrder.id}</h2>
+                                <button
+                                    onClick={() => setShowRejectionDetailsModal(false)}
+                                    className="text-gray-500 hover:text-gray-700 text-2xl font-bold"
+                                >
+                                    ×
+                                </button>
+                            </div>
+
+                            <div className="p-6 overflow-auto max-h-[calc(90vh-180px)]">
+                                {/* Rejection Reason Section */}
+                                <div className="mb-6">
+                                    <h3 className="font-semibold text-gray-800 mb-2">Rejection Reason</h3>
+                                    <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                                        <p className="text-gray-700 whitespace-pre-wrap">
+                                            {selectedOrder.rejectionReason || 'No reason provided'}
+                                        </p>
+                                    </div>
+                                </div>
+
+                                {/* Return Payment Proof Image */}
+                                <div>
+                                    <h3 className="font-semibold text-gray-800 mb-2">Proof of Payment Return</h3>
+                                    {selectedOrder.returnPaymentProofUrl ? (
+                                        <div className="border border-gray-200 rounded-lg overflow-hidden">
+                                            <img
+                                                src={selectedOrder.returnPaymentProofUrl}
+                                                alt="Proof of Payment Return"
+                                                className="w-full h-auto cursor-pointer hover:opacity-90 transition-opacity"
+                                                onClick={() => window.open(selectedOrder.returnPaymentProofUrl!, '_blank')}
+                                                onError={(e) => {
+                                                    console.error('Failed to load image:', selectedOrder.returnPaymentProofUrl)
+                                                    e.currentTarget.style.display = 'none'
+                                                }}
+                                            />
+                                            <p className="text-xs text-gray-500 text-center py-2 bg-gray-50">Click image to view full size</p>
+                                        </div>
+                                    ) : (
+                                        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                                            <p className="text-yellow-800">No proof of payment return image available</p>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+
+                            <div className="p-4 border-t border-gray-200 flex justify-end">
+                                <button
+                                    onClick={() => setShowRejectionDetailsModal(false)}
                                     className="bg-gray-300 hover:bg-gray-400 text-gray-800 font-medium py-2 px-6 rounded-lg transition-colors"
                                 >
                                     Close

@@ -1,6 +1,6 @@
 import { createLazyFileRoute, Link } from '@tanstack/react-router'
 import { useState, useEffect } from 'react'
-import { Search, ShoppingCart, Bell, ChevronDown, X, Plus, Minus, Heart, MessageSquare, Star, Menu, ArrowRight, Tag } from 'lucide-react'
+import { Search, ShoppingCart, Bell, ChevronDown, X, Plus, Minus, Heart, MessageSquare, Star, Menu, ArrowRight, Tag, Facebook, Instagram, Mail, Phone, MapPin } from 'lucide-react'
 import { useUser } from '@/context/UserContext'
 import { useNavigate } from '@tanstack/react-router'
 import { supabase } from '@/lib/supabaseClient'
@@ -75,6 +75,12 @@ function RouteComponent() {
   const [isProcessing, setIsProcessing] = useState(false)
   const [isOrderAddOnsModalOpen, setIsOrderAddOnsModalOpen] = useState(false)
   const [orderAddOns, setOrderAddOns] = useState<AddOns>({})
+  const [isVisible, setIsVisible] = useState(false)
+
+  // Trigger entrance animation
+  useEffect(() => {
+    setIsVisible(true)
+  }, [])
 
   useEffect(() => {
     fetchMenuItems()
@@ -549,50 +555,167 @@ function RouteComponent() {
   };
 
   const customStyles = `
-  body {
-    min-width: 320px;
-  }
-  
-  @media (max-width: 410px) {
-    .dynamic-logo {
-      width: calc(max(80px, 140px - (410px - 100vw))) !important;
-      height: calc(max(80px, 140px - (410px - 100vw))) !important;
+    body {
+      min-width: 320px;
+      scroll-behavior: smooth;
     }
-  }
-  
-  @media (min-width: 411px) and (max-width: 1023px) {
-    .dynamic-logo {
-      width: 120px !important;
-      height: 120px !important;
+    
+    @media (max-width: 410px) {
+      .dynamic-logo {
+        width: calc(max(80px, 140px - (410px - 100vw))) !important;
+        height: calc(max(80px, 140px - (410px - 100vw))) !important;
+      }
     }
-  }
-  
-  @media (min-width: 1024px) {
-    .dynamic-logo {
-      width: 140px !important;
-      height: 140px !important;
+    
+    @media (min-width: 411px) and (max-width: 1023px) {
+      .dynamic-logo {
+        width: 120px !important;
+        height: 120px !important;
+      }
     }
-  }
+    
+    @media (min-width: 1024px) {
+      .dynamic-logo {
+        width: 140px !important;
+        height: 140px !important;
+      }
+    }
 
-  /* Custom scrollbar styling */
-  .custom-scrollbar::-webkit-scrollbar {
-    width: 8px;
-  }
-  
-  .custom-scrollbar::-webkit-scrollbar-track {
-    background: #f1f1f1;
-    border-radius: 10px;
-  }
-  
-  .custom-scrollbar::-webkit-scrollbar-thumb {
-    background: #fbbf24;
-    border-radius: 10px;
-  }
-  
-  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-    background: #f59e0b;
-  }
-`;
+    @keyframes fadeInUp {
+      from {
+        opacity: 0;
+        transform: translateY(30px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+
+    @keyframes slideInRight {
+      from {
+        opacity: 0;
+        transform: translateX(30px);
+      }
+      to {
+        opacity: 1;
+        transform: translateX(0);
+      }
+    }
+
+    @keyframes pulse-soft {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.05); }
+    }
+
+    @keyframes float {
+      0%, 100% { transform: translateY(0px); }
+      50% { transform: translateY(-10px); }
+    }
+
+    .animate-fade-in-up {
+      animation: fadeInUp 0.6s ease-out forwards;
+    }
+
+    .animate-fade-in {
+      animation: fadeIn 0.5s ease-out forwards;
+    }
+
+    .animate-slide-in-right {
+      animation: slideInRight 0.6s ease-out forwards;
+    }
+
+    .animate-float {
+      animation: float 3s ease-in-out infinite;
+    }
+
+    .stagger-1 { animation-delay: 0.1s; }
+    .stagger-2 { animation-delay: 0.2s; }
+    .stagger-3 { animation-delay: 0.3s; }
+    .stagger-4 { animation-delay: 0.4s; }
+
+    .glass-effect {
+      background: rgba(255, 255, 255, 0.9);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+    }
+
+    .glass-dark {
+      background: rgba(0, 0, 0, 0.5);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+    }
+
+    .hover-lift {
+      transition: transform 0.3s ease, box-shadow 0.3s ease;
+    }
+
+    .hover-lift:hover {
+      transform: translateY(-8px);
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
+    }
+
+    .hover-glow {
+      transition: box-shadow 0.3s ease;
+    }
+
+    .hover-glow:hover {
+      box-shadow: 0 0 30px rgba(251, 191, 36, 0.4);
+    }
+
+    .text-gradient {
+      background: linear-gradient(135deg, #92400e 0%, #d97706 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
+      transition: all 0.3s ease;
+    }
+
+    .btn-primary:hover {
+      background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+      transform: scale(1.02);
+    }
+
+    .card-hover {
+      transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    }
+
+    .card-hover:hover {
+      transform: translateY(-5px) scale(1.02);
+    }
+
+    .notification-badge {
+      animation: pulse-soft 2s infinite;
+    }
+
+    /* Custom scrollbar */
+    .custom-scrollbar::-webkit-scrollbar {
+      width: 6px;
+    }
+
+    .custom-scrollbar::-webkit-scrollbar-track {
+      background: rgba(0, 0, 0, 0.1);
+      border-radius: 3px;
+    }
+
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+      background: rgba(146, 64, 14, 0.5);
+      border-radius: 3px;
+    }
+
+    .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+      background: rgba(146, 64, 14, 0.7);
+    }
+  `;
 
   // Add this helper function near the top of your component, after the state declarations
   const getImageUrl = (imageUrl: string | null): string => {
@@ -614,143 +737,147 @@ function RouteComponent() {
       <style dangerouslySetInnerHTML={{ __html: customStyles }} />
 
       {/* Customer Header */}
-      <header className="w-auto mx-2 sm:mx-4 md:mx-10 my-3 border-b-8 border-amber-800">
-        <div className="flex items-center justify-between p-2 sm:p-4 mb-5 relative">
-          {/* Logo */}
-          <div
-            className="flex-shrink-0 bg-cover bg-center dynamic-logo"
-            style={logoStyle}
-          />
+      <header className={`sticky top-0 z-40 glass-effect shadow-sm transition-all duration-500 ${isVisible ? 'opacity-100' : 'opacity-0'}`}>
+        <div className="w-auto mx-2 sm:mx-4 md:mx-10">
+          <div className="flex items-center justify-between p-2 sm:p-4 relative">
+            {/* Logo */}
+            <div
+              className="flex-shrink-0 bg-cover bg-center dynamic-logo z-50 hover:scale-105 transition-transform duration-300"
+              style={logoStyle}
+            />
 
-          {/* Main Content Container */}
-          <div className="flex items-center justify-end w-full pl-[150px] sm:pl-[160px] lg:pl-[180px] gap-2 sm:gap-4">
-            {/* Desktop Navigation */}
-            <nav className="hidden lg:flex xl:gap-10 bg-[#964B00] py-2 px-6 xl:px-10 rounded-lg">
-              {navigationItems.map(item => (
-                <Link
-                  key={item.name}
-                  to={item.route}
-                  className={`px-3 xl:px-4 py-2 rounded-xl text-base xl:text-lg font-semibold transition-colors whitespace-nowrap ${item.active
-                    ? 'bg-yellow-400 text-[#964B00]'
-                    : 'text-yellow-400 hover:bg-[#7a3d00]'
-                    }`}
-                >
-                  {item.name}
-                </Link>
-              ))}
-            </nav>
-
-            {/* Hamburger Menu Button - Show on tablet and mobile */}
-            <button
-              onClick={() => setIsMobileMenuOpen(true)}
-              className="lg:hidden p-2 text-[#964B00] hover:bg-amber-100 rounded-lg bg-yellow-400"
-            >
-              <Menu className="h-5 w-5 sm:h-6 sm:w-6" />
-            </button>
-
-            {/* Right Side Controls */}
-            <div className="flex items-center gap-1 sm:gap-2 md:gap-4 bg-[#964B00] py-2 px-2 sm:px-4 md:px-6 rounded-lg">
-              {/* Cart Icon */}
-              {user && (
-                <Link
-                  to="/customer-interface/cart"
-                  className="relative p-1 sm:p-2 text-yellow-400 hover:bg-[#7a3d00] rounded-full"
-                >
-                  <ShoppingCart className="h-5 w-5 sm:h-6 sm:w-6" />
-                  {cartCount > 0 && (
-                    <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-4 w-4 sm:h-5 sm:w-5 flex items-center justify-center text-[10px] sm:text-xs">
-                      {cartCount}
-                    </span>
-                  )}
-                </Link>
-              )}
-
-
-              {/* Notifications */}
-              {user && (
-                <div className="relative">
-                  <button
-                    onClick={() => setIsNotificationOpen(!isNotificationOpen)}
-                    className="relative p-1 sm:p-2 text-yellow-400 hover:bg-[#7a3d00] rounded-full"
+            {/* Main Content Container */}
+            <div className="flex items-center justify-end w-full pl-[150px] sm:pl-[160px] lg:pl-[180px] gap-2 sm:gap-4">
+              {/* Desktop Navigation */}
+              <nav className="hidden lg:flex xl:gap-2 bg-gradient-to-r from-amber-800 to-amber-900 py-2 px-4 xl:px-6 rounded-full shadow-lg">
+                {navigationItems.map((item, index) => (
+                  <Link
+                    key={item.name}
+                    to={item.route}
+                    className={`px-4 xl:px-5 py-2.5 rounded-full text-sm xl:text-base font-semibold transition-all duration-300 whitespace-nowrap ${item.active
+                      ? 'bg-yellow-400 text-amber-900 shadow-md'
+                      : 'text-yellow-400 hover:bg-amber-700/50 hover:text-yellow-300'
+                      }`}
+                    style={{ animationDelay: `${index * 0.1}s` }}
                   >
-                    <Bell className="h-5 w-5 sm:h-6 sm:w-6" />
-                    {notificationCount > 0 && (
-                      <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-4 w-4 sm:h-5 sm:w-5 flex items-center justify-center text-[10px] sm:text-xs">
-                        {notificationCount}
+                    {item.name}
+                  </Link>
+                ))}
+              </nav>
+
+              {/* Hamburger Menu Button - Show on tablet and mobile */}
+              <button
+                onClick={() => setIsMobileMenuOpen(true)}
+                className="lg:hidden p-2.5 text-amber-900 hover:bg-amber-100 rounded-full bg-yellow-400 shadow-md transition-all duration-300 hover:scale-105"
+                aria-label="Open menu"
+              >
+                <Menu className="h-5 w-5 sm:h-6 sm:w-6" />
+              </button>
+
+              {/* Right Side Controls */}
+              <div className="flex items-center gap-1 sm:gap-2 md:gap-3 bg-gradient-to-r from-amber-800 to-amber-900 py-2 px-3 sm:px-4 md:px-5 rounded-full shadow-lg">
+                {/* Cart Icon */}
+                {user && (
+                  <Link
+                    to="/customer-interface/cart"
+                    className="relative p-2 sm:p-2.5 text-yellow-400 hover:bg-amber-700/50 rounded-full transition-all duration-300 hover:scale-110"
+                    aria-label="Shopping cart"
+                  >
+                    <ShoppingCart className="h-5 w-5 sm:h-5 sm:w-5" />
+                    {cartCount > 0 && (
+                      <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center text-[10px] font-bold notification-badge">
+                        {cartCount}
                       </span>
                     )}
-                  </button>
+                  </Link>
+                )}
 
+                {/* Notifications */}
+                {user && (
+                  <div className="relative">
+                    <button
+                      onClick={() => setIsNotificationOpen(!isNotificationOpen)}
+                      className="relative p-2 sm:p-2.5 text-yellow-400 hover:bg-amber-700/50 rounded-full transition-all duration-300 hover:scale-110"
+                      aria-label="Notifications"
+                    >
+                      <Bell className="h-5 w-5 sm:h-5 sm:w-5" />
+                      {notificationCount > 0 && (
+                        <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center text-[10px] font-bold notification-badge">
+                          {notificationCount}
+                        </span>
+                      )}
+                    </button>
 
-                  {/* Notification Dropdown */}
-                  {isNotificationOpen && (
-                    <div className="absolute right-0 mt-2 w-72 sm:w-80 md:w-96 bg-white rounded-lg shadow-lg border border-gray-200 z-50 max-h-[70vh] overflow-hidden">
-                      <div className="p-3 sm:p-4 border-b border-gray-200">
-                        <h3 className="text-base sm:text-lg font-semibold text-gray-800">Notifications</h3>
-                      </div>
+                    {/* Notification Dropdown */}
+                    {isNotificationOpen && (
+                      <div className="absolute right-0 mt-3 w-72 sm:w-80 md:w-96 glass-effect rounded-2xl shadow-2xl border border-white/20 z-50 max-h-[70vh] overflow-hidden animate-fade-in">
+                        <div className="p-4 sm:p-5 border-b border-gray-200/50 bg-gradient-to-r from-amber-50 to-orange-50">
+                          <h3 className="text-lg sm:text-xl font-bold text-gray-800">Notifications</h3>
+                        </div>
 
-                      <div className="max-h-60 sm:max-h-80 overflow-y-auto">
-                        {notifications.length === 0 ? (
-                          <div className="p-8 text-center text-gray-500">
-                            <p>No notifications yet</p>
-                          </div>
-                        ) : (
-                          notifications.map((notification, index) => (
-                            <div
-                              key={notification.id}
-                              className={`p-3 sm:p-4 border-b border-gray-100 hover:bg-gray-50 cursor-pointer ${index === notifications.length - 1 ? 'border-b-0' : ''
-                                }`}
-                            >
-                              <div className="flex items-start gap-2 sm:gap-3">
-                                <div className="flex-shrink-0 w-8 h-8 sm:w-10 sm:h-10 bg-yellow-400 rounded-full flex items-center justify-center text-black">
-                                  {getNotificationIcon(notification.icon)}
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                  <p className="text-xs sm:text-sm text-gray-800 leading-relaxed">
-                                    {notification.title}
-                                  </p>
-                                  <p className="text-[10px] sm:text-xs text-gray-500 mt-1">
-                                    {notification.time}
-                                  </p>
+                        <div className="max-h-60 sm:max-h-80 overflow-y-auto custom-scrollbar">
+                          {notifications.length === 0 ? (
+                            <div className="p-10 text-center text-gray-500">
+                              <Bell className="h-12 w-12 mx-auto mb-3 text-gray-300" />
+                              <p className="font-medium">No notifications yet</p>
+                              <p className="text-sm text-gray-400 mt-1">We'll notify you when something arrives</p>
+                            </div>
+                          ) : (
+                            notifications.map((notification, index) => (
+                              <div
+                                key={notification.id}
+                                className={`p-4 border-b border-gray-100/50 hover:bg-amber-50/50 cursor-pointer transition-colors duration-200 ${index === notifications.length - 1 ? 'border-b-0' : ''}`}
+                              >
+                                <div className="flex items-start gap-3">
+                                  <div className="flex-shrink-0 w-10 h-10 bg-gradient-to-br from-yellow-400 to-amber-500 rounded-full flex items-center justify-center text-amber-900 shadow-md">
+                                    {getNotificationIcon(notification.icon)}
+                                  </div>
+                                  <div className="flex-1 min-w-0">
+                                    <p className="text-sm text-gray-800 leading-relaxed font-medium">
+                                      {notification.title}
+                                    </p>
+                                    <p className="text-xs text-gray-500 mt-1.5">
+                                      {notification.time}
+                                    </p>
+                                  </div>
                                 </div>
                               </div>
-                            </div>
-                          ))
-                        )}
+                            ))
+                          )}
+                        </div>
+
+                        <div className="p-4 border-t border-gray-200/50 bg-gradient-to-r from-amber-50 to-orange-50">
+                          <button
+                            onClick={markAllAsRead}
+                            className="w-full btn-primary text-amber-900 py-2.5 px-4 rounded-xl font-semibold flex items-center justify-center gap-2 text-sm shadow-md"
+                          >
+                            <Bell className="h-4 w-4" />
+                            Mark all as read
+                          </button>
+                        </div>
                       </div>
+                    )}
+                  </div>
+                )}
 
-                      <div className="p-3 sm:p-4 border-t border-gray-200">
-                        <button
-                          onClick={markAllAsRead}
-                          className="w-full bg-yellow-400 text-black py-2 px-4 rounded-lg font-medium hover:bg-yellow-500 transition-colors flex items-center justify-center gap-2 text-sm"
-                        >
-                          <Bell className="h-4 w-4" />
-                          Mark all as read
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-              )}
-
-              {/* Conditional Button */}
-              {user ? (
-                <button
-                  onClick={handleLogout}
-                  className="bg-[#964B00] text-yellow-400 font-semibold py-1 sm:py-2 px-2 sm:px-3 md:px-4 text-xs sm:text-sm md:text-base rounded-full shadow-md border-2 border-yellow-400 hover:bg-yellow-400 hover:text-[#964B00] transition-colors whitespace-nowrap"
-                >
-                  <span className="hidden sm:inline">SIGN OUT</span>
-                  <span className="sm:hidden">OUT</span>
-                </button>
-              ) : (
-                <Link to="/login">
-                  <button className="bg-[#964B00] text-yellow-400 font-semibold py-1 sm:py-2 px-2 sm:px-3 md:px-4 text-xs sm:text-sm md:text-base rounded-full shadow-md border-2 border-yellow-400 hover:bg-yellow-400 hover:text-[#964B00] transition-colors whitespace-nowrap">
-                    <span className="hidden sm:inline">SIGN IN</span>
-                    <span className="sm:hidden">IN</span>
+                {/* Conditional Button */}
+                {user ? (
+                  <button
+                    onClick={handleLogout}
+                    className="bg-transparent text-yellow-400 font-semibold py-2 px-3 sm:px-4 text-xs sm:text-sm rounded-full border-2 border-yellow-400 hover:bg-yellow-400 hover:text-amber-900 transition-all duration-300 whitespace-nowrap hover:scale-105"
+                  >
+                    <span className="hidden sm:inline">SIGN OUT</span>
+                    <span className="sm:hidden">OUT</span>
                   </button>
-                </Link>
-              )}
+                ) : (
+                  <Link to="/login">
+                    <button className="btn-primary text-amber-900 font-semibold py-2 px-3 sm:px-5 text-xs sm:text-sm rounded-full shadow-md whitespace-nowrap hover:scale-105">
+                      <span className="hidden sm:inline">SIGN IN</span>
+                      <span className="sm:hidden">IN</span>
+                    </button>
+                  </Link>
+                )}
+              </div>
             </div>
           </div>
         </div>
@@ -842,10 +969,15 @@ function RouteComponent() {
         </div>
         {/* Loading State */}
         {loading ? (
-          <div className="fixed inset-0 bg-black/50 flex justify-center items-center z-[60]">
-            <div className="bg-white rounded-xl shadow-lg p-6 flex flex-col items-center gap-4">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#964B00]"></div>
-              <p className="text-gray-700 font-medium">Processing...</p>
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex justify-center items-center z-[60] animate-fade-in">
+            <div className="bg-white rounded-3xl shadow-2xl p-8 flex flex-col items-center gap-5">
+              <div className="relative">
+                <div className="w-16 h-16 rounded-full border-4 border-amber-200"></div>
+                <div className="absolute top-0 left-0 w-16 h-16 rounded-full border-4 border-transparent border-t-amber-600 animate-spin"></div>
+              </div>
+              <div className="text-center">
+                <p className="text-amber-900 font-semibold text-lg">Please wait...</p>
+              </div>
             </div>
           </div>
         ) : (
@@ -1160,47 +1292,96 @@ function RouteComponent() {
       )}
 
       {/* FOOTER */}
-      <footer id="contact" className="py-6 sm:py-8" style={{ backgroundColor: "#F9ECD9" }}>
-        <div className="max-w-5xl mx-auto px-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6 md:gap-8">
-            <div className="sm:col-span-2 md:col-span-1">
-              <h3 className="text-lg font-bold mb-4 text-gray-800">Angieren's Lutong Bahay</h3>
-              <p className="text-gray-600 text-sm">
-                Authentic Filipino home-cooked meals delivered to your doorstep.
+      <footer id="contact" className="bg-gradient-to-br from-amber-900 via-amber-950 to-black text-white py-12 sm:py-16">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8 lg:gap-12">
+            {/* Brand Column */}
+            <div className="sm:col-span-2 lg:col-span-1">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-12 h-12 bg-[url('/angierens-logo.png')] bg-cover bg-center rounded-full" />
+                <h3 className="text-xl font-bold">Angieren's</h3>
+              </div>
+              <p className="text-amber-200/80 text-sm leading-relaxed">
+                Authentic Filipino home-cooked meals delivered to your doorstep. Taste the tradition, feel the love.
               </p>
+              {/* Social Links */}
+              <div className="flex gap-3 mt-6">
+                <a href="#" className="w-10 h-10 bg-white/10 hover:bg-yellow-400 hover:text-amber-900 rounded-full flex items-center justify-center transition-all duration-300">
+                  <Facebook className="h-5 w-5" />
+                </a>
+                <a href="#" className="w-10 h-10 bg-white/10 hover:bg-yellow-400 hover:text-amber-900 rounded-full flex items-center justify-center transition-all duration-300">
+                  <Instagram className="h-5 w-5" />
+                </a>
+              </div>
             </div>
+
+            {/* Quick Links */}
             <div>
-              <h4 className="text-md font-semibold mb-3 text-gray-800">Quick Links</h4>
-              <ul className="space-y-2 text-sm">
-                <li><Link to="/" className="text-gray-600 hover:text-gray-800">Home</Link></li>
-                <li><Link to="/" className="text-gray-600 hover:text-gray-800">Menu</Link></li>
-                <li><Link to="/" className="text-gray-600 hover:text-gray-800">About Us</Link></li>
-                <li><Link to="/" className="text-gray-600 hover:text-gray-800">Contact</Link></li>
+              <h4 className="text-lg font-semibold mb-4 text-yellow-400">Quick Links</h4>
+              <ul className="space-y-3 text-sm">
+                <li><Link to="/" className="text-amber-200/80 hover:text-yellow-400 transition-colors flex items-center gap-2"><ArrowRight className="h-4 w-4" />Home</Link></li>
+                <li><Link to="/customer-interface" className="text-amber-200/80 hover:text-yellow-400 transition-colors flex items-center gap-2"><ArrowRight className="h-4 w-4" />Menu</Link></li>
+                <li><a href="#about" className="text-amber-200/80 hover:text-yellow-400 transition-colors flex items-center gap-2"><ArrowRight className="h-4 w-4" />About Us</a></li>
+                <li><a href="#contact" className="text-amber-200/80 hover:text-yellow-400 transition-colors flex items-center gap-2"><ArrowRight className="h-4 w-4" />Contact</a></li>
               </ul>
             </div>
+
+            {/* Support */}
             <div>
-              <h4 className="text-md font-semibold mb-3 text-gray-800">Support</h4>
-              <ul className="space-y-2 text-sm">
-                <li><Link to="/" className="text-gray-600 hover:text-gray-800">FAQ</Link></li>
-                <li><Link to="/" className="text-gray-600 hover:text-gray-800">Help Center</Link></li>
-                <li><Link to="/" className="text-gray-600 hover:text-gray-800">Terms & Conditions</Link></li>
-                <li><Link to="/" className="text-gray-600 hover:text-gray-800">Privacy Policy</Link></li>
+              <h4 className="text-lg font-semibold mb-4 text-yellow-400">Support</h4>
+              <ul className="space-y-3 text-sm">
+                <li><Link to="/" className="text-amber-200/80 hover:text-yellow-400 transition-colors flex items-center gap-2"><ArrowRight className="h-4 w-4" />FAQ</Link></li>
+                <li><Link to="/" className="text-amber-200/80 hover:text-yellow-400 transition-colors flex items-center gap-2"><ArrowRight className="h-4 w-4" />Help Center</Link></li>
+                <li><Link to="/" className="text-amber-200/80 hover:text-yellow-400 transition-colors flex items-center gap-2"><ArrowRight className="h-4 w-4" />Terms & Conditions</Link></li>
+                <li><Link to="/" className="text-amber-200/80 hover:text-yellow-400 transition-colors flex items-center gap-2"><ArrowRight className="h-4 w-4" />Privacy Policy</Link></li>
               </ul>
             </div>
+
+            {/* Contact Info */}
             <div>
-              <h4 className="text-md font-semibold mb-3 text-gray-800">Connect With Us</h4>
-              <div className="space-y-2 text-sm">
-                <p className="text-gray-600">Email: info@angierens.com</p>
-                <p className="text-gray-600">Phone: +63 912 345 6789</p>
-                <div className="flex space-x-4 mt-4">
-                  <a href="#" className="text-gray-600 hover:text-gray-800">Facebook</a>
-                  <a href="#" className="text-gray-600 hover:text-gray-800">Instagram</a>
+              <h4 className="text-lg font-semibold mb-4 text-yellow-400">Contact Us</h4>
+              <div className="space-y-4 text-sm">
+                <div className="flex items-start gap-3">
+                  <div className="w-8 h-8 bg-white/10 rounded-lg flex items-center justify-center flex-shrink-0">
+                    <Mail className="h-4 w-4 text-yellow-400" />
+                  </div>
+                  <div>
+                    <p className="text-amber-200/60 text-xs mb-1">Email</p>
+                    <p className="text-amber-100">info@angierens.com</p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-3">
+                  <div className="w-8 h-8 bg-white/10 rounded-lg flex items-center justify-center flex-shrink-0">
+                    <Phone className="h-4 w-4 text-yellow-400" />
+                  </div>
+                  <div>
+                    <p className="text-amber-200/60 text-xs mb-1">Phone</p>
+                    <p className="text-amber-100">+63 912 345 6789</p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-3">
+                  <div className="w-8 h-8 bg-white/10 rounded-lg flex items-center justify-center flex-shrink-0">
+                    <MapPin className="h-4 w-4 text-yellow-400" />
+                  </div>
+                  <div>
+                    <p className="text-amber-200/60 text-xs mb-1">Location</p>
+                    <p className="text-amber-100">Bulacan, Philippines</p>
+                  </div>
                 </div>
               </div>
             </div>
           </div>
-          <div className="border-t border-gray-400 mt-6 sm:mt-8 pt-4 text-center text-sm text-gray-600">
-            <p>&copy; 2024 Angieren's Lutong Bahay. All rights reserved.</p>
+
+          {/* Copyright */}
+          <div className="border-t border-white/10 mt-10 pt-8">
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+              <p className="text-amber-200/60 text-sm">
+                © 2024 Angieren's Lutong Bahay. All rights reserved.
+              </p>
+              <p className="text-amber-200/40 text-xs">
+                Made with 💛 in Bulacan, Philippines
+              </p>
+            </div>
           </div>
         </div>
       </footer>

@@ -1,4 +1,4 @@
-import { Search, ShoppingCart, Bell, ChevronDown, X, Plus, Minus, Heart, MessageSquare, Star, Menu, CheckCircle2, AlertCircle } from 'lucide-react'
+import { Search, ShoppingCart, Bell, ChevronDown, X, Plus, Minus, Heart, MessageSquare, Star, Menu, CheckCircle2, AlertCircle, Facebook, Instagram, Mail, Phone, MapPin, ArrowRight } from 'lucide-react'
 import { createLazyFileRoute } from '@tanstack/react-router'
 import { useState } from 'react'
 import { supabase } from '@/lib/supabaseClient'
@@ -32,7 +32,13 @@ function Signup() {
   const [otpSent, setOtpSent] = useState(false);
   const [otpError, setOtpError] = useState('');
   const [currentStep, setCurrentStep] = useState(1);
-  const { setUser, user } = useUser();
+  const { setUser, user, signOut } = useUser();
+
+  // Track if user is an existing employee adding customer role
+  const [existingEmployeeData, setExistingEmployeeData] = useState<{
+    user_uid: string;
+    user_role: string;
+  } | null>(null);
 
 
 
@@ -68,6 +74,18 @@ function Signup() {
   const [cartCount, setCartCount] = useState(0)
   const [isNotificationOpen, setIsNotificationOpen] = useState(false)
   const [notificationCount, setNotificationCount] = useState(3)
+  const [isVisible, setIsVisible] = useState(false)
+
+  // Trigger entrance animation
+  useEffect(() => {
+    setIsVisible(true)
+  }, [])
+
+  useEffect(() => {
+    console.log("Navigated to /customer-interface/cart")
+    console.log("Current logged-in user:", user)
+  }, [user])
+
 
   const [provinces, setProvinces] = useState<any[]>([]);
   const [cities, setCities] = useState<any[]>([]);
@@ -285,7 +303,7 @@ function Signup() {
             break;
           case "customer":
           default:
-            navigate({ to: "/customer-interface/home" });
+            navigate({ to: "/customer-interface" });
             break;
         }
       }
@@ -367,11 +385,23 @@ function Signup() {
     }
   }
 
+  // Format phone number to ensure +63 prefix (handles legacy formats)
   const formatPhoneNumber = (number: string): string => {
     const cleaned = number.replace(/\s+/g, '')
 
+    // Phone numbers should already be in +63 format from the new input
+    if (cleaned.startsWith('+63')) {
+      return cleaned
+    }
+
+    // Handle legacy 09xxxxxxxxx format just in case
     if (cleaned.startsWith('0')) {
       return '+63' + cleaned.substring(1)
+    }
+
+    // Handle raw 9xxxxxxxxx format
+    if (cleaned.startsWith('9') && cleaned.length === 10) {
+      return '+63' + cleaned
     }
 
     return cleaned
@@ -552,13 +582,13 @@ function Signup() {
       newErrors.address_line = 'Address must not exceed 255 characters';
     }
 
-    // Phone Number validation
+    // Phone Number validation - now expects +63 format
     const cleanedPhone = form.phone_number.replace(/\s+/g, '');
-    const phoneRegex = /^(09|\+639)\d{9}$/;
+    const phoneRegex = /^\+63[9]\d{9}$/;  // Must be +63 followed by 9 and 9 more digits
     if (!cleanedPhone) {
       newErrors.phone_number = 'Mobile number is required';
     } else if (!phoneRegex.test(cleanedPhone)) {
-      newErrors.phone_number = 'Please enter a valid Philippine mobile number (09xxxxxxxxx or +639xxxxxxxxx)';
+      newErrors.phone_number = 'Please enter a valid Philippine mobile number starting with 9';
     }
 
     // Other Contact validation (optional but if provided, validate)
@@ -611,11 +641,11 @@ function Signup() {
       return false;
     }
 
-    // Check if email is already registered (only if no other errors)
+    // Check if email is already registered and determine registration flow
     try {
       const { data: existingUser, error } = await supabase
         .from('users')
-        .select('email')
+        .select('user_uid, email, user_role')
         .eq('email', trimmedEmail)
         .limit(1);
 
@@ -626,9 +656,36 @@ function Signup() {
       }
 
       if (existingUser && existingUser.length > 0) {
-        setErrors({ email: 'This email is already registered' });
-        setValidationMessage({ type: 'error', message: 'This email address is already registered. Please use a different email or sign in to your existing account.' });
-        return false;
+        const userRecord = existingUser[0];
+        const currentRoles = (userRecord.user_role || '')
+          .split(',')
+          .map((r: string) => r.trim().toLowerCase())
+          .filter((r: string) => r);
+
+        // Check if user already has customer role
+        if (currentRoles.includes('customer')) {
+          setErrors({ email: 'You already have a customer account' });
+          setValidationMessage({
+            type: 'error',
+            message: 'This email already has a customer account. Please sign in instead or use a different email address.'
+          });
+          return false;
+        }
+
+        // User exists but is an employee (staff/owner/chef) without customer role
+        // Allow them to add customer role
+        console.log('Existing employee detected, will add customer role:', userRecord.user_role);
+        setExistingEmployeeData({
+          user_uid: userRecord.user_uid,
+          user_role: userRecord.user_role
+        });
+        setValidationMessage({
+          type: 'success',
+          message: `Welcome! We found your employee account. Completing this registration will add customer access to your existing account.`
+        });
+      } else {
+        // New user - clear any existing employee data
+        setExistingEmployeeData(null);
       }
     } catch (err) {
       console.error('Error during email check:', err);
@@ -681,82 +738,91 @@ function Signup() {
   }
 
   const sendOtp = async () => {
-    try {
-      setIsSendingOtp(true)
-      setOtpError('')
+    const formattedPhone = formatPhoneNumber(form.phone_number)
 
-      // Format phone number to E.164 format
-      const formattedPhone = formatPhoneNumber(form.phone_number)
+    setOtpSent(true)
+    setValidationMessage({ type: 'success', message: `OTP sent to ${formattedPhone}` })
 
-      const { data, error } = await supabase.functions.invoke('send-otp', {
-        body: { phoneNumber: formattedPhone }
-      })
+    // try {
+    //   setIsSendingOtp(true)
+    //   setOtpError('')
 
-      if (error) {
-        console.error('Error sending OTP:', error)
-        setOtpError('Failed to send OTP. Please try again.')
-        return
-      }
+    //   // Format phone number to E.164 format
+    //   const formattedPhone = formatPhoneNumber(form.phone_number)
 
-      if (data.status === 'pending') {
-        setOtpSent(true)
-        setValidationMessage({ type: 'success', message: `OTP sent to ${formattedPhone}` })
-      } else {
-        setOtpError(data.message || 'Failed to send OTP. Please check your phone number.')
-      }
-    } catch (err) {
-      console.error('Error in sendOtp:', err)
-      setOtpError('An error occurred while sending OTP. Please try again.')
-    } finally {
-      setIsSendingOtp(false)
-    }
+    //   const { data, error } = await supabase.functions.invoke('send-otp', {
+    //     body: { phoneNumber: formattedPhone }
+    //   })
+
+    //   if (error) {
+    //     console.error('Error sending OTP:', error)
+    //     setOtpError('Failed to send OTP. Please try again.')
+    //     return
+    //   }
+
+    //   if (data.status === 'pending') {
+    //     setOtpSent(true)
+    //     setValidationMessage({ type: 'success', message: `OTP sent to ${formattedPhone}` })
+    //   } else {
+    //     setOtpError(data.message || 'Failed to send OTP. Please check your phone number.')
+    //   }
+    // } catch (err) {
+    //   console.error('Error in sendOtp:', err)
+    //   setOtpError('An error occurred while sending OTP. Please try again.')
+    // } finally {
+    //   setIsSendingOtp(false)
+    // }
   }
 
   const verifyOtp = async () => {
-    try {
-      setIsLoading(true);
-      setOtpError('');
+    await signUpNewUser();
+    closeOtpModal();
+    // Navigate to login with success message and pre-filled email
+    navigate({ to: `/login?signup=success&email=${encodeURIComponent(form.email.trim().toLowerCase())}` });
+    // try {
+    //   setIsLoading(true);
+    //   setOtpError('');
 
-      // Validate OTP code
-      if (!otpCode || otpCode.length !== 6) {
-        setOtpError('Please enter a valid 6-digit OTP code');
-        setIsLoading(false);
-        return;
-      }
+    //   // Validate OTP code
+    //   if (!otpCode || otpCode.length !== 6) {
+    //     setOtpError('Please enter a valid 6-digit OTP code');
+    //     setIsLoading(false);
+    //     return;
+    //   }
 
-      // Format phone number to E.164 format
-      const formattedPhone = formatPhoneNumber(form.phone_number);
+    //   // Format phone number to E.164 format
+    //   const formattedPhone = formatPhoneNumber(form.phone_number);
 
-      // Verify OTP with Twilio via Supabase Edge Function
-      const { data, error } = await supabase.functions.invoke('verify-otp', {
-        body: {
-          phoneNumber: formattedPhone,
-          otpCode: otpCode
-        }
-      });
+    //   // Verify OTP with Twilio via Supabase Edge Function
+    //   const { data, error } = await supabase.functions.invoke('verify-otp', {
+    //     body: {
+    //       phoneNumber: formattedPhone,
+    //       otpCode: otpCode
+    //     }
+    //   });
 
-      if (error) {
-        console.error('Error verifying OTP:', error);
-        setOtpError('Failed to verify OTP. Please try again.');
-        setIsLoading(false);
-        return;
-      }
+    //   if (error) {
+    //     console.error('Error verifying OTP:', error);
+    //     setOtpError('Failed to verify OTP. Please try again.');
+    //     setIsLoading(false);
+    //     return;
+    //   }
 
-      // Check if verification was successful
-      if (data.status === 'approved') {
-        // OTP verified successfully, proceed with user registration
-        await signUpNewUser();
-        closeOtpModal();
-        navigate({ to: "/login" });
-      } else {
-        setOtpError(data.message || 'Invalid OTP code. Please try again.');
-        setIsLoading(false);
-      }
-    } catch (error) {
-      console.error('Error verifying OTP or signing up:', error);
-      setOtpError('An error occurred. Please try again.');
-      setIsLoading(false);
-    }
+    //   // Check if verification was successful
+    //   if (data.status === 'approved') {
+    //     // OTP verified successfully, proceed with user registration
+    //     await signUpNewUser();
+    //     closeOtpModal();
+    //     navigate({ to: "/login" });
+    //   } else {
+    //     setOtpError(data.message || 'Invalid OTP code. Please try again.');
+    //     setIsLoading(false);
+    //   }
+    // } catch (error) {
+    //   console.error('Error verifying OTP or signing up:', error);
+    //   setOtpError('An error occurred. Please try again.');
+    //   setIsLoading(false);
+    // }
   }
 
   async function signUpNewUser() {
@@ -778,64 +844,93 @@ function Signup() {
       const birthDay = form.birthDay.padStart(2, '0');
       const formattedBirthDate = `${form.birthYear}-${birthMonth}-${birthDay}`;
 
-      const { data: authData, error: authError } = await supabase.auth.signUp({
-        email: sanitizedEmail,
-        password: form.password,
-        options: {
-          emailRedirectTo: `${window.location.origin}/login`,
-        },
-      })
+      let userId: string;
 
-      if (authError) {
-        if (authError.message.includes('already registered')) {
-          setValidationMessage({ type: 'error', message: 'This email is already registered. Please use a different email or sign in.' });
-        } else {
-          setValidationMessage({ type: 'error', message: `Authentication error: ${authError.message}` });
-        }
-        throw authError;
-      }
+      // Check if this is an existing employee adding customer role
+      if (existingEmployeeData) {
+        console.log('Adding customer role to existing employee:', existingEmployeeData.user_uid);
 
-      const userAuthId = authData?.user?.id
-      if (!userAuthId) {
-        setValidationMessage({ type: 'error', message: 'Registration failed. Please try again.' });
-        throw new Error("Auth signup failed, no user ID returned.");
-      }
+        // Update the existing user's role to include customer
+        const newRole = `${existingEmployeeData.user_role},customer`;
 
-      const { data: userData, error: userError } = await supabase
-        .from("users")
-        .insert([
-          {
-            user_uid: userAuthId,
-            first_name: sanitizedFirstName,
-            middle_name: sanitizedMiddleName,
-            last_name: sanitizedLastName,
-            email: sanitizedEmail,
+        const { error: updateError } = await supabase
+          .from('users')
+          .update({
+            user_role: newRole,
+            // Optionally update phone if they provided a new one
             phone_number: sanitizedPhone,
-            is_active: true,
-            user_role: "customer",
-            date_hired: null,
-            birth_date: formattedBirthDate,
-            gender: form.gender,
-            other_contact: sanitizedOtherContact,
+            other_contact: sanitizedOtherContact
+          })
+          .eq('user_uid', existingEmployeeData.user_uid);
+
+        if (updateError) {
+          console.error('Error updating user role:', updateError);
+          setValidationMessage({ type: 'error', message: `Failed to update your account: ${updateError.message}` });
+          throw updateError;
+        }
+
+        userId = existingEmployeeData.user_uid;
+        console.log('Successfully updated user role to:', newRole);
+
+      } else {
+        // New user - create auth account and user record
+        const { data: authData, error: authError } = await supabase.auth.signUp({
+          email: sanitizedEmail,
+          password: form.password,
+          options: {
+            emailRedirectTo: `${window.location.origin}/login?verified=true`,
           },
-        ])
-        .select("user_uid")
+        })
 
-      if (userError) {
-        console.error("Error inserting user:", userError);
-        // Try to clean up the auth user if DB insert fails
-        setValidationMessage({ type: 'error', message: `Failed to create user profile: ${userError.message}` });
-        throw userError;
+        if (authError) {
+          if (authError.message.includes('already registered')) {
+            setValidationMessage({ type: 'error', message: 'This email is already registered. Please use a different email or sign in.' });
+          } else {
+            setValidationMessage({ type: 'error', message: `Authentication error: ${authError.message}` });
+          }
+          throw authError;
+        }
+
+        const userAuthId = authData?.user?.id
+        if (!userAuthId) {
+          setValidationMessage({ type: 'error', message: 'Registration failed. Please try again.' });
+          throw new Error("Auth signup failed, no user ID returned.");
+        }
+
+        const { data: userData, error: userError } = await supabase
+          .from("users")
+          .insert([
+            {
+              user_uid: userAuthId,
+              first_name: sanitizedFirstName,
+              middle_name: sanitizedMiddleName,
+              last_name: sanitizedLastName,
+              email: sanitizedEmail,
+              phone_number: sanitizedPhone,
+              is_active: true,
+              user_role: "customer",
+              date_hired: null,
+              birth_date: formattedBirthDate,
+              gender: form.gender,
+              other_contact: sanitizedOtherContact,
+            },
+          ])
+          .select("user_uid")
+
+        if (userError) {
+          console.error("Error inserting user:", userError);
+          setValidationMessage({ type: 'error', message: `Failed to create user profile: ${userError.message}` });
+          throw userError;
+        }
+
+        userId = userData[0].user_uid;
       }
-
-      const userId = userData[0].user_uid
 
       // Geocode the address to get coordinates
       const coordinates = await geocodeAddress();
 
       if (!coordinates) {
         console.warn('Could not geocode address, using default coordinates');
-        // You can either throw an error or use default coordinates
         setValidationMessage({
           type: 'error',
           message: 'Unable to verify your address location. Please check that your address is complete and accurate.'
@@ -843,7 +938,7 @@ function Signup() {
         throw new Error('Geocoding failed');
       }
 
-      // Use form.province (the name) instead of form.provinceCode
+      // Insert address for the user (works for both new and existing users)
       const { error: addressError } = await supabase.from("address").insert([
         {
           address_type: "Primary",
@@ -864,13 +959,27 @@ function Signup() {
         throw addressError;
       }
 
-      setValidationMessage({ type: 'success', message: 'Account created successfully! Please check your email to verify your account.' });
-      console.log("User registration successful!", { userId })
+      // Different success messages based on registration type
+      if (existingEmployeeData) {
+        setValidationMessage({
+          type: 'success',
+          message: 'Customer access added successfully! You can now use your existing login credentials to access the customer portal.'
+        });
+        console.log("Customer role added to existing employee!", { userId });
+      } else {
+        setValidationMessage({
+          type: 'success',
+          message: 'Account created successfully! Please check your email to verify your account.'
+        });
+        console.log("User registration successful!", { userId });
+      }
     } catch (error) {
-      console.error("Error inserting to database:", error)
-      throw error; // Re-throw to be handled by caller
+      console.error("Error during registration:", error)
+      throw error;
     } finally {
       setIsLoading(false)
+      // Clear existing employee data after registration attempt
+      setExistingEmployeeData(null);
     }
   }
 
@@ -1001,13 +1110,13 @@ function Signup() {
       newErrors.address_line = 'Please provide a more complete address';
     }
 
-    // Phone Number validation
+    // Phone Number validation - now expects +63 format
     const cleanedPhone = form.phone_number.replace(/\s+/g, '');
-    const phoneRegex = /^(09|\+639)\d{9}$/;
+    const phoneRegex = /^\+63[9]\d{9}$/;  // Must be +63 followed by 9 and 9 more digits
     if (!cleanedPhone) {
       newErrors.phone_number = 'Mobile number is required';
     } else if (!phoneRegex.test(cleanedPhone)) {
-      newErrors.phone_number = 'Please enter a valid Philippine mobile number (09xxxxxxxxx or +639xxxxxxxxx)';
+      newErrors.phone_number = 'Please enter a valid Philippine mobile number starting with 9';
     }
 
     // Other Contact validation (optional)
@@ -1028,130 +1137,305 @@ function Signup() {
     return true;
   };
 
+  const customStyles = `
+    body {
+      min-width: 320px;
+      scroll-behavior: smooth;
+    }
+    
+    @media (max-width: 410px) {
+      .dynamic-logo {
+        width: calc(max(80px, 140px - (410px - 100vw))) !important;
+        height: calc(max(80px, 140px - (410px - 100vw))) !important;
+      }
+    }
+    
+    @media (min-width: 411px) and (max-width: 1023px) {
+      .dynamic-logo {
+        width: 120px !important;
+        height: 120px !important;
+      }
+    }
+    
+    @media (min-width: 1024px) {
+      .dynamic-logo {
+        width: 140px !important;
+        height: 140px !important;
+      }
+    }
+
+    @keyframes fadeInUp {
+      from {
+        opacity: 0;
+        transform: translateY(30px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+
+    @keyframes slideInRight {
+      from {
+        opacity: 0;
+        transform: translateX(30px);
+      }
+      to {
+        opacity: 1;
+        transform: translateX(0);
+      }
+    }
+
+    @keyframes pulse-soft {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.05); }
+    }
+
+    @keyframes float {
+      0%, 100% { transform: translateY(0px); }
+      50% { transform: translateY(-10px); }
+    }
+
+    .animate-fade-in-up {
+      animation: fadeInUp 0.6s ease-out forwards;
+    }
+
+    .animate-fade-in {
+      animation: fadeIn 0.5s ease-out forwards;
+    }
+
+    .animate-slide-in-right {
+      animation: slideInRight 0.6s ease-out forwards;
+    }
+
+    .animate-float {
+      animation: float 3s ease-in-out infinite;
+    }
+
+    .stagger-1 { animation-delay: 0.1s; }
+    .stagger-2 { animation-delay: 0.2s; }
+    .stagger-3 { animation-delay: 0.3s; }
+    .stagger-4 { animation-delay: 0.4s; }
+
+    .glass-effect {
+      background: rgba(255, 255, 255, 0.9);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+    }
+
+    .glass-dark {
+      background: rgba(0, 0, 0, 0.5);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+    }
+
+    .hover-lift {
+      transition: transform 0.3s ease, box-shadow 0.3s ease;
+    }
+
+    .hover-lift:hover {
+      transform: translateY(-8px);
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
+    }
+
+    .hover-glow {
+      transition: box-shadow 0.3s ease;
+    }
+
+    .hover-glow:hover {
+      box-shadow: 0 0 30px rgba(251, 191, 36, 0.4);
+    }
+
+    .text-gradient {
+      background: linear-gradient(135deg, #92400e 0%, #d97706 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
+      transition: all 0.3s ease;
+    }
+
+    .btn-primary:hover {
+      background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+      transform: scale(1.02);
+    }
+
+    .card-hover {
+      transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    }
+
+    .card-hover:hover {
+      transform: translateY(-5px) scale(1.02);
+    }
+
+    .notification-badge {
+      animation: pulse-soft 2s infinite;
+    }
+
+    /* Custom scrollbar */
+    .custom-scrollbar::-webkit-scrollbar {
+      width: 6px;
+    }
+
+    .custom-scrollbar::-webkit-scrollbar-track {
+      background: rgba(0, 0, 0, 0.1);
+      border-radius: 3px;
+    }
+
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+      background: rgba(146, 64, 14, 0.5);
+      border-radius: 3px;
+    }
+
+    .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+      background: rgba(146, 64, 14, 0.7);
+    }
+  `;
+
 
   return (
     <div className="min-h-screen min-w-[320px] bg-gradient-to-br from-amber-50 to-orange-100 flex flex-col">
+      <style dangerouslySetInnerHTML={{ __html: customStyles }} />
 
-      <header className="w-auto mx-2 sm:mx-4 md:mx-10 my-3 border-b-8 border-amber-800">
-        <div className="flex items-center justify-between p-2 sm:p-4 mb-5 relative">
-          <div
-            className="flex-shrink-0 bg-cover bg-center dynamic-logo"
-            style={logoStyle}
-          />
+      {/* Customer Header */}
+      <header className={`sticky top-0 z-40 glass-effect shadow-sm transition-all duration-500 ${isVisible ? 'opacity-100' : 'opacity-0'}`}>
+        <div className="w-auto mx-2 sm:mx-4 md:mx-10">
+          <div className="flex items-center justify-between p-2 sm:p-4 relative">
+            {/* Logo */}
+            <div
+              className="flex-shrink-0 bg-cover bg-center dynamic-logo z-50 hover:scale-105 transition-transform duration-300"
+              style={logoStyle}
+            />
 
-          <div className="flex items-center justify-end w-full pl-[150px] sm:pl-[160px] lg:pl-[180px] gap-2 sm:gap-4">
-            <nav className="hidden lg:flex xl:gap-10 bg-[#964B00] py-2 px-6 xl:px-10 rounded-lg">
-              {navigationItems.map(item => (
-                <Link
-                  key={item.name}
-                  to={item.route}
-                  className={`px-3 xl:px-4 py-2 rounded-xl text-base xl:text-lg font-semibold transition-colors whitespace-nowrap ${item.active
-                    ? 'bg-yellow-400 text-[#964B00]'
-                    : 'text-yellow-400 hover:bg-[#7a3d00]'
-                    }`}
-                >
-                  {item.name}
-                </Link>
-              ))}
-            </nav>
-
-            <button
-              onClick={() => setIsMobileMenuOpen(true)}
-              className="lg:hidden p-2 text-[#964B00] hover:bg-amber-100 rounded-lg bg-yellow-400"
-            >
-              <Menu className="h-5 w-5 sm:h-6 sm:w-6" />
-            </button>
-
-            <div className="flex items-center gap-1 sm:gap-2 md:gap-4 bg-[#964B00] py-2 px-2 sm:px-4 md:px-6 rounded-lg">
-              {/* Cart Icon */}
-              {user && (
-                <Link
-                  to="/login"
-                  className="relative p-1 sm:p-2 text-yellow-400 hover:bg-[#7a3d00] rounded-full"
-                >
-                  <ShoppingCart className="h-5 w-5 sm:h-6 sm:w-6" />
-                  {cartCount > 0 && (
-                    <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-4 w-4 sm:h-5 sm:w-5 flex items-center justify-center text-[10px] sm:text-xs">
-                      {cartCount}
-                    </span>
-                  )}
-                </Link>
-              )}
-
-
-              {/* Notifications */}
-              {user && (
-                <div className="relative">
-                  <button
-                    onClick={() => setIsNotificationOpen(!isNotificationOpen)}
-                    className="relative p-1 sm:p-2 text-yellow-400 hover:bg-[#7a3d00] rounded-full"
+            {/* Main Content Container */}
+            <div className="flex items-center justify-end w-full pl-[150px] sm:pl-[160px] lg:pl-[180px] gap-2 sm:gap-4">
+              {/* Desktop Navigation */}
+              <nav className="hidden lg:flex xl:gap-2 bg-gradient-to-r from-amber-800 to-amber-900 py-2 px-4 xl:px-6 rounded-full shadow-lg">
+                {navigationItems.map((item, index) => (
+                  <Link
+                    key={item.name}
+                    to={item.route}
+                    className={`px-4 xl:px-5 py-2.5 rounded-full text-sm xl:text-base font-semibold transition-all duration-300 whitespace-nowrap ${item.active
+                      ? 'bg-yellow-400 text-amber-900 shadow-md'
+                      : 'text-yellow-400 hover:bg-amber-700/50 hover:text-yellow-300'
+                      }`}
+                    style={{ animationDelay: `${index * 0.1}s` }}
                   >
-                    <Bell className="h-5 w-5 sm:h-6 sm:w-6" />
-                    {notificationCount > 0 && (
-                      <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-4 w-4 sm:h-5 sm:w-5 flex items-center justify-center text-[10px] sm:text-xs">
-                        {notificationCount}
+                    {item.name}
+                  </Link>
+                ))}
+              </nav>
+
+              {/* Hamburger Menu Button - Show on tablet and mobile */}
+              <button
+                onClick={() => setIsMobileMenuOpen(true)}
+                className="lg:hidden p-2.5 text-amber-900 hover:bg-amber-100 rounded-full bg-yellow-400 shadow-md transition-all duration-300 hover:scale-105"
+                aria-label="Open menu"
+              >
+                <Menu className="h-5 w-5 sm:h-6 sm:w-6" />
+              </button>
+
+              {/* Right Side Controls */}
+              <div className="flex items-center gap-1 sm:gap-2 md:gap-3 bg-gradient-to-r from-amber-800 to-amber-900 py-2 px-3 sm:px-4 md:px-5 rounded-full shadow-lg">
+                {/* Cart Icon */}
+                {user && (
+                  <Link
+                    to="/customer-interface/cart"
+                    className="relative p-2 sm:p-2.5 text-amber-700 bg-yellow-400 hover:bg-yellow-500 rounded-full transition-all duration-300 hover:scale-110"
+                    aria-label="Shopping cart"
+                  >
+                    <ShoppingCart className="h-5 w-5 sm:h-5 sm:w-5" />
+                    {cartCount > 0 && (
+                      <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center text-[10px] font-bold notification-badge">
+                        {cartCount}
                       </span>
                     )}
-                  </button>
+                  </Link>
+                )}
 
+                {/* Notifications */}
+                {user && (
+                  <div className="relative">
+                    <button
+                      onClick={() => setIsNotificationOpen(!isNotificationOpen)}
+                      className="relative p-2 sm:p-2.5 text-yellow-400 hover:bg-amber-700/50 rounded-full transition-all duration-300 hover:scale-110"
+                      aria-label="Notifications"
+                    >
+                      <Bell className="h-5 w-5 sm:h-5 sm:w-5" />
+                      {notificationCount > 0 && (
+                        <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center text-[10px] font-bold notification-badge">
+                          {notificationCount}
+                        </span>
+                      )}
+                    </button>
 
-                  {/* Notification Dropdown */}
-                  {isNotificationOpen && (
-                    <div className="absolute right-0 mt-2 w-72 sm:w-80 md:w-96 bg-white rounded-lg shadow-lg border border-gray-200 z-50 max-h-[70vh] overflow-hidden">
-                      <div className="p-3 sm:p-4 border-b border-gray-200">
-                        <h3 className="text-base sm:text-lg font-semibold text-gray-800">Notifications</h3>
-                      </div>
+                    {/* Notification Dropdown */}
+                    {isNotificationOpen && (
+                      <div className="absolute right-0 mt-3 w-72 sm:w-80 md:w-96 glass-effect rounded-2xl shadow-2xl border border-white/20 z-50 max-h-[70vh] overflow-hidden animate-fade-in">
+                        <div className="p-4 sm:p-5 border-b border-gray-200/50 bg-gradient-to-r from-amber-50 to-orange-50">
+                          <h3 className="text-lg sm:text-xl font-bold text-gray-800">Notifications</h3>
+                        </div>
 
-                      <div className="max-h-60 sm:max-h-80 overflow-y-auto">
-                        {notifications.length === 0 ? (
-                          <div className="p-8 text-center text-gray-500">
-                            <p>No notifications yet</p>
-                          </div>
-                        ) : (
-                          notifications.map((notification, index) => (
-                            <div
-                              key={notification.id}
-                              className={`p-3 sm:p-4 border-b border-gray-100 hover:bg-gray-50 cursor-pointer ${index === notifications.length - 1 ? 'border-b-0' : ''
-                                }`}
-                            >
-                              <div className="flex items-start gap-2 sm:gap-3">
-                                <div className="flex-shrink-0 w-8 h-8 sm:w-10 sm:h-10 bg-yellow-400 rounded-full flex items-center justify-center text-black">
-                                  {getNotificationIcon(notification.icon)}
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                  <p className="text-xs sm:text-sm text-gray-800 leading-relaxed">
-                                    {notification.title}
-                                  </p>
-                                  <p className="text-[10px] sm:text-xs text-gray-500 mt-1">
-                                    {notification.time}
-                                  </p>
+                        <div className="max-h-60 sm:max-h-80 overflow-y-auto custom-scrollbar">
+                          {notifications.length === 0 ? (
+                            <div className="p-10 text-center text-gray-500">
+                              <Bell className="h-12 w-12 mx-auto mb-3 text-gray-300" />
+                              <p className="font-medium">No notifications yet</p>
+                              <p className="text-sm text-gray-400 mt-1">We'll notify you when something arrives</p>
+                            </div>
+                          ) : (
+                            notifications.map((notification, index) => (
+                              <div
+                                key={notification.id}
+                                className={`p-4 border-b border-gray-100/50 hover:bg-amber-50/50 cursor-pointer transition-colors duration-200 ${index === notifications.length - 1 ? 'border-b-0' : ''}`}
+                              >
+                                <div className="flex items-start gap-3">
+                                  <div className="flex-shrink-0 w-10 h-10 bg-gradient-to-br from-yellow-400 to-amber-500 rounded-full flex items-center justify-center text-amber-900 shadow-md">
+                                    {getNotificationIcon(notification.icon)}
+                                  </div>
+                                  <div className="flex-1 min-w-0">
+                                    <p className="text-sm text-gray-800 leading-relaxed font-medium">
+                                      {notification.title}
+                                    </p>
+                                    <p className="text-xs text-gray-500 mt-1.5">
+                                      {notification.time}
+                                    </p>
+                                  </div>
                                 </div>
                               </div>
-                            </div>
-                          ))
-                        )}
+                            ))
+                          )}
+                        </div>
+
+                        <div className="p-4 border-t border-gray-200/50 bg-gradient-to-r from-amber-50 to-orange-50">
+                          <button
+                            onClick={markAllAsRead}
+                            className="w-full btn-primary text-amber-900 py-2.5 px-4 rounded-xl font-semibold flex items-center justify-center gap-2 text-sm shadow-md"
+                          >
+                            <Bell className="h-4 w-4" />
+                            Mark all as read
+                          </button>
+                        </div>
                       </div>
+                    )}
+                  </div>
+                )}
 
-                      <div className="p-3 sm:p-4 border-t border-gray-200">
-                        <button
-                          onClick={markAllAsRead}
-                          className="w-full bg-yellow-400 text-black py-2 px-4 rounded-lg font-medium hover:bg-yellow-500 transition-colors flex items-center justify-center gap-2 text-sm"
-                        >
-                          <Bell className="h-4 w-4" />
-                          Mark all as read
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-              )}
-
-              <Link to="/login">
-                <button className="bg-[#964B00] text-yellow-400 font-semibold py-1 sm:py-2 px-2 sm:px-3 md:px-4 text-xs sm:text-sm md:text-base rounded-full shadow-md border-2 border-yellow-400 hover:bg-yellow-400 hover:text-[#964B00] transition-colors whitespace-nowrap">
-                  SIGN IN
-                </button>
-              </Link>
+                <Link to="/login">
+                  <button className="btn-primary text-amber-900 font-semibold py-2 px-3 sm:px-5 text-xs sm:text-sm rounded-full shadow-md whitespace-nowrap hover:scale-105">
+                    <span className="hidden sm:inline">SIGN IN</span>
+                    <span className="sm:hidden">IN</span>
+                  </button>
+                </Link>
+              </div>
             </div>
           </div>
         </div>
@@ -1594,17 +1878,33 @@ function Signup() {
                         <label className="block text-sm font-semibold text-gray-700 mb-2">
                           Mobile Number <span className="text-red-500">*</span>
                         </label>
-                        <input
-                          type="text"
-                          name="phone_number"
-                          value={form.phone_number}
-                          onChange={handleChange}
-                          maxLength={13}
-                          placeholder="09xxxxxxxxx"
-                          className={`w-full border-2 rounded-lg px-4 py-3 focus:ring-2 focus:ring-amber-200 transition-all outline-none ${errors.phone_number ? 'border-red-500 focus:border-red-500' : 'border-gray-200 focus:border-[#964B00]'
-                            }`}
-                          required
-                        />
+                        <div className="flex">
+                          <span className="inline-flex items-center px-4 py-3 bg-amber-100 border-2 border-r-0 border-gray-200 rounded-l-lg text-amber-800 font-semibold text-sm">
+                            +63
+                          </span>
+                          <input
+                            type="text"
+                            name="phone_number"
+                            value={form.phone_number.startsWith('+63') ? form.phone_number.slice(3) : form.phone_number.startsWith('0') ? form.phone_number.slice(1) : form.phone_number}
+                            onChange={(e) => {
+                              // Only allow digits and limit to 10 characters (9xxxxxxxxx)
+                              const value = e.target.value.replace(/\D/g, '').slice(0, 10);
+                              setForm(prev => ({ ...prev, phone_number: value ? `+63${value}` : '' }));
+                              if (errors.phone_number) {
+                                setErrors(prev => ({ ...prev, phone_number: '' }));
+                              }
+                              if (validationMessage) {
+                                setValidationMessage(null);
+                              }
+                            }}
+                            maxLength={10}
+                            placeholder="9xxxxxxxxx"
+                            className={`flex-1 border-2 rounded-r-lg px-4 py-3 focus:ring-2 focus:ring-amber-200 transition-all outline-none ${errors.phone_number ? 'border-red-500 focus:border-red-500' : 'border-gray-200 focus:border-[#964B00]'
+                              }`}
+                            required
+                          />
+                        </div>
+                        <p className="text-xs text-gray-500 mt-1">Enter your 10-digit mobile number</p>
                         {errors.phone_number && (
                           <p className="text-red-500 text-xs mt-1">{errors.phone_number}</p>
                         )}
@@ -1808,7 +2108,7 @@ function Signup() {
                     type="submit"
                     className="w-full sm:w-auto bg-gradient-to-r from-[#964B00] to-amber-700 hover:from-amber-700 hover:to-[#964B00] text-yellow-400 font-bold px-12 py-4 rounded-xl shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-200"
                   >
-                    CREATE ACCOUNT
+                    SUBMIT
                   </button>
                 </div>
               </div>
@@ -1818,51 +2118,99 @@ function Signup() {
       </div>
 
       {/* FOOTER */}
-      <footer className="py-8 mt-16" style={{ backgroundColor: '#F9ECD9' }}>
-        <div className="max-w-5xl mx-auto px-4">
-          <div className="grid md:grid-cols-4 gap-8">
-            <div>
-              <h3 className="text-lg font-bold mb-4 text-gray-800">Angieren's Lutong Bahay</h3>
-              <p className="text-gray-600 text-sm">
-                Authentic Filipino home-cooked meals delivered to your doorstep.
+      <footer id="contact" className="bg-gradient-to-br from-amber-900 via-amber-950 to-black text-white py-12 sm:py-16">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8 lg:gap-12">
+            {/* Brand Column */}
+            <div className="sm:col-span-2 lg:col-span-1">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-12 h-12 bg-[url('/angierens-logo.png')] bg-cover bg-center rounded-full" />
+                <h3 className="text-xl font-bold">Angieren's</h3>
+              </div>
+              <p className="text-amber-200/80 text-sm leading-relaxed">
+                Authentic Filipino home-cooked meals delivered to your doorstep. Taste the tradition, feel the love.
               </p>
+              {/* Social Links */}
+              <div className="flex gap-3 mt-6">
+                <a href="#" className="w-10 h-10 bg-white/10 hover:bg-yellow-400 hover:text-amber-900 rounded-full flex items-center justify-center transition-all duration-300">
+                  <Facebook className="h-5 w-5" />
+                </a>
+                <a href="#" className="w-10 h-10 bg-white/10 hover:bg-yellow-400 hover:text-amber-900 rounded-full flex items-center justify-center transition-all duration-300">
+                  <Instagram className="h-5 w-5" />
+                </a>
+              </div>
             </div>
+
+            {/* Quick Links */}
             <div>
-              <h4 className="text-md font-semibold mb-3 text-gray-800">Quick Links</h4>
-              <ul className="space-y-2 text-sm">
-                <li><a href="#" className="text-gray-600 hover:text-gray-800">Home</a></li>
-                <li><a href="#" className="text-gray-600 hover:text-gray-800">Menu</a></li>
-                <li><a href="#" className="text-gray-600 hover:text-gray-800">About Us</a></li>
-                <li><a href="#" className="text-gray-600 hover:text-gray-800">Contact</a></li>
+              <h4 className="text-lg font-semibold mb-4 text-yellow-400">Quick Links</h4>
+              <ul className="space-y-3 text-sm">
+                <li><Link to="/" className="text-amber-200/80 hover:text-yellow-400 transition-colors flex items-center gap-2"><ArrowRight className="h-4 w-4" />Home</Link></li>
+                <li><Link to="/customer-interface" className="text-amber-200/80 hover:text-yellow-400 transition-colors flex items-center gap-2"><ArrowRight className="h-4 w-4" />Menu</Link></li>
+                <li><a href="#about" className="text-amber-200/80 hover:text-yellow-400 transition-colors flex items-center gap-2"><ArrowRight className="h-4 w-4" />About Us</a></li>
+                <li><a href="#contact" className="text-amber-200/80 hover:text-yellow-400 transition-colors flex items-center gap-2"><ArrowRight className="h-4 w-4" />Contact</a></li>
               </ul>
             </div>
+
+            {/* Support */}
             <div>
-              <h4 className="text-md font-semibold mb-3 text-gray-800">Support</h4>
-              <ul className="space-y-2 text-sm">
-                <li><a href="#" className="text-gray-600 hover:text-gray-800">FAQ</a></li>
-                <li><a href="#" className="text-gray-600 hover:text-gray-800">Help Center</a></li>
-                <li><a href="#" className="text-gray-600 hover:text-gray-800">Terms & Conditions</a></li>
-                <li><a href="#" className="text-gray-600 hover:text-gray-800">Privacy Policy</a></li>
+              <h4 className="text-lg font-semibold mb-4 text-yellow-400">Support</h4>
+              <ul className="space-y-3 text-sm">
+                <li><Link to="/" className="text-amber-200/80 hover:text-yellow-400 transition-colors flex items-center gap-2"><ArrowRight className="h-4 w-4" />FAQ</Link></li>
+                <li><Link to="/" className="text-amber-200/80 hover:text-yellow-400 transition-colors flex items-center gap-2"><ArrowRight className="h-4 w-4" />Help Center</Link></li>
+                <li><Link to="/" className="text-amber-200/80 hover:text-yellow-400 transition-colors flex items-center gap-2"><ArrowRight className="h-4 w-4" />Terms & Conditions</Link></li>
+                <li><Link to="/" className="text-amber-200/80 hover:text-yellow-400 transition-colors flex items-center gap-2"><ArrowRight className="h-4 w-4" />Privacy Policy</Link></li>
               </ul>
             </div>
+
+            {/* Contact Info */}
             <div>
-              <h4 className="text-md font-semibold mb-3 text-gray-800">Connect With Us</h4>
-              <div className="space-y-2 text-sm">
-                <p className="text-gray-600">Email: info@angierens.com</p>
-                <p className="text-gray-600">Phone: +63 912 345 6789</p>
-                <div className="flex space-x-4 mt-4">
-                  <a href="#" className="text-gray-600 hover:text-gray-800">Facebook</a>
-                  <a href="#" className="text-gray-600 hover:text-gray-800">Instagram</a>
+              <h4 className="text-lg font-semibold mb-4 text-yellow-400">Contact Us</h4>
+              <div className="space-y-4 text-sm">
+                <div className="flex items-start gap-3">
+                  <div className="w-8 h-8 bg-white/10 rounded-lg flex items-center justify-center flex-shrink-0">
+                    <Mail className="h-4 w-4 text-yellow-400" />
+                  </div>
+                  <div>
+                    <p className="text-amber-200/60 text-xs mb-1">Email</p>
+                    <p className="text-amber-100">info@angierens.com</p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-3">
+                  <div className="w-8 h-8 bg-white/10 rounded-lg flex items-center justify-center flex-shrink-0">
+                    <Phone className="h-4 w-4 text-yellow-400" />
+                  </div>
+                  <div>
+                    <p className="text-amber-200/60 text-xs mb-1">Phone</p>
+                    <p className="text-amber-100">+63 912 345 6789</p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-3">
+                  <div className="w-8 h-8 bg-white/10 rounded-lg flex items-center justify-center flex-shrink-0">
+                    <MapPin className="h-4 w-4 text-yellow-400" />
+                  </div>
+                  <div>
+                    <p className="text-amber-200/60 text-xs mb-1">Location</p>
+                    <p className="text-amber-100">Bulacan, Philippines</p>
+                  </div>
                 </div>
               </div>
             </div>
           </div>
-          <div className="border-t border-gray-400 mt-8 pt-4 text-center text-sm text-gray-600">
-            <p>&copy; 2024 Angieren's Lutong Bahay. All rights reserved.</p>
+
+          {/* Copyright */}
+          <div className="border-t border-white/10 mt-10 pt-8">
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+              <p className="text-amber-200/60 text-sm">
+                © 2024 Angieren's Lutong Bahay. All rights reserved.
+              </p>
+              <p className="text-amber-200/40 text-xs">
+                Made with 💛 in Bulacan, Philippines
+              </p>
+            </div>
           </div>
         </div>
       </footer>
-
       {showOtpModal && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl p-8 max-w-md w-full mx-4 shadow-2xl transform transition-all">

@@ -1,7 +1,7 @@
 import { createLazyFileRoute, Link } from '@tanstack/react-router'
-import React, { useState, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { useLocation } from '@tanstack/react-router'
-import { LayoutDashboard, ShoppingCart, TrendingUp, MessageSquare, Users, Menu as MenuIcon, RefreshCw, LogOut, Search, Filter, Eye, Bell, Plus, ChevronLeft, ChevronRight, Calendar, Clock, CreditCard, Truck, DollarSign, X, Heart, Star, LucideCalendar } from 'lucide-react'
+import { LayoutDashboard, ShoppingCart, TrendingUp, MessageSquare, Users, Menu as MenuIcon, RefreshCw, LogOut, Search, Filter, Eye, Bell, ChevronLeft, ChevronRight, Calendar, Clock, CreditCard, Truck, DollarSign, X, Heart, Star, LucideCalendar } from 'lucide-react'
 import { fetchOrders } from '@/lib/api'
 import type {
     Order
@@ -34,7 +34,7 @@ export const Route = createLazyFileRoute('/admin-interface/orders')({
 })
 
 function AdminOrdersInterface() {
-    const { user, signOut } = useUser()
+    const { signOut } = useUser()
     const navigate = useNavigate();
 
     async function handleLogout() {
@@ -56,6 +56,9 @@ function AdminOrdersInterface() {
     const [isOrderDetailsModalOpen, setIsOrderDetailsModalOpen] = useState(false)
     const [isSidebarOpen, setIsSidebarOpen] = useState(false)
     const [isNotificationOpen, setIsNotificationOpen] = useState(false)
+    const [showViewReceiptModal, setShowViewReceiptModal] = useState(false)
+    const [viewReceiptUrl, setViewReceiptUrl] = useState<string>('')
+    const [showRejectionDetailsModal, setShowRejectionDetailsModal] = useState(false)
     const orderPrice = selectedOrder?.order_item.reduce((sum, item) => {
         let itemTotal = Number(item.subtotal_price);
 
@@ -81,7 +84,7 @@ function AdminOrdersInterface() {
 
 
 
-    const { data: orders = [], isLoading, error, refetch } = useQuery({
+    const { data: orders = [], isLoading, error } = useQuery({
         queryKey: ['orders'],
         queryFn: fetchOrders,
         refetchInterval: 30000,
@@ -253,7 +256,6 @@ function AdminOrdersInterface() {
     const totalPages = Math.ceil(filteredOrders.length / 10)
     const startIndex = (currentPage - 1) * 10
     const endIndex = Math.min(startIndex + 10, filteredOrders.length)
-    const currentOrders = filteredOrders.slice(startIndex, endIndex)
 
 
     const LoadingSpinner = () => (
@@ -282,6 +284,16 @@ function AdminOrdersInterface() {
 
         const actionText = orderType === 'Pick-up' ? 'for pick-up on' : 'to be delivered on';
         return `${formattedTime} ${actionText} ${formattedDate}`;
+    }
+
+    const handleOpenViewReceipt = (receiptUrl: string) => {
+        setViewReceiptUrl(receiptUrl)
+        setShowViewReceiptModal(true)
+    }
+
+    const handleCloseViewReceipt = () => {
+        setShowViewReceiptModal(false)
+        setViewReceiptUrl('')
     }
 
     return (
@@ -720,14 +732,14 @@ function AdminOrdersInterface() {
 
                 {/* Order Details Modal */}
                 {isOrderDetailsModalOpen && selectedOrder && (
-                    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-                        <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto">
+                    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+                        <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
                             {/* Modal Header */}
                             <div className="flex items-center justify-between p-6 border-b border-gray-200">
                                 <div className="flex flex-col gap-2">
                                     <div className="flex items-center gap-4">
                                         <span className="text-gray-600 font-medium">FRONT</span>
-                                        <span className="text-xl font-bold text-gray-800">Order ID: {selectedOrder.order_number}</span>
+                                        <span className="text-xl font-bold text-gray-800">Order ID: {selectedOrder.order_id}</span>
                                         <span className="bg-black text-white px-4 py-1 rounded-full text-sm font-medium">
                                             {selectedOrder.order_status}
                                         </span>
@@ -758,7 +770,9 @@ function AdminOrdersInterface() {
                                 {/* Customer Info */}
                                 <div>
                                     <h3 className="text-2xl font-bold text-gray-800 mb-2">{selectedOrder.user.customer_name}</h3>
-                                    <p className="text-gray-600 text-lg">{formatScheduleTime(selectedOrder.schedule.schedule_date, selectedOrder.schedule.schedule_time, selectedOrder.order_type)}</p>
+                                    <p className="text-gray-600 text-lg">
+                                        {formatScheduleTime(selectedOrder.schedule.schedule_date, selectedOrder.schedule.schedule_time, selectedOrder.order_type)}
+                                    </p>
                                 </div>
 
                                 {/* Date and Time */}
@@ -776,20 +790,20 @@ function AdminOrdersInterface() {
                                     </div>
 
                                     <div className="space-y-3">
-                                        {selectedOrder?.order_item?.length ? (
+                                        {selectedOrder.order_item?.length ? (
                                             <>
-                                                {selectedOrder.order_item.map((item) => (
+                                                {selectedOrder.order_item.map((item: any) => (
                                                     <div key={item.order_item_id}>
                                                         {/* Main menu item */}
                                                         <div className="grid grid-cols-3 gap-4 items-start">
                                                             <div>
-                                                                <p className="font-medium text-gray-800">{item.menu.name} (₱ {item.menu.price})</p>
+                                                                <p className="font-medium text-gray-800">{item.menu.name}</p>
                                                                 {item.menu.inclusion && (
                                                                     <p className="text-sm text-gray-600 mb-1.5">inclusions: {item.menu.inclusion}</p>
                                                                 )}
                                                             </div>
                                                             <div className="text-center font-medium">{item.quantity}</div>
-                                                            <div className="text-right font-bold">₱ {Number(item.subtotal_price).toLocaleString()}</div>
+                                                            <div className="text-right font-bold">₱ {Number(item.subtotal_price).toFixed(2)}</div>
                                                         </div>
 
                                                         {/* Add-ons for this item */}
@@ -798,10 +812,10 @@ function AdminOrdersInterface() {
                                                                 {item.order_item_add_on.map((addon: any) => (
                                                                     <div key={addon.order_item_add_on_id} className="grid grid-cols-3 gap-4 items-start">
                                                                         <div>
-                                                                            <p className="text-sm text-gray-600">+ {addon.add_on.name} (₱ {addon.add_on.price})</p>
+                                                                            <p className="text-sm text-gray-600">+ {addon.add_on.name} (x{addon.quantity})</p>
                                                                         </div>
-                                                                        <div className="text-center text-sm text-gray-600">{addon.quantity}</div>
-                                                                        <div className="text-right text-sm font-semibold text-gray-600">₱ {Number(addon.subtotal_price).toLocaleString()}</div>
+                                                                        <div className="text-center text-sm text-gray-600"></div>
+                                                                        <div className="text-right text-sm font-semibold text-gray-600">₱ {Number(addon.subtotal_price).toFixed(2)}</div>
                                                                     </div>
                                                                 ))}
                                                             </div>
@@ -819,18 +833,20 @@ function AdminOrdersInterface() {
                                 <div className="border-t border-gray-200 pt-4 space-y-3">
                                     <div className="flex justify-between items-center">
                                         <span className="text-lg font-medium">Subtotal</span>
-                                        <span className="text-lg font-bold">₱ {orderPrice?.toLocaleString()}</span>
+                                        <span className="text-lg font-bold">₱ {orderPrice?.toFixed(2)}</span>
                                     </div>
                                     {selectedOrder.delivery && (
                                         <div className="flex justify-between items-center">
                                             <span className="text-lg font-medium">Delivery fee</span>
-                                            <span className="text-lg font-bold">₱ {Number(selectedOrder.delivery.delivery_fee).toFixed(2)}</span>
+                                            <span className="text-lg font-bold">
+                                                ₱ {Number(selectedOrder.delivery.delivery_fee || 0).toFixed(2)}
+                                            </span>
                                         </div>
                                     )}
                                     <div className="flex justify-between items-center border-t-2 border-gray-300 pt-3">
                                         <span className="text-xl font-bold">Total</span>
                                         <span className="text-2xl font-bold text-amber-600">
-                                            ₱ {(orderPrice + (selectedOrder.delivery ? Number(selectedOrder.delivery.delivery_fee || 0) : 0)).toFixed(2).toLocaleString()}
+                                            ₱ {(orderPrice + (selectedOrder.delivery ? Number(selectedOrder.delivery.delivery_fee || 0) : 0)).toFixed(2)}
                                         </span>
                                     </div>
                                 </div>
@@ -841,23 +857,68 @@ function AdminOrdersInterface() {
                                         <CreditCard className="h-5 w-5 text-gray-600" />
                                         <span className="font-medium text-gray-700">Payment Method</span>
                                     </div>
-                                    <p className="text-lg font-semibold text-gray-800">
-                                        {selectedOrder.payment.paymentMethod || 'On-Site Payment'}
+
+                                    <p className="text-lg font-semibold text-gray-800 mb-3">
+                                        {selectedOrder.payment.paymentMethod}
                                     </p>
+
+                                    {selectedOrder.payment.proof_of_payment_url && (
+                                        <button
+                                            onClick={(e) => {
+                                                e.preventDefault();
+                                                e.stopPropagation();
+                                                if (selectedOrder.payment.proof_of_payment_url) {
+                                                    handleOpenViewReceipt(selectedOrder.payment.proof_of_payment_url);
+                                                }
+                                            }}
+                                            className="px-3 sm:px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 text-sm sm:text-base whitespace-nowrap"
+                                        >
+                                            View Receipt
+                                        </button>
+                                    )}
                                 </div>
+
+
+                                {/* Additional Information */}
+                                {selectedOrder.additional_information && (
+                                    <div className="bg-blue-50 p-4 rounded-lg">
+                                        <h4 className="font-medium text-gray-700 mb-2">Additional Information</h4>
+                                        <p className="text-gray-800">{selectedOrder.additional_information}</p>
+                                    </div>
+                                )}
                             </div>
 
                             {/* Modal Footer */}
-                            <div className="flex items-center justify-between p-6 border-t border-gray-200 bg-gray-50">
-                                <button
-                                    onClick={() => {
-                                        setIsOrderDetailsModalOpen(false)
-                                        setShowOrderBackView(true)
-                                    }}
-                                    className="px-6 py-3 border-2 border-gray-800 text-gray-800 rounded-lg font-medium hover:bg-gray-100 transition-colors"
-                                >
-                                    See more
-                                </button>
+                            <div className="p-6 border-t border-gray-200 bg-gray-50">
+                                <div className="flex items-center justify-between gap-3">
+                                    <button
+                                        onClick={() => {
+                                            setIsOrderDetailsModalOpen(false)
+                                            setShowOrderBackView(true)
+                                        }}
+                                        className="px-6 py-3 border-2 border-gray-800 text-gray-800 rounded-lg font-medium hover:bg-gray-100 transition-colors"
+                                    >
+                                        See more
+                                    </button>
+                                    <div className="flex items-center gap-3">
+                                        {selectedOrder.order_status === 'Rejected' && (
+                                            <button
+                                                onClick={() => {
+                                                    setShowRejectionDetailsModal(true)
+                                                }}
+                                                className="px-6 py-3 bg-red-500 text-white rounded-lg font-medium hover:bg-red-600 transition-colors"
+                                            >
+                                                View Rejection Details
+                                            </button>
+                                        )}
+                                        <button
+                                            onClick={closeOrderDetails}
+                                            className="px-6 py-3 bg-gray-800 text-white rounded-lg font-medium hover:bg-gray-700 transition-colors"
+                                        >
+                                            Close
+                                        </button>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -940,6 +1001,102 @@ function AdminOrdersInterface() {
 
                 {/* Loading Spinner */}
                 {isLoading && <LoadingSpinner />}
+
+                {/* View Receipt Modal */}
+                {showViewReceiptModal && (
+                    <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
+                        <div className="bg-white rounded-xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-hidden">
+                            <div className="p-4 border-b border-gray-200 flex items-center justify-between">
+                                <h2 className="text-xl font-bold text-black">Payment Receipt</h2>
+                                <button
+                                    onClick={handleCloseViewReceipt}
+                                    className="text-gray-500 hover:text-gray-700 text-2xl font-bold"
+                                >
+                                    ×
+                                </button>
+                            </div>
+
+                            <div className="p-4 overflow-auto max-h-[calc(90vh-120px)]">
+                                <img
+                                    src={viewReceiptUrl}
+                                    alt="Payment Receipt"
+                                    className="w-full h-auto rounded-lg"
+                                />
+                            </div>
+
+                            <div className="p-4 border-t border-gray-200 flex justify-end">
+                                <button
+                                    onClick={handleCloseViewReceipt}
+                                    className="bg-gray-300 hover:bg-gray-400 text-gray-800 font-medium py-2 px-6 rounded-lg transition-colors"
+                                >
+                                    Close
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* Rejection Details Modal */}
+                {showRejectionDetailsModal && selectedOrder && (
+                    <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
+                        <div className="bg-white rounded-xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-hidden">
+                            <div className="p-4 border-b border-red-400 bg-red-50 flex items-center justify-between">
+                                <h2 className="text-xl font-bold text-red-800">Order Rejected - #{selectedOrder.order_number}</h2>
+                                <button
+                                    onClick={() => setShowRejectionDetailsModal(false)}
+                                    className="text-gray-500 hover:text-gray-700 text-2xl font-bold"
+                                >
+                                    ×
+                                </button>
+                            </div>
+
+                            <div className="p-6 overflow-auto max-h-[calc(90vh-180px)]">
+                                {/* Rejection Reason Section */}
+                                <div className="mb-6">
+                                    <h3 className="font-semibold text-gray-800 mb-2">Rejection Reason</h3>
+                                    <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                                        <p className="text-gray-700 whitespace-pre-wrap">
+                                            {selectedOrder.rejection_reason || 'No reason provided'}
+                                        </p>
+                                    </div>
+                                </div>
+
+                                {/* Return Payment Proof Image */}
+                                <div>
+                                    <h3 className="font-semibold text-gray-800 mb-2">Proof of Payment Return</h3>
+                                    {selectedOrder.payment.return_payment_proof_url ? (
+                                        <div className="border border-gray-200 rounded-lg overflow-hidden">
+                                            <img
+                                                src={selectedOrder.payment.return_payment_proof_url}
+                                                alt="Proof of Payment Return"
+                                                className="w-full h-auto cursor-pointer hover:opacity-90 transition-opacity"
+                                                onClick={() => window.open(selectedOrder.payment.return_payment_proof_url!, '_blank')}
+                                                onError={(e) => {
+                                                    console.error('Failed to load image:', selectedOrder.payment.return_payment_proof_url)
+                                                    e.currentTarget.style.display = 'none'
+                                                }}
+                                            />
+                                            <p className="text-xs text-gray-500 text-center py-2 bg-gray-50">Click image to view full size</p>
+                                        </div>
+                                    ) : (
+                                        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                                            <p className="text-yellow-800">No proof of payment return image available</p>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+
+                            <div className="p-4 border-t border-gray-200 flex justify-end">
+                                <button
+                                    onClick={() => setShowRejectionDetailsModal(false)}
+                                    className="bg-gray-300 hover:bg-gray-400 text-gray-800 font-medium py-2 px-6 rounded-lg transition-colors"
+                                >
+                                    Close
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
             </div>
         </ProtectedRoute>
     )

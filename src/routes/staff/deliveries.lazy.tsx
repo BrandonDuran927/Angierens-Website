@@ -391,8 +391,36 @@ function RouteComponent() {
             return
         }
 
+        // Check if order status allows rider removal
+        // Only allow removal before delivery starts (before "On Delivery" or "Claim Order")
+        const allowedStatuses = ['Pending', 'Queueing', 'Preparing', 'Cooking', 'Ready']
+        
+        if (!allowedStatuses.includes(selectedOrder.status)) {
+            alert(`Cannot remove rider. Order status is "${selectedOrder.status}". Riders can only be removed from orders with status: Pending, Queueing, Preparing, Cooking, or Ready.`)
+            setIsRemoveRiderModalOpen(false)
+            return
+        }
+
         try {
             setIsRemovingRider(true)
+
+            // Verify current status from database before proceeding
+            const { data: orderData, error: verifyError } = await supabase
+                .from('order')
+                .select('order_status')
+                .eq('order_id', selectedOrder.orderId)
+                .single()
+
+            if (verifyError) throw verifyError
+
+            // Double-check status hasn't changed - only proceed if status is still allowed
+            if (!allowedStatuses.includes(orderData.order_status)) {
+                alert(`Cannot remove rider. Order status has changed to "${orderData.order_status}".`)
+                await fetchDeliveryOrders() // Refresh to show current status
+                setIsRemoveRiderModalOpen(false)
+                setIsOrderDetailsModalOpen(false)
+                return
+            }
 
             // Update the delivery record to set rider_id to null
             const { error: updateError } = await supabase
@@ -1199,7 +1227,8 @@ function RouteComponent() {
                                             See more
                                         </button>
                                         <div className="flex items-center gap-3">
-                                            {selectedOrder.assignedRider && (
+                                            {selectedOrder.assignedRider && 
+                                             ['Pending', 'Queueing', 'Preparing', 'Cooking', 'Ready'].includes(selectedOrder.status) && (
                                                 <button
                                                     onClick={() => setIsRemoveRiderModalOpen(true)}
                                                     className="px-6 py-3 bg-red-500 text-white rounded-lg font-medium hover:bg-red-600 transition-colors"

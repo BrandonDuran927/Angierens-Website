@@ -312,45 +312,49 @@ function RouteComponent() {
 
     const fetchBestAndLeastSales = async () => {
         try {
-            const { data: orderItems, error } = await supabase
+            // First, get ALL menu items
+            const { data: allMenuItems, error: menuError } = await supabase
+                .from('menu')
+                .select('menu_id, name, image_url')
+
+            if (menuError) throw menuError
+
+            // Then get order items for completed orders
+            const { data: orderItems, error: orderError } = await supabase
                 .from('order_item')
                 .select(`
                     quantity,
                     menu_id,
-                    menu (
-                        name,
-                        image_url
-                    ),
                     order!inner (
                         order_status
                     )
                 `)
                 .in('order.order_status', ['Completed'])
 
-            if (error) throw error
+            if (orderError) throw orderError
 
-            // Group by menu item
+            // Initialize all menu items with 0 count
             const itemCounts: { [key: string]: { name: string; count: number; menu_id: string; image_url: string } } = {}
 
-            orderItems?.forEach(item => {
-                const menuId = item.menu_id
-                const menuData = item.menu as any
-
-                if (!itemCounts[menuId]) {
-                    itemCounts[menuId] = {
-                        name: menuData?.name || 'Unknown',
-                        count: 0,
-                        menu_id: menuId,
-                        image_url: menuData?.image_url || ''
-                    }
+            allMenuItems?.forEach(menuItem => {
+                itemCounts[menuItem.menu_id] = {
+                    name: menuItem.name,
+                    count: 0,
+                    menu_id: menuItem.menu_id,
+                    image_url: menuItem.image_url || ''
                 }
-                itemCounts[menuId].count += item.quantity
             })
 
-            // Sort and format
-            const sortedItems = Object.values(itemCounts).sort((a, b) => b.count - a.count)
+            // Add order counts to menu items that have orders
+            orderItems?.forEach(item => {
+                if (itemCounts[item.menu_id]) {
+                    itemCounts[item.menu_id].count += item.quantity
+                }
+            })
 
-            const best = sortedItems.slice(0, 10).map((item, index) => ({
+            // Sort and format for BEST sales (highest orders)
+            const sortedBest = Object.values(itemCounts).sort((a, b) => b.count - a.count)
+            const best = sortedBest.slice(0, 10).map((item, index) => ({
                 rank: index + 1,
                 name: item.name,
                 orders: item.count,
@@ -358,7 +362,9 @@ function RouteComponent() {
                 image_url: item.image_url
             }))
 
-            const least = sortedItems.slice(-10).reverse().map((item, index) => ({
+            // Sort and format for LEAST sales (lowest orders, including 0)
+            const sortedLeast = Object.values(itemCounts).sort((a, b) => a.count - b.count)
+            const least = sortedLeast.slice(0, 10).map((item, index) => ({
                 rank: index + 1,
                 name: item.name,
                 orders: item.count,

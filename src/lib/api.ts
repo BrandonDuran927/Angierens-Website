@@ -2,11 +2,24 @@ import { supabase } from '@/lib/supabaseClient'
 
 export interface Order {
   order_id: string
-  order_status: 'New Orders' | 'In Process' | 'Completed'
+  order_status:
+    | 'Pending'
+    | 'Queueing'
+    | 'Preparing'
+    | 'Cooking'
+    | 'Ready'
+    | 'On Delivery'
+    | 'Claim Order'
+    | 'Completed'
+    | 'Refunding'
+    | 'Refund'
+    | 'Cancelled'
+    | 'Rejected'
   order_type: 'Delivery' | 'Pick-up'
   total_price: string
   failed_delivery_reason: string | null
   additional_information: string | null
+  rejection_reason: string | null
   user: User
   schedule: Schedule
   order_number: string
@@ -14,6 +27,7 @@ export interface Order {
   date: string
   time: string
   payment: Payment
+  payment_id: string | null
   delivery: Delivery
   order_item: OrderItem[]
   status_updated_at: string | null
@@ -37,6 +51,7 @@ export interface Payment {
   paymentMethod: string | null
   payment_date: string
   proof_of_payment_url: string | null
+  return_payment_proof_url: string | null
 }
 
 export interface Address {
@@ -120,10 +135,12 @@ export async function fetchOrders(): Promise<Order[]> {
     total_price,
     failed_delivery_reason,
     additional_information,
+    rejection_reason,
     order_number,
     order_cooked,
     created_at,
     status_updated_at,
+    payment_id,
 
     users!customer_uid (
       user_uid,
@@ -143,7 +160,8 @@ export async function fetchOrders(): Promise<Order[]> {
       payment_id,
       payment_method,
       payment_date,
-      proof_of_payment_url
+      proof_of_payment_url,
+      return_payment_proof_url
     ),
 
     delivery:delivery_id (
@@ -236,7 +254,11 @@ export async function fetchOrders(): Promise<Order[]> {
         paymentMethod: paymentObj?.payment_method ?? null,
         payment_date: paymentObj?.payment_date ?? '',
         proof_of_payment_url: paymentObj?.proof_of_payment_url ?? null,
+        return_payment_proof_url: paymentObj?.return_payment_proof_url ?? null,
       },
+
+      rejection_reason: order.rejection_reason ?? null,
+      payment_id: order.payment_id ?? null,
 
       delivery: {
         delivery_id: deliveryObj?.delivery_id ?? '',
