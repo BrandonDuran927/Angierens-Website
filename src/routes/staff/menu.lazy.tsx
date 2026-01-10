@@ -25,7 +25,8 @@ import {
     DollarSign,
     Edit,
     Trash2,
-    Plus
+    Plus,
+    ChefHat
 } from 'lucide-react'
 import { useEffect } from 'react'
 import { supabase } from '@/lib/supabaseClient'
@@ -93,6 +94,12 @@ function RouteComponent() {
             route: '/staff/deliveries',
             icon: <Truck className="h-5 w-5" />,
             active: location.pathname === '/staff/deliveries'
+        },
+        {
+            name: 'Kitchen Display',
+            route: '/staff/kitchen-display',
+            icon: <ChefHat className="h-5 w-5" />,
+            active: location.pathname === '/staff/kitchen-display'
         },
         {
             name: 'Schedule',

@@ -32,6 +32,9 @@ const StaffReviewsLazyRouteImport = createFileRoute('/staff/reviews')()
 const StaffRefundLazyRouteImport = createFileRoute('/staff/refund')()
 const StaffMyInfoLazyRouteImport = createFileRoute('/staff/my-info')()
 const StaffMenuLazyRouteImport = createFileRoute('/staff/menu')()
+const StaffKitchenDisplayLazyRouteImport = createFileRoute(
+  '/staff/kitchen-display',
+)()
 const StaffDeliveriesLazyRouteImport = createFileRoute('/staff/deliveries')()
 const CustomerInterfaceOrderLazyRouteImport = createFileRoute(
   '/customer-interface/order',
@@ -166,6 +169,13 @@ const StaffMenuLazyRoute = StaffMenuLazyRouteImport.update({
   path: '/staff/menu',
   getParentRoute: () => rootRouteImport,
 } as any).lazy(() => import('./routes/staff/menu.lazy').then((d) => d.Route))
+const StaffKitchenDisplayLazyRoute = StaffKitchenDisplayLazyRouteImport.update({
+  id: '/staff/kitchen-display',
+  path: '/staff/kitchen-display',
+  getParentRoute: () => rootRouteImport,
+} as any).lazy(() =>
+  import('./routes/staff/kitchen-display.lazy').then((d) => d.Route),
+)
 const StaffDeliveriesLazyRoute = StaffDeliveriesLazyRouteImport.update({
   id: '/staff/deliveries',
   path: '/staff/deliveries',
@@ -338,6 +348,7 @@ export interface FileRoutesByFullPath {
   '/customer-interface/my-info': typeof CustomerInterfaceMyInfoLazyRoute
   '/customer-interface/order': typeof CustomerInterfaceOrderLazyRoute
   '/staff/deliveries': typeof StaffDeliveriesLazyRoute
+  '/staff/kitchen-display': typeof StaffKitchenDisplayLazyRoute
   '/staff/menu': typeof StaffMenuLazyRoute
   '/staff/my-info': typeof StaffMyInfoLazyRoute
   '/staff/refund': typeof StaffRefundLazyRoute
@@ -374,6 +385,7 @@ export interface FileRoutesByTo {
   '/customer-interface/my-info': typeof CustomerInterfaceMyInfoLazyRoute
   '/customer-interface/order': typeof CustomerInterfaceOrderLazyRoute
   '/staff/deliveries': typeof StaffDeliveriesLazyRoute
+  '/staff/kitchen-display': typeof StaffKitchenDisplayLazyRoute
   '/staff/menu': typeof StaffMenuLazyRoute
   '/staff/my-info': typeof StaffMyInfoLazyRoute
   '/staff/refund': typeof StaffRefundLazyRoute
@@ -411,6 +423,7 @@ export interface FileRoutesById {
   '/customer-interface/my-info': typeof CustomerInterfaceMyInfoLazyRoute
   '/customer-interface/order': typeof CustomerInterfaceOrderLazyRoute
   '/staff/deliveries': typeof StaffDeliveriesLazyRoute
+  '/staff/kitchen-display': typeof StaffKitchenDisplayLazyRoute
   '/staff/menu': typeof StaffMenuLazyRoute
   '/staff/my-info': typeof StaffMyInfoLazyRoute
   '/staff/refund': typeof StaffRefundLazyRoute
@@ -449,6 +462,7 @@ export interface FileRouteTypes {
     | '/customer-interface/my-info'
     | '/customer-interface/order'
     | '/staff/deliveries'
+    | '/staff/kitchen-display'
     | '/staff/menu'
     | '/staff/my-info'
     | '/staff/refund'
@@ -485,6 +499,7 @@ export interface FileRouteTypes {
     | '/customer-interface/my-info'
     | '/customer-interface/order'
     | '/staff/deliveries'
+    | '/staff/kitchen-display'
     | '/staff/menu'
     | '/staff/my-info'
     | '/staff/refund'
@@ -521,6 +536,7 @@ export interface FileRouteTypes {
     | '/customer-interface/my-info'
     | '/customer-interface/order'
     | '/staff/deliveries'
+    | '/staff/kitchen-display'
     | '/staff/menu'
     | '/staff/my-info'
     | '/staff/refund'
@@ -558,6 +574,7 @@ export interface RootRouteChildren {
   CustomerInterfaceMyInfoLazyRoute: typeof CustomerInterfaceMyInfoLazyRoute
   CustomerInterfaceOrderLazyRoute: typeof CustomerInterfaceOrderLazyRoute
   StaffDeliveriesLazyRoute: typeof StaffDeliveriesLazyRoute
+  StaffKitchenDisplayLazyRoute: typeof StaffKitchenDisplayLazyRoute
   StaffMenuLazyRoute: typeof StaffMenuLazyRoute
   StaffMyInfoLazyRoute: typeof StaffMyInfoLazyRoute
   StaffRefundLazyRoute: typeof StaffRefundLazyRoute
@@ -680,6 +697,13 @@ declare module '@tanstack/react-router' {
       path: '/staff/menu'
       fullPath: '/staff/menu'
       preLoaderRoute: typeof StaffMenuLazyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/staff/kitchen-display': {
+      id: '/staff/kitchen-display'
+      path: '/staff/kitchen-display'
+      fullPath: '/staff/kitchen-display'
+      preLoaderRoute: typeof StaffKitchenDisplayLazyRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/staff/deliveries': {
@@ -838,6 +862,7 @@ const rootRouteChildren: RootRouteChildren = {
   CustomerInterfaceMyInfoLazyRoute: CustomerInterfaceMyInfoLazyRoute,
   CustomerInterfaceOrderLazyRoute: CustomerInterfaceOrderLazyRoute,
   StaffDeliveriesLazyRoute: StaffDeliveriesLazyRoute,
+  StaffKitchenDisplayLazyRoute: StaffKitchenDisplayLazyRoute,
   StaffMenuLazyRoute: StaffMenuLazyRoute,
   StaffMyInfoLazyRoute: StaffMyInfoLazyRoute,
   StaffRefundLazyRoute: StaffRefundLazyRoute,

@@ -1,6 +1,6 @@
 import { createLazyFileRoute, useLocation, Link } from '@tanstack/react-router'
 import React, { useState, useEffect } from 'react'
-import { MessageSquare, Menu as MenuIcon, X, Bell, Star, Heart, Search, Filter, Menu, Calendar, Settings, User, DollarSign, Package, Truck, LogOut } from 'lucide-react'
+import { MessageSquare, Menu as MenuIcon, X, Bell, Star, Heart, Search, Filter, Menu, Calendar, Settings, User, DollarSign, Package, Truck, LogOut, ChefHat } from 'lucide-react'
 import { supabase } from '@/lib/supabaseClient'
 import { useNavigate } from '@tanstack/react-router'
 import { useUser } from '@/context/UserContext'
@@ -103,6 +103,12 @@ function RouteComponent() {
             route: '/staff/deliveries',
             icon: <Truck className="h-5 w-5" />,
             active: location.pathname === '/staff/deliveries'
+        },
+        {
+            name: 'Kitchen Display',
+            route: '/staff/kitchen-display',
+            icon: <ChefHat className="h-5 w-5" />,
+            active: location.pathname === '/staff/kitchen-display'
         },
         {
             name: 'Schedule',

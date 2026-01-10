@@ -9,7 +9,8 @@ import {
   Package,
   Truck,
   LogOut,
-  Star
+  Star,
+  ChefHat
 } from 'lucide-react'
 import { supabase } from '@/lib/supabaseClient'
 import { useNavigate } from '@tanstack/react-router'
@@ -398,6 +399,12 @@ function RouteComponent() {
       route: '/staff/deliveries',
       icon: <Truck className="h-5 w-5" />,
       active: location.pathname === '/staff/deliveries'
+    },
+    {
+      name: 'Kitchen Display',
+      route: '/staff/kitchen-display',
+      icon: <ChefHat className="h-5 w-5" />,
+      active: location.pathname === '/staff/kitchen-display'
     },
     {
       name: 'Schedule',

@@ -8,7 +8,8 @@ import {
     DollarSign,
     Package,
     LogOut,
-    Upload
+    Upload,
+    ChefHat
 } from 'lucide-react'
 import { useUser } from '@/context/UserContext'
 import { fetchOrders } from '@/lib/api'
@@ -601,6 +602,12 @@ function RouteComponent() {
             route: '/staff/deliveries',
             icon: <Truck className="h-5 w-5" />,
             active: location.pathname === '/staff/deliveries'
+        },
+        {
+            name: 'Kitchen Display',
+            route: '/staff/kitchen-display',
+            icon: <ChefHat className="h-5 w-5" />,
+            active: location.pathname === '/staff/kitchen-display'
         },
         {
             name: 'Schedule',

@@ -19,7 +19,8 @@ import {
     Package,
     Truck,
     LogOut,
-    Star
+    Star,
+    ChefHat
 } from 'lucide-react'
 import { supabase } from '@/lib/supabaseClient'
 import { useUser } from '@/context/UserContext'
@@ -394,7 +395,7 @@ function RouteComponent() {
         // Check if order status allows rider removal
         // Only allow removal before delivery starts (before "On Delivery" or "Claim Order")
         const allowedStatuses = ['Pending', 'Queueing', 'Preparing', 'Cooking', 'Ready']
-        
+
         if (!allowedStatuses.includes(selectedOrder.status)) {
             alert(`Cannot remove rider. Order status is "${selectedOrder.status}". Riders can only be removed from orders with status: Pending, Queueing, Preparing, Cooking, or Ready.`)
             setIsRemoveRiderModalOpen(false)
@@ -545,6 +546,12 @@ function RouteComponent() {
             route: '/staff/deliveries',
             icon: <Truck className="h-5 w-5" />,
             active: location.pathname === '/staff/deliveries'
+        },
+        {
+            name: 'Kitchen Display',
+            route: '/staff/kitchen-display',
+            icon: <ChefHat className="h-5 w-5" />,
+            active: location.pathname === '/staff/kitchen-display'
         },
         {
             name: 'Schedule',
@@ -1227,15 +1234,15 @@ function RouteComponent() {
                                             See more
                                         </button>
                                         <div className="flex items-center gap-3">
-                                            {selectedOrder.assignedRider && 
-                                             ['Pending', 'Queueing', 'Preparing', 'Cooking', 'Ready'].includes(selectedOrder.status) && (
-                                                <button
-                                                    onClick={() => setIsRemoveRiderModalOpen(true)}
-                                                    className="px-6 py-3 bg-red-500 text-white rounded-lg font-medium hover:bg-red-600 transition-colors"
-                                                >
-                                                    Remove Rider
-                                                </button>
-                                            )}
+                                            {selectedOrder.assignedRider &&
+                                                ['Pending', 'Queueing', 'Preparing', 'Cooking', 'Ready'].includes(selectedOrder.status) && (
+                                                    <button
+                                                        onClick={() => setIsRemoveRiderModalOpen(true)}
+                                                        className="px-6 py-3 bg-red-500 text-white rounded-lg font-medium hover:bg-red-600 transition-colors"
+                                                    >
+                                                        Remove Rider
+                                                    </button>
+                                                )}
                                             {selectedOrder.cancellationRequest === 'Pending' && selectedOrder.cancellationDetails && (
                                                 <button
                                                     onClick={() => handleCancellationRequest(selectedOrder)}
