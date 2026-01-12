@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabaseClient'
 import { useNavigate } from '@tanstack/react-router'
 import { useUser } from '@/context/UserContext'
 import { ProtectedRoute } from '@/components/ProtectedRoute'
+import { AlertModal, type AlertType } from '@/components/AlertModal'
 
 export const Route = createLazyFileRoute('/staff/refund')({
     component: RouteComponent,
@@ -72,6 +73,22 @@ function RouteComponent() {
     const [refundResponse, setRefundResponse] = useState('')
     const [proofOfRefundFile, setProofOfRefundFile] = useState<File | null>(null)
     const [proofOfRefundPreview, setProofOfRefundPreview] = useState<string | null>(null)
+
+    // Alert Modal State
+    const [alertModal, setAlertModal] = useState<{
+        isOpen: boolean
+        title?: string
+        message: string
+        type: AlertType
+    }>({ isOpen: false, message: '', type: 'info' })
+
+    const showAlert = (message: string, type: AlertType = 'info', title?: string) => {
+        setAlertModal({ isOpen: true, message, type, title })
+    }
+
+    const closeAlert = () => {
+        setAlertModal(prev => ({ ...prev, isOpen: false }))
+    }
 
     const getCurrentDate = () => {
         const now = new Date()
@@ -400,14 +417,15 @@ function RouteComponent() {
             }
 
             // 4. Notify user
-            alert(
+            showAlert(
                 newStatus === 'Approved'
                     ? 'Refund approved and order status updated to Refund.'
-                    : 'Refund request rejected successfully.'
+                    : 'Refund request rejected successfully.',
+                'success'
             );
         } catch (error) {
             console.error('Error updating refund status:', error);
-            alert('Failed to update refund status. Please try again.');
+            showAlert('Failed to update refund status. Please try again.', 'error');
         } finally {
             setIsProcessing(false);
         }
@@ -435,12 +453,12 @@ function RouteComponent() {
         const file = event.target.files?.[0];
         if (file) {
             if (!file.type.startsWith('image/')) {
-                alert('Please select an image file');
+                showAlert('Please select an image file', 'warning');
                 return;
             }
 
             if (file.size > 5 * 1024 * 1024) {
-                alert('File size must be less than 5MB');
+                showAlert('File size must be less than 5MB', 'warning');
                 return;
             }
 
@@ -458,12 +476,12 @@ function RouteComponent() {
         if (!selectedRefund) return;
 
         if (!refundResponse.trim()) {
-            alert('Please provide a response message');
+            showAlert('Please provide a response message', 'warning');
             return;
         }
 
         if (!proofOfRefundFile) {
-            alert('Please upload proof of refund image');
+            showAlert('Please upload proof of refund image', 'warning');
             return;
         }
 
@@ -496,7 +514,7 @@ function RouteComponent() {
             setProofOfRefundPreview(null);
         } catch (error) {
             console.error('Error approving refund:', error);
-            alert('Failed to approve refund. Please try again.');
+            showAlert('Failed to approve refund. Please try again.', 'error');
         } finally {
             setIsProcessing(false);
         }
@@ -506,7 +524,7 @@ function RouteComponent() {
         if (!selectedRefund) return;
 
         if (!refundResponse.trim()) {
-            alert('Please provide a reason for rejection');
+            showAlert('Please provide a reason for rejection', 'warning');
             return;
         }
 
@@ -1183,6 +1201,15 @@ function RouteComponent() {
                         </div>
                     </div>
                 )}
+
+                {/* Alert Modal */}
+                <AlertModal
+                    isOpen={alertModal.isOpen}
+                    onClose={closeAlert}
+                    title={alertModal.title}
+                    message={alertModal.message}
+                    type={alertModal.type}
+                />
             </div>
         </ProtectedRoute>
     )

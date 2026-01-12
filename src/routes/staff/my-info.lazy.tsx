@@ -16,6 +16,7 @@ import { supabase } from '@/lib/supabaseClient'
 import { useNavigate } from '@tanstack/react-router'
 import { useUser } from '@/context/UserContext'
 import { ProtectedRoute } from '@/components/ProtectedRoute'
+import { AlertModal, type AlertType } from '@/components/AlertModal'
 
 
 export const Route = createLazyFileRoute('/staff/my-info')({
@@ -78,6 +79,22 @@ function RouteComponent() {
     lastName: ''
   })
 
+  // Alert Modal State
+  const [alertModal, setAlertModal] = useState<{
+    isOpen: boolean
+    title?: string
+    message: string
+    type: AlertType
+  }>({ isOpen: false, message: '', type: 'info' })
+
+  const showAlert = (message: string, type: AlertType = 'info', title?: string) => {
+    setAlertModal({ isOpen: true, message, type, title })
+  }
+
+  const closeAlert = () => {
+    setAlertModal(prev => ({ ...prev, isOpen: false }))
+  }
+
   useEffect(() => {
     fetchCurrentUser()
   }, [])
@@ -91,7 +108,7 @@ function RouteComponent() {
 
       if (authError || !user) {
         console.error('Error getting authenticated user:', authError)
-        alert('Please log in to view your information')
+        showAlert('Please log in to view your information', 'warning')
         navigate({ to: '/login' })
         return
       }
@@ -107,7 +124,7 @@ function RouteComponent() {
 
       if (userError) {
         console.error('Error fetching user data:', userError)
-        alert('Failed to load user information')
+        showAlert('Failed to load user information', 'error')
         return
       }
 
@@ -134,7 +151,7 @@ function RouteComponent() {
       }
     } catch (error) {
       console.error('Error in fetchCurrentUser:', error)
-      alert('An error occurred while loading your information')
+      showAlert('An error occurred while loading your information', 'error')
     } finally {
       setLoading(false)
     }
@@ -183,7 +200,7 @@ function RouteComponent() {
 
   const verifyPassword = async () => {
     if (currentPassword.trim() === '') {
-      alert('Please enter your current password!')
+      showAlert('Please enter your current password!', 'warning')
       return
     }
 
@@ -191,7 +208,7 @@ function RouteComponent() {
       const { data: { user }, error: authError } = await supabase.auth.getUser()
 
       if (authError || !user) {
-        alert('Session expired. Please log in again.')
+        showAlert('Session expired. Please log in again.', 'warning')
         return
       }
 
@@ -201,7 +218,7 @@ function RouteComponent() {
       })
 
       if (error) {
-        alert('Incorrect password!')
+        showAlert('Incorrect password!', 'error')
         return
       }
 
@@ -221,7 +238,7 @@ function RouteComponent() {
       setCurrentPassword('')
     } catch (error) {
       console.error('Error verifying password:', error)
-      alert('An error occurred while verifying your password')
+      showAlert('An error occurred while verifying your password', 'error')
     }
   }
 
@@ -233,14 +250,14 @@ function RouteComponent() {
 
   const saveField = async (field: string) => {
     if (!currentUserId) {
-      alert('User not authenticated')
+      showAlert('User not authenticated', 'error')
       return
     }
 
     if (field === 'phoneNumber') {  // Only phoneNumber now
       // Basic validation
       if (editableData.phoneNumber.trim().length === 0) {
-        alert('Please enter a phone number!')
+        showAlert('Please enter a phone number!', 'warning')
         return
       }
 
@@ -255,7 +272,7 @@ function RouteComponent() {
 
         if (updateError) {
           console.error('Error updating user data:', updateError)
-          alert('Failed to update. Please try again.')
+          showAlert('Failed to update. Please try again.', 'error')
           return
         }
 
@@ -270,10 +287,10 @@ function RouteComponent() {
           phoneNumber: false
         }))
 
-        alert('Phone number updated successfully!')
+        showAlert('Phone number updated successfully!', 'success')
       } catch (error) {
         console.error('Error saving field:', error)
-        alert('An error occurred while saving your changes')
+        showAlert('An error occurred while saving your changes', 'error')
       } finally {
         setLoading(false)
       }
@@ -282,15 +299,15 @@ function RouteComponent() {
 
   const handleChangePassword = async () => {
     if (editableData.newPassword !== editableData.retypePassword) {
-      alert('Passwords do not match!')
+      showAlert('Passwords do not match!', 'warning')
       return
     }
     if (editableData.newPassword.length === 0) {
-      alert('Please enter a new password!')
+      showAlert('Please enter a new password!', 'warning')
       return
     }
     if (editableData.newPassword.length < 6) {
-      alert('Password must be at least 6 characters long!')
+      showAlert('Password must be at least 6 characters long!', 'warning')
       return
     }
 
@@ -303,7 +320,7 @@ function RouteComponent() {
 
       if (error) {
         console.error('Error updating password:', error)
-        alert('Failed to update password. Please try again.')
+        showAlert('Failed to update password. Please try again.', 'error')
         return
       }
 
@@ -316,10 +333,10 @@ function RouteComponent() {
         ...prev,
         password: false
       }))
-      alert('Password changed successfully!')
+      showAlert('Password changed successfully!', 'success')
     } catch (error) {
       console.error('Error changing password:', error)
-      alert('An error occurred while changing your password')
+      showAlert('An error occurred while changing your password', 'error')
     } finally {
       setLoading(false)
     }
@@ -476,13 +493,13 @@ function RouteComponent() {
 
   const verifyOtp = async () => {
     if (otpCode.trim() === '') {
-      alert('Please enter the OTP code!')
+      showAlert('Please enter the OTP code!', 'warning')
       return
     }
 
     // Mock OTP verification - in reality, verify against backend
     if (otpCode !== '123456') {
-      alert('Invalid OTP code!')
+      showAlert('Invalid OTP code!', 'error')
       return
     }
 
@@ -957,6 +974,15 @@ function RouteComponent() {
         </div>
 
         {loading && <LoadingSpinner />}
+
+        {/* Alert Modal */}
+        <AlertModal
+          isOpen={alertModal.isOpen}
+          onClose={closeAlert}
+          title={alertModal.title}
+          message={alertModal.message}
+          type={alertModal.type}
+        />
       </div>
     </ProtectedRoute>
   )

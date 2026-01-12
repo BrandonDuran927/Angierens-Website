@@ -1,6 +1,7 @@
 import { createLazyFileRoute, Link } from '@tanstack/react-router'
 import { ShoppingCart, Bell, ChevronDown, ArrowLeft, X, Menu, Calendar, Heart, Star, MessageSquare, Upload, Check, Trash2 } from 'lucide-react'
 import { ProtectedRoute } from '@/components/ProtectedRoute'
+import { AlertModal, type AlertType } from '@/components/AlertModal'
 import { useState, useEffect, useRef } from 'react'
 import { useUser } from '@/context/UserContext'
 import { useNavigate } from '@tanstack/react-router'
@@ -36,6 +37,7 @@ interface CartItem {
     menu_id: string
     quantity: number
     price: number
+    size: string | null
     menu: {
         name: string
         description: string
@@ -126,6 +128,24 @@ function RouteComponent() {
     const [routeOrigin, setRouteOrigin] = useState<{ lat: number; lng: number } | null>(null);
     const [routeDestination, setRouteDestination] = useState<{ lat: number; lng: number } | null>(null);
     const [isSubmittingOrder, setIsSubmittingOrder] = useState(false);
+    const [alertModal, setAlertModal] = useState<{
+        isOpen: boolean
+        message: string
+        type: AlertType
+        title?: string
+    }>({
+        isOpen: false,
+        message: '',
+        type: 'info'
+    })
+
+    const showAlert = (message: string, type: AlertType = 'info', title?: string) => {
+        setAlertModal({ isOpen: true, message, type, title })
+    }
+
+    const closeAlert = () => {
+        setAlertModal(prev => ({ ...prev, isOpen: false }))
+    }
 
     const handleShowDirections = (originLat: number, originLng: number, destLat: number, destLng: number) => {
         setRouteOrigin({ lat: originLat, lng: originLng });
@@ -499,6 +519,7 @@ function RouteComponent() {
                             menu_id: orderDetails.menu_id,
                             quantity: orderDetails.quantity,
                             price: orderDetails.price,
+                            size: orderDetails.size || null,
                             menu: {
                                 name: orderDetails.name,
                                 description: orderDetails.description,
@@ -543,6 +564,7 @@ function RouteComponent() {
                         cart_item_id,
                         quantity,
                         price,
+                        size,
                         menu_id,
                         menu:menu_id (
                             name,
@@ -587,6 +609,7 @@ function RouteComponent() {
                                 menu_id: row.menu_id,
                                 quantity: row.quantity,
                                 price: row.price,
+                                size: row.size || null,
                                 menu: menuObj ? {
                                     name: menuObj.name,
                                     description: menuObj.description,
@@ -869,12 +892,12 @@ function RouteComponent() {
         const file = event.target.files?.[0];
         if (file) {
             if (!file.type.startsWith('image/')) {
-                alert('Please select an image file');
+                showAlert('Please select an image file', 'warning');
                 return;
             }
 
             if (file.size > 5 * 1024 * 1024) {
-                alert('File size must be less than 5MB');
+                showAlert('File size must be less than 5MB', 'warning');
                 return;
             }
 
@@ -900,7 +923,7 @@ function RouteComponent() {
 
     const handleUploadReceipt = async () => {
         if (!receiptFile) {
-            alert('Please select a receipt image');
+            showAlert('Please select a receipt image', 'warning');
             return;
         }
 
@@ -933,14 +956,14 @@ function RouteComponent() {
             handlePlaceOrder(publicUrl);
         } catch (error) {
             console.error('Error uploading receipt:', error);
-            alert('Failed to upload receipt. Please try again.');
+            showAlert('Failed to upload receipt. Please try again.', 'error');
             setIsSubmittingOrder(false); // Re-enable on error
         }
     };
 
     const handleUploadProofOfPayment = async () => {
         if (!proofOfPaymentFile) {
-            alert('Please take a photo of your payment');
+            showAlert('Please take a photo of your payment', 'warning');
             return;
         }
 
@@ -972,31 +995,31 @@ function RouteComponent() {
             handlePlaceOrder(publicUrl);
         } catch (error) {
             console.error('Error uploading proof of payment:', error);
-            alert('Failed to upload photo. Please try again.');
+            showAlert('Failed to upload photo. Please try again.', 'error');
             setIsSubmittingOrder(false); // Re-enable on error
         }
     };
 
     const handlePlaceOrder = async (receiptUrl?: string) => {
         if (!user) {
-            alert('Please log in to place an order');
+            showAlert('Please log in to place an order', 'warning');
             return;
         }
 
         if (selectedCartItems.length === 0) {
-            alert('No items in order');
+            showAlert('No items in order', 'warning');
             return;
         }
 
         // Check if delivery address is required
         if (deliveryOption === 'Delivery' && !selectedAddressId) {
-            alert('Please select a delivery address');
+            showAlert('Please select a delivery address', 'warning');
             return;
         }
 
         try {
             if (!selectedDate || isDateDisabled(selectedDate)) {
-                alert('Please select a valid date for your order');
+                showAlert('Please select a valid date for your order', 'warning');
                 setIsSubmittingOrder(false);
                 return;
             }
@@ -1018,7 +1041,7 @@ function RouteComponent() {
             );
 
             if (!matchingSchedule) {
-                alert('Selected schedule is no longer available. Please choose another time.');
+                showAlert('Selected schedule is no longer available. Please choose another time.', 'warning');
                 return;
             }
 
@@ -1085,7 +1108,8 @@ function RouteComponent() {
                         order_id: orderData.order_id,
                         menu_id: item.menu_id,
                         quantity: item.quantity,
-                        subtotal_price: itemSubtotal
+                        subtotal_price: itemSubtotal,
+                        size: item.size || null
                     })
                     .select()
                     .single();
@@ -1134,11 +1158,11 @@ function RouteComponent() {
             // Clear session storage for direct orders
             sessionStorage.removeItem('directOrder');
 
-            alert('Order placed successfully!');
+            showAlert('Order placed successfully!', 'success');
             navigate({ to: '/customer-interface/order' });
         } catch (error) {
             console.error('Error placing order:', error);
-            alert('Failed to place order. Please try again.');
+            showAlert('Failed to place order. Please try again.', 'error');
             setIsSubmittingOrder(false); // Re-enable button on error
         }
     };
@@ -1152,7 +1176,7 @@ function RouteComponent() {
     const handleDeleteAddress = async (addressId: string, addressType: string) => {
         // Prevent deletion of primary addresses
         if (addressType === 'Primary') {
-            alert('Cannot delete primary address. Please change it to secondary first in your profile.');
+            showAlert('Cannot delete primary address. Please change it to secondary first in your profile.', 'warning');
             return;
         }
 
@@ -1183,10 +1207,10 @@ function RouteComponent() {
                 }
             }
 
-            alert('Address deleted successfully!');
+            showAlert('Address deleted successfully!', 'success');
         } catch (error) {
             console.error('Error deleting address:', error);
-            alert('Failed to delete address. Please try again.');
+            showAlert('Failed to delete address. Please try again.', 'error');
         }
     };
 
@@ -1195,16 +1219,17 @@ function RouteComponent() {
 
         // Validate required fields
         if (!newAddressForm.address_line || !newAddressForm.city || !newAddressForm.barangay) {
-            alert('Please fill in all required fields');
+            showAlert('Please fill in all required fields', 'warning');
             return;
         }
 
         // Validate distance before saving
         const validation = validateLocationDistance(selectedLocation.lat, selectedLocation.lng);
         if (!validation.valid) {
-            alert(
+            showAlert(
                 `This location is ${validation.distance.toFixed(1)} km away from our store. ` +
-                `We only deliver within ${MAX_DELIVERY_DISTANCE_KM} km. Please select a closer location.`
+                `We only deliver within ${MAX_DELIVERY_DISTANCE_KM} km. Please select a closer location.`,
+                'warning'
             );
             return;
         }
@@ -1245,10 +1270,10 @@ function RouteComponent() {
             setAutocompleteInput('');
             setIsAddAddressModalOpen(false);
 
-            alert('Address added successfully!');
+            showAlert('Address added successfully!', 'success');
         } catch (error) {
             console.error('Error saving address:', error);
-            alert('Failed to save address. Please try again.');
+            showAlert('Failed to save address. Please try again.', 'error');
         }
 
         setAutocompleteInput('');
@@ -2081,7 +2106,7 @@ function RouteComponent() {
                                             <button
                                                 onClick={() => {
                                                     if (deliveryOption === 'Delivery' && !selectedAddressId) {
-                                                        alert('Please select a delivery address');
+                                                        showAlert('Please select a delivery address', 'warning');
                                                         return;
                                                     }
                                                     handleUploadReceipt();
@@ -2203,7 +2228,7 @@ function RouteComponent() {
                                             <button
                                                 onClick={() => {
                                                     if (deliveryOption === 'Delivery' && !selectedAddressId) {
-                                                        alert('Please select a delivery address');
+                                                        showAlert('Please select a delivery address', 'warning');
                                                         return;
                                                     }
                                                     handleUploadProofOfPayment();
@@ -2553,6 +2578,15 @@ function RouteComponent() {
                         </div>
                     </div>
                 </footer>
+
+                {/* Alert Modal */}
+                <AlertModal
+                    isOpen={alertModal.isOpen}
+                    onClose={closeAlert}
+                    title={alertModal.title}
+                    message={alertModal.message}
+                    type={alertModal.type}
+                />
             </div>
         </ProtectedRoute>
     );

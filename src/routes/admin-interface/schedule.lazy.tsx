@@ -7,6 +7,7 @@ import { supabase } from '@/lib/supabaseClient'
 import { useUser } from '@/context/UserContext'
 import { useNavigate } from '@tanstack/react-router'
 import { ProtectedRoute } from '@/components/ProtectedRoute'
+import { AlertModal, type AlertType } from '@/components/AlertModal'
 
 export const Route = createLazyFileRoute('/admin-interface/schedule')({
     component: RouteComponent,
@@ -64,6 +65,22 @@ interface ScheduleData {
 function RouteComponent() {
     const { user, signOut } = useUser()
     const navigate = useNavigate();
+
+    // Alert Modal State
+    const [alertModal, setAlertModal] = useState<{
+        isOpen: boolean;
+        message: string;
+        type: AlertType;
+        title?: string;
+    }>({ isOpen: false, message: '', type: 'info' })
+
+    const showAlert = (message: string, type: AlertType, title?: string) => {
+        setAlertModal({ isOpen: true, message, type, title })
+    }
+
+    const closeAlert = () => {
+        setAlertModal(prev => ({ ...prev, isOpen: false }))
+    }
 
     async function handleLogout() {
         await signOut();
@@ -787,6 +804,15 @@ function RouteComponent() {
                         </div>
                     </div>
                 </div>
+
+                {/* Alert Modal */}
+                <AlertModal
+                    isOpen={alertModal.isOpen}
+                    onClose={closeAlert}
+                    message={alertModal.message}
+                    type={alertModal.type}
+                    title={alertModal.title}
+                />
             </div>
         </ProtectedRoute>
     )

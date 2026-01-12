@@ -4,6 +4,7 @@ import { Search, ShoppingCart, Bell, ChevronDown, X, Plus, Minus, Heart, Message
 import { useUser } from '@/context/UserContext'
 import { useNavigate } from '@tanstack/react-router'
 import { supabase } from '@/lib/supabaseClient'
+import { AlertModal, type AlertType } from '@/components/AlertModal'
 
 
 // Type definitions
@@ -76,6 +77,24 @@ function RouteComponent() {
   const [isOrderAddOnsModalOpen, setIsOrderAddOnsModalOpen] = useState(false)
   const [orderAddOns, setOrderAddOns] = useState<AddOns>({})
   const [isVisible, setIsVisible] = useState(false)
+  const [alertModal, setAlertModal] = useState<{
+    isOpen: boolean
+    message: string
+    type: AlertType
+    title?: string
+  }>({
+    isOpen: false,
+    message: '',
+    type: 'info'
+  })
+
+  const showAlert = (message: string, type: AlertType = 'info', title?: string) => {
+    setAlertModal({ isOpen: true, message, type, title })
+  }
+
+  const closeAlert = () => {
+    setAlertModal(prev => ({ ...prev, isOpen: false }))
+  }
 
   // Trigger entrance animation
   useEffect(() => {
@@ -162,7 +181,7 @@ function RouteComponent() {
 
   const openOrderAddOnsModal = () => {
     if (!user?.id) {
-      alert('Please sign in to place an order')
+      showAlert('Please sign in to place an order', 'warning')
       navigate({ to: '/login' })
       return
     }
@@ -190,7 +209,7 @@ function RouteComponent() {
     if (isProcessing) return
 
     if (!user?.id) {
-      alert('Please sign in to place an order')
+      showAlert('Please sign in to place an order', 'warning')
       navigate({ to: '/login' })
       return
     }
@@ -262,7 +281,7 @@ function RouteComponent() {
       } as any)
     } catch (error) {
       console.error('Error processing order:', error)
-      alert('Failed to process order. Please try again.')
+      showAlert('Failed to process order. Please try again.', 'error')
     } finally {
       setIsProcessing(false)
     }
@@ -418,7 +437,7 @@ function RouteComponent() {
     if (isProcessing) return // Prevent duplicate clicks
 
     if (!user?.id) {
-      alert('Please sign in to add items to cart')
+      showAlert('Please sign in to add items to cart', 'warning')
       navigate({ to: '/login' })
       return
     }
@@ -462,6 +481,7 @@ function RouteComponent() {
         .eq('cart_id', cartData.cart_id)
         .eq('menu_id', selectedItem.menu_id)
         .eq('price', itemPrice)
+        .eq('size', selectedSize || '')
         .single()
 
       if (existingError && existingError.code !== 'PGRST116') {
@@ -485,7 +505,8 @@ function RouteComponent() {
             cart_id: cartData.cart_id,
             menu_id: selectedItem.menu_id,
             quantity: orderQuantity,
-            price: itemPrice
+            price: itemPrice,
+            size: selectedSize || null
           }])
           .select()
           .single()
@@ -518,10 +539,10 @@ function RouteComponent() {
       await fetchCartCount()
 
       closeModal()
-      alert('Item added to cart successfully!')
+      showAlert('Item added to cart successfully!', 'success')
     } catch (error) {
       console.error('Error adding to cart:', error)
-      alert('Failed to add item to cart. Please try again.')
+      showAlert('Failed to add item to cart. Please try again.', 'error')
     } finally {
       setIsProcessing(false)
     }
@@ -1385,6 +1406,15 @@ function RouteComponent() {
           </div>
         </div>
       </footer>
+
+      {/* Alert Modal */}
+      <AlertModal
+        isOpen={alertModal.isOpen}
+        onClose={closeAlert}
+        title={alertModal.title}
+        message={alertModal.message}
+        type={alertModal.type}
+      />
     </div>
   )
 }

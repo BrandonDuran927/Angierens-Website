@@ -24,6 +24,7 @@ import {
 import { supabase } from '@/lib/supabaseClient'
 import { ProtectedRoute } from '@/components/ProtectedRoute'
 import { useUser } from '@/context/UserContext'
+import { AlertModal, type AlertType } from '@/components/AlertModal'
 
 export const Route = createLazyFileRoute('/admin-interface/employee/')({
     component: RouteComponent,
@@ -102,6 +103,24 @@ function RouteComponent() {
     const [selectedEmployeeForAssign, setSelectedEmployeeForAssign] = useState<Employee | null>(null)
     const [isTrackModalOpen, setIsTrackModalOpen] = useState(false)
     const [selectedEmployeeForTrack, setSelectedEmployeeForTrack] = useState<Employee | null>(null)
+    const [alertModal, setAlertModal] = useState<{
+        isOpen: boolean
+        message: string
+        type: AlertType
+        title?: string
+    }>({
+        isOpen: false,
+        message: '',
+        type: 'info'
+    })
+
+    const showAlert = (message: string, type: AlertType = 'info', title?: string) => {
+        setAlertModal({ isOpen: true, message, type, title })
+    }
+
+    const closeAlert = () => {
+        setAlertModal(prev => ({ ...prev, isOpen: false }))
+    }
 
     async function handleLogout() {
         await signOut();
@@ -309,7 +328,7 @@ function RouteComponent() {
             setSelectedEmployee(null)
         } catch (error) {
             console.error('Error deactivating employee:', error)
-            alert('Failed to deactivate employee. Please try again.')
+            showAlert('Failed to deactivate employee. Please try again.', 'error')
             setLoading(false)
         }
     }
@@ -472,7 +491,7 @@ function RouteComponent() {
             if (checkError) throw checkError
 
             if (existingUser) {
-                alert('This email is already registered. Please use a different email address.')
+                showAlert('This email is already registered. Please use a different email address.', 'warning')
                 setLoading(false)
                 return
             }
@@ -490,7 +509,7 @@ function RouteComponent() {
                 // Check if it's a duplicate email error
                 if (authError.message.toLowerCase().includes('already registered') ||
                     authError.message.toLowerCase().includes('already exists')) {
-                    alert('This email is already registered in the system. Please use a different email address.')
+                    showAlert('This email is already registered in the system. Please use a different email address.', 'warning')
                     setLoading(false)
                     return
                 }
@@ -524,7 +543,7 @@ function RouteComponent() {
             // Refresh the employee list
             await fetchEmployees()
 
-            alert('Employee account created successfully!')
+            showAlert('Employee account created successfully!', 'success')
             setIsCreateModalOpen(false)
             setLoading(false)
             // Reset form
@@ -541,7 +560,7 @@ function RouteComponent() {
             })
         } catch (error: any) {
             console.error('Error creating account:', error)
-            alert(error.message || 'Failed to create account. Please try again.')
+            showAlert(error.message || 'Failed to create account. Please try again.', 'error')
             setLoading(false)
         }
     }
@@ -1205,6 +1224,15 @@ function RouteComponent() {
                         </div>
                     </div>
                 )}
+
+                {/* Alert Modal */}
+                <AlertModal
+                    isOpen={alertModal.isOpen}
+                    onClose={closeAlert}
+                    message={alertModal.message}
+                    type={alertModal.type}
+                    title={alertModal.title}
+                />
             </div>
         </ProtectedRoute>
     )

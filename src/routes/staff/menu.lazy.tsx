@@ -34,6 +34,7 @@ import { useLocation } from '@tanstack/react-router'
 import { useUser } from '@/context/UserContext'
 import { useNavigate } from '@tanstack/react-router'
 import { ProtectedRoute } from '@/components/ProtectedRoute'
+import { AlertModal, type AlertType } from '@/components/AlertModal'
 
 export const Route = createLazyFileRoute('/staff/menu')({
     component: RouteComponent,
@@ -74,6 +75,22 @@ function RouteComponent() {
     const [imageFile, setImageFile] = useState<File | null>(null)
     const [imagePreview, setImagePreview] = useState<string | null>(null)
     const [uploadingImage, setUploadingImage] = useState(false)
+
+    // Alert Modal State
+    const [alertModal, setAlertModal] = useState<{
+        isOpen: boolean
+        title?: string
+        message: string
+        type: AlertType
+    }>({ isOpen: false, message: '', type: 'info' })
+
+    const showAlert = (message: string, type: AlertType = 'info', title?: string) => {
+        setAlertModal({ isOpen: true, message, type, title })
+    }
+
+    const closeAlert = () => {
+        setAlertModal(prev => ({ ...prev, isOpen: false }))
+    }
 
     const { user, signOut } = useUser()
 
@@ -242,7 +259,7 @@ function RouteComponent() {
         if (file) {
             // Validate file type
             if (!file.type.startsWith('image/')) {
-                alert('Please select an image file (PNG, JPG, JPEG, GIF, or WebP)')
+                showAlert('Please select an image file (PNG, JPG, JPEG, GIF, or WebP)', 'warning')
                 e.target.value = ''
                 return
             }
@@ -250,7 +267,7 @@ function RouteComponent() {
             // Validate file size (max 5MB)
             const maxSize = 5 * 1024 * 1024 // 5MB in bytes
             if (file.size > maxSize) {
-                alert('Image size must not exceed 5MB. Please choose a smaller image.')
+                showAlert('Image size must not exceed 5MB. Please choose a smaller image.', 'warning')
                 e.target.value = ''
                 return
             }
@@ -264,14 +281,14 @@ function RouteComponent() {
 
                 // Optional: Check minimum dimensions
                 if (img.width < 200 || img.height < 200) {
-                    alert('Image dimensions must be at least 200x200 pixels')
+                    showAlert('Image dimensions must be at least 200x200 pixels', 'warning')
                     e.target.value = ''
                     return
                 }
 
                 // Optional: Check maximum dimensions
                 if (img.width > 4000 || img.height > 4000) {
-                    alert('Image dimensions must not exceed 4000x4000 pixels')
+                    showAlert('Image dimensions must not exceed 4000x4000 pixels', 'warning')
                     e.target.value = ''
                     return
                 }
@@ -287,7 +304,7 @@ function RouteComponent() {
 
             img.onerror = () => {
                 URL.revokeObjectURL(objectUrl)
-                alert('Failed to load image. Please select a valid image file.')
+                showAlert('Failed to load image. Please select a valid image file.', 'error')
                 e.target.value = ''
             }
 
@@ -325,7 +342,7 @@ function RouteComponent() {
             return fileName
         } catch (err: any) {
             console.error('Error uploading image:', err)
-            alert(`Failed to upload image: ${err.message || 'Unknown error'}`)
+            showAlert(`Failed to upload image: ${err.message || 'Unknown error'}`, 'error')
             return null
         } finally {
             setUploadingImage(false)
@@ -497,7 +514,7 @@ function RouteComponent() {
     const handleSaveMenuItem = async () => {
         // Validate form
         if (!validateMenuItemForm()) {
-            alert('Please fix the errors in the form before saving.')
+            showAlert('Please fix the errors in the form before saving.', 'warning')
             return
         }
 
@@ -520,7 +537,7 @@ function RouteComponent() {
 
             // If adding mode, any duplicate is an error
             if (isAddMode && existingItems && existingItems.length > 0) {
-                alert(`A menu item with the name "${sanitizedName}" already exists. Please use a different name.`)
+                showAlert(`A menu item with the name "${sanitizedName}" already exists. Please use a different name.`, 'warning')
                 setProcessingAction(false)
                 return
             }
@@ -529,7 +546,7 @@ function RouteComponent() {
             if (isEditMode && selectedMenuItem && existingItems) {
                 const duplicates = existingItems.filter(item => item.menu_id !== selectedMenuItem.menu_id)
                 if (duplicates.length > 0) {
-                    alert(`A menu item with the name "${sanitizedName}" already exists. Please use a different name.`)
+                    showAlert(`A menu item with the name "${sanitizedName}" already exists. Please use a different name.`, 'warning')
                     setProcessingAction(false)
                     return
                 }
@@ -561,7 +578,7 @@ function RouteComponent() {
                     .insert([menuData])
 
                 if (error) throw error
-                alert('Menu item added successfully!')
+                showAlert('Menu item added successfully!', 'success')
             } else if (isEditMode && selectedMenuItem) {
                 const { error } = await supabase
                     .from('menu')
@@ -569,14 +586,14 @@ function RouteComponent() {
                     .eq('menu_id', selectedMenuItem.menu_id)
 
                 if (error) throw error
-                alert('Menu item updated successfully!')
+                showAlert('Menu item updated successfully!', 'success')
             }
 
             await fetchMenuItems()
             closeMenuDetails()
         } catch (err: any) {
             console.error('Error saving menu item:', err)
-            alert(`Failed to save menu item: ${err.message || 'Unknown error'}`)
+            showAlert(`Failed to save menu item: ${err.message || 'Unknown error'}`, 'error')
         } finally {
             setProcessingAction(false)
         }
@@ -594,12 +611,12 @@ function RouteComponent() {
 
             if (error) throw error
 
-            alert('Menu item deleted successfully!')
+            showAlert('Menu item deleted successfully!', 'success')
             await fetchMenuItems()
             closeMenuDetails()
         } catch (err) {
             console.error('Error deleting menu item:', err)
-            alert('Failed to delete menu item')
+            showAlert('Failed to delete menu item', 'error')
         } finally {
             setProcessingAction(false)
         }
@@ -672,7 +689,7 @@ function RouteComponent() {
     const handleSaveAddon = async () => {
         // Validate form
         if (!validateAddonForm()) {
-            alert('Please fix the errors in the form before saving.')
+            showAlert('Please fix the errors in the form before saving.', 'warning')
             return
         }
 
@@ -691,7 +708,7 @@ function RouteComponent() {
 
             // If adding mode, any duplicate is an error
             if (isAddAddonMode && existingAddons && existingAddons.length > 0) {
-                alert(`An add-on with the name "${sanitizedName}" already exists. Please use a different name.`)
+                showAlert(`An add-on with the name "${sanitizedName}" already exists. Please use a different name.`, 'warning')
                 setProcessingAction(false)
                 return
             }
@@ -700,7 +717,7 @@ function RouteComponent() {
             if (isEditAddonMode && selectedAddon && existingAddons) {
                 const duplicates = existingAddons.filter(addon => addon.add_on !== selectedAddon.add_on)
                 if (duplicates.length > 0) {
-                    alert(`An add-on with the name "${sanitizedName}" already exists. Please use a different name.`)
+                    showAlert(`An add-on with the name "${sanitizedName}" already exists. Please use a different name.`, 'warning')
                     setProcessingAction(false)
                     return
                 }
@@ -717,7 +734,7 @@ function RouteComponent() {
                     .insert([addonData])
 
                 if (error) throw error
-                alert('Add-on added successfully!')
+                showAlert('Add-on added successfully!', 'success')
             } else if (isEditAddonMode && selectedAddon) {
                 const { error } = await supabase
                     .from('add_on')
@@ -725,7 +742,7 @@ function RouteComponent() {
                     .eq('add_on', selectedAddon.add_on)
 
                 if (error) throw error
-                alert('Add-on updated successfully!')
+                showAlert('Add-on updated successfully!', 'success')
             }
 
             await fetchAddons()
@@ -735,7 +752,7 @@ function RouteComponent() {
             resetAddonForm()
         } catch (err: any) {
             console.error('Error saving add-on:', err)
-            alert(`Failed to save add-on: ${err.message || 'Unknown error'}`)
+            showAlert(`Failed to save add-on: ${err.message || 'Unknown error'}`, 'error')
         } finally {
             setProcessingAction(false)
         }
@@ -753,11 +770,11 @@ function RouteComponent() {
 
             if (error) throw error
 
-            alert('Add-on deleted successfully!')
+            showAlert('Add-on deleted successfully!', 'success')
             await fetchAddons()
         } catch (err) {
             console.error('Error deleting add-on:', err)
-            alert('Failed to delete add-on')
+            showAlert('Failed to delete add-on', 'error')
         } finally {
             setProcessingAction(false)
         }
@@ -1726,6 +1743,15 @@ function RouteComponent() {
                         </div>
                     </div>
                 )}
+
+                {/* Alert Modal */}
+                <AlertModal
+                    isOpen={alertModal.isOpen}
+                    onClose={closeAlert}
+                    title={alertModal.title}
+                    message={alertModal.message}
+                    type={alertModal.type}
+                />
             </div>
         </ProtectedRoute>
     )
