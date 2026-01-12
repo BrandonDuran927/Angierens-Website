@@ -102,6 +102,35 @@ function KitchenDisplay() {
         })
     }
 
+    // Helper to toggle main item and all its inclusions/add-ons
+    const handleMainItemToggle = (orderId: string, mainKey: string, item: { inclusions: string[], addOns: string[] }) => {
+        setCheckedState(prev => {
+            const orderChecks = prev[orderId] || {}
+            const isMainChecked = !!orderChecks[mainKey]
+            const newStatus = !isMainChecked
+
+            const newOrderChecks = { ...orderChecks }
+            
+            // Toggle main item
+            newOrderChecks[mainKey] = newStatus
+
+            // Toggle all inclusions
+            item.inclusions.forEach((_, idx) => {
+                newOrderChecks[`${mainKey}-inc-${idx}`] = newStatus
+            })
+
+            // Toggle all add-ons
+            item.addOns.forEach((_, idx) => {
+                newOrderChecks[`${mainKey}-ao-${idx}`] = newStatus
+            })
+
+            return {
+                ...prev,
+                [orderId]: newOrderChecks
+            }
+        })
+    }
+
     // Helper to update order status
     const updateOrderStatus = async (orderId: string, newStatus: string) => {
         try {
@@ -473,7 +502,7 @@ function KitchenDisplay() {
                                 <div className="flex items-start gap-3">
                                     {/* Checkbox for Main Item */}
                                     {isCooking && (
-                                        <div className="mt-1 flex-shrink-0 cursor-pointer" onClick={() => handleCheckToggle(order.order_id, mainKey)}>
+                                        <div className="mt-1 flex-shrink-0 cursor-pointer" onClick={() => handleMainItemToggle(order.order_id, mainKey, item)}>
                                             <div className={`w-8 h-8 rounded border-2 flex items-center justify-center transition-colors ${isMainChecked
                                                 ? 'bg-green-500 border-green-600 text-white'
                                                 : 'bg-white border-gray-300 hover:border-green-400'
