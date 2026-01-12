@@ -6,6 +6,7 @@ import { useUser } from '@/context/UserContext'
 import { useNavigate } from '@tanstack/react-router'
 import { ProtectedRoute } from '@/components/ProtectedRoute'
 import { supabase } from '@/lib/supabaseClient'
+import { AlertModal, type AlertType } from '@/components/AlertModal'
 
 
 export const Route = createLazyFileRoute(
@@ -66,6 +67,24 @@ function RouteComponent() {
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
   const [isVisible, setIsVisible] = useState(false)
+  const [alertModal, setAlertModal] = useState<{
+    isOpen: boolean
+    message: string
+    type: AlertType
+    title?: string
+  }>({
+    isOpen: false,
+    message: '',
+    type: 'info'
+  })
+
+  const showAlert = (message: string, type: AlertType = 'info', title?: string) => {
+    setAlertModal({ isOpen: true, message, type, title })
+  }
+
+  const closeAlert = () => {
+    setAlertModal(prev => ({ ...prev, isOpen: false }))
+  }
 
   // Trigger entrance animation
   useEffect(() => {
@@ -302,13 +321,13 @@ function RouteComponent() {
 
       // Validate that user has entered something
       if (rating === 0) {
-        alert('Please provide a rating')
+        showAlert('Please provide a rating', 'warning')
         setIsSaving(false)
         return
       }
 
       if (!comment || comment.trim() === '') {
-        alert('Please provide a comment')
+        showAlert('Please provide a comment', 'warning')
         setIsSaving(false)
         return
       }
@@ -336,7 +355,7 @@ function RouteComponent() {
 
         if (error) {
           console.error('Error updating review:', error)
-          alert('Failed to update review. Please try again.')
+          showAlert('Failed to update review. Please try again.', 'error')
           setIsSaving(false)
           return
         }
@@ -355,7 +374,7 @@ function RouteComponent() {
 
         if (error) {
           console.error('Error inserting review:', error)
-          alert('Failed to submit review. Please try again.')
+          showAlert('Failed to submit review. Please try again.', 'error')
           setIsSaving(false)
           return
         }
@@ -369,11 +388,11 @@ function RouteComponent() {
         }
       }
 
-      alert('Review submitted successfully!')
+      showAlert('Review submitted successfully!', 'success')
       setIsEditing(false)
     } catch (err) {
       console.error('Unexpected error submitting review:', err)
-      alert('An unexpected error occurred. Please try again.')
+      showAlert('An unexpected error occurred. Please try again.', 'error')
     } finally {
       setIsSaving(false)
     }
@@ -954,6 +973,14 @@ function RouteComponent() {
       </div>
       {isLoading && <LoadingSpinner />}
 
+      {/* Alert Modal */}
+      <AlertModal
+        isOpen={alertModal.isOpen}
+        onClose={closeAlert}
+        title={alertModal.title}
+        message={alertModal.message}
+        type={alertModal.type}
+      />
     </ProtectedRoute>
   )
 }

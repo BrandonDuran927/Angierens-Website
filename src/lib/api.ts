@@ -74,6 +74,7 @@ export interface OrderItem {
   order_item_id: string
   quantity: number
   subtotal_price: number
+  size: string | null
   order_id: string
   menu: Menu
   order_item_add_on?: OrderItemAddOn[]
@@ -182,6 +183,7 @@ export async function fetchOrders(): Promise<Order[]> {
       order_item_id,
       quantity,
       subtotal_price,
+      size,
       order_id,
       menu:menu_id (
         menu_id,

@@ -4,8 +4,9 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabaseClient'
 import { useNavigate } from '@tanstack/react-router';
 import { useUser } from '@/context/UserContext';
-// testing collaboration
-// testing again for contribute repo 
+import { AlertModal, type AlertType } from '@/components/AlertModal'
+
+
 interface Notification {
   id: string
   type: 'order' | 'feedback'
@@ -51,6 +52,22 @@ function RouteComponent() {
   // Email verified modal state (shown after clicking verification link)
   const [showVerifiedModal, setShowVerifiedModal] = useState(false);
   const [verifiedEmail, setVerifiedEmail] = useState<string>("");
+
+  // Alert Modal State
+  const [alertModal, setAlertModal] = useState<{
+    isOpen: boolean;
+    message: string;
+    type: AlertType;
+    title?: string;
+  }>({ isOpen: false, message: '', type: 'info' })
+
+  const showAlert = (message: string, type: AlertType, title?: string) => {
+    setAlertModal({ isOpen: true, message, type, title })
+  }
+
+  const closeAlert = () => {
+    setAlertModal(prev => ({ ...prev, isOpen: false }))
+  }
 
   // Role configuration with icons, colors, and paths
   const roleConfig: Record<string, { path: string; icon: React.ReactNode; label: string; color: string; bgColor: string }> = {
@@ -347,7 +364,7 @@ function RouteComponent() {
 
   async function signInWithEmail() {
     if (!email || !password) {
-      alert("Please fill in both fields.");
+      showAlert('Please fill in both fields.', 'warning')
       return;
     }
 
@@ -364,9 +381,9 @@ function RouteComponent() {
 
     if (error) {
       if (error.message === "Email not confirmed") {
-        alert("Please verify your email address before logging in.");
+        showAlert('Please verify your email address before logging in.', 'warning')
       } else {
-        alert(error.message || "Credentials are not valid. Please try again.");
+        showAlert(error.message || 'Credentials are not valid. Please try again.', 'error')
       }
       console.log("Error:", error);
       return;
@@ -385,7 +402,7 @@ function RouteComponent() {
 
     if (userError || !userData) {
       console.error("Error fetching user role:", userError);
-      alert("Error fetching user. Please contact support.");
+      showAlert('Error fetching user. Please contact support.', 'error')
       return;
     }
 
@@ -415,13 +432,13 @@ function RouteComponent() {
 
   async function sendPasswordResetEmail() {
     if (!emailToReset) {
-      alert("Please enter your email address.");
+      showAlert('Please enter your email address.', 'warning')
       return;
     }
 
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(emailToReset)) {
-      alert("Please enter a valid email address format.");
+      showAlert('Please enter a valid email address format.', 'warning')
       return;
     }
 
@@ -436,27 +453,27 @@ function RouteComponent() {
     setIsLoading(false);
 
     if (error) {
-      alert("Error sending reset email. Please make sure the email is valid.");
+      showAlert('Error sending reset email. Please make sure the email is valid.', 'error')
       console.error("Reset error:", error);
     } else {
-      alert("Password reset email sent! Please check your inbox.");
+      showAlert('Password reset email sent! Please check your inbox.', 'success')
       handleCloseModal();
     }
   }
 
   async function updatePassword() {
     if (!newPassword || !confirmPassword) {
-      alert("Please fill in both password fields.");
+      showAlert('Please fill in both password fields.', 'warning')
       return;
     }
 
     if (newPassword !== confirmPassword) {
-      alert("Passwords do not match!");
+      showAlert('Passwords do not match!', 'warning')
       return;
     }
 
     if (newPassword.length < 6) {
-      alert("Password must be at least 6 characters long.");
+      showAlert('Password must be at least 6 characters long.', 'warning')
       return;
     }
 
@@ -469,10 +486,10 @@ function RouteComponent() {
     setIsLoading(false);
 
     if (error) {
-      alert("Error updating password. Please try again.");
+      showAlert('Error updating password. Please try again.', 'error')
       console.error("Update password error:", error);
     } else {
-      alert("Password updated successfully! You can now log in with your new password.");
+      showAlert('Password updated successfully! You can now log in with your new password.', 'success')
 
       // Sign out the user to force manual login
       await supabase.auth.signOut();
@@ -1403,6 +1420,15 @@ function RouteComponent() {
 
       {/* Loading Spinner */}
       {isLoading && <LoadingSpinner />}
+
+      {/* Alert Modal */}
+      <AlertModal
+        isOpen={alertModal.isOpen}
+        onClose={closeAlert}
+        message={alertModal.message}
+        type={alertModal.type}
+        title={alertModal.title}
+      />
     </div>
   );
 }

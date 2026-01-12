@@ -5,6 +5,7 @@ import { useState, useEffect } from 'react'
 import { useUser } from '@/context/UserContext'
 import { useNavigate } from '@tanstack/react-router'
 import { supabase } from '@/lib/supabaseClient'
+import { AlertModal, type AlertType } from '@/components/AlertModal'
 
 export const Route = createLazyFileRoute('/customer-interface/cart')({
     component: RouteComponent,
@@ -20,6 +21,7 @@ interface CartItem {
     image: string
     description?: string
     inclusions?: string[]
+    size?: string | null
 }
 interface AddOnOption {
     add_on: string
@@ -66,6 +68,24 @@ function RouteComponent() {
     const [isCheckoutAddOnsModalOpen, setIsCheckoutAddOnsModalOpen] = useState(false);
     const [checkoutAddOns, setCheckoutAddOns] = useState<Record<string, number>>({});
     const [isVisible, setIsVisible] = useState(false)
+    const [alertModal, setAlertModal] = useState<{
+        isOpen: boolean
+        message: string
+        type: AlertType
+        title?: string
+    }>({
+        isOpen: false,
+        message: '',
+        type: 'info'
+    })
+
+    const showAlert = (message: string, type: AlertType = 'info', title?: string) => {
+        setAlertModal({ isOpen: true, message, type, title })
+    }
+
+    const closeAlert = () => {
+        setAlertModal(prev => ({ ...prev, isOpen: false }))
+    }
 
     // Trigger entrance animation
     useEffect(() => {
@@ -193,6 +213,7 @@ function RouteComponent() {
                         cart_item_id,
                         quantity,
                         price,
+                        size,
                         menu_id,
                         menu:menu_id (
                             name,
@@ -256,7 +277,8 @@ function RouteComponent() {
                                 quantity: parseInt(item.quantity) || 1,
                                 image: item.menu.image_url || '/public/menu-page img/pancit malabonbon.png',
                                 description: item.menu.description,
-                                inclusions: inclusions
+                                inclusions: inclusions,
+                                size: item.size || null
                             };
                         })
                     );
@@ -619,7 +641,7 @@ function RouteComponent() {
         const selectedCartItems = cartItems.filter(item => selectedItems.has(item.cart_item_id));
 
         if (selectedCartItems.length === 0) {
-            alert('Please select at least one item to proceed.');
+            showAlert('Please select at least one item to proceed.', 'warning');
             return;
         }
 
@@ -638,7 +660,7 @@ function RouteComponent() {
 
             if (unavailableItems.length > 0) {
                 const unavailableNames = unavailableItems.map(item => item.name).join(', ');
-                alert(`The following menu item(s) are currently unavailable and cannot be ordered:\n\n${unavailableNames}\n\nPlease remove them from your selection to proceed.`);
+                showAlert(`The following menu item(s) are currently unavailable and cannot be ordered:\n\n${unavailableNames}\n\nPlease remove them from your selection to proceed.`, 'warning');
                 return;
             }
 
@@ -647,7 +669,7 @@ function RouteComponent() {
             setIsCheckoutAddOnsModalOpen(true);
         } catch (error) {
             console.error('Error checking menu availability:', error);
-            alert('An error occurred while checking menu availability. Please try again.');
+            showAlert('An error occurred while checking menu availability. Please try again.', 'error');
         }
     };
 
@@ -700,7 +722,7 @@ function RouteComponent() {
 
             if (unavailableItems.length > 0) {
                 const unavailableNames = unavailableItems.map(item => item.name).join(', ');
-                alert(`The following menu item(s) are currently unavailable:\n\n${unavailableNames}\n\nPlease remove them from your cart to proceed.`);
+                showAlert(`The following menu item(s) are currently unavailable:\n\n${unavailableNames}\n\nPlease remove them from your cart to proceed.`, 'warning');
                 closeCheckoutAddOnsModal();
                 return;
             }
@@ -1075,6 +1097,11 @@ function RouteComponent() {
                                                         <h3 className="text-xl font-bold text-gray-900 mb-2 truncate">
                                                             {item.name}
                                                         </h3>
+                                                        {item.size && (
+                                                            <p className="text-sm text-amber-700 font-semibold mb-2">
+                                                                Size: {item.size}
+                                                            </p>
+                                                        )}
                                                         {item.addOns.length > 0 && (
                                                             <div className="flex flex-wrap gap-2 mb-2">
                                                                 {item.addOns.map((addOn, idx) => (
@@ -1178,6 +1205,11 @@ function RouteComponent() {
                                                             <h3 className="text-base sm:text-lg font-bold text-gray-900 mb-1 line-clamp-2">
                                                                 {item.name}
                                                             </h3>
+                                                            {item.size && (
+                                                                <p className="text-xs text-amber-700 font-semibold mb-1">
+                                                                    Size: {item.size}
+                                                                </p>
+                                                            )}
                                                             {item.addOns.length > 0 && (
                                                                 <div className="flex flex-wrap gap-1 mb-2">
                                                                     {item.addOns.slice(0, 2).map((addOn, idx) => (
@@ -1591,6 +1623,15 @@ function RouteComponent() {
                         </div>
                     </div>
                 </footer>
+
+                {/* Alert Modal */}
+                <AlertModal
+                    isOpen={alertModal.isOpen}
+                    onClose={closeAlert}
+                    title={alertModal.title}
+                    message={alertModal.message}
+                    type={alertModal.type}
+                />
             </div>
         </ProtectedRoute >
     )

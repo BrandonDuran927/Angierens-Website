@@ -31,6 +31,7 @@ import {
 import { useUser } from '@/context/UserContext'
 import { useNavigate } from '@tanstack/react-router'
 import { ProtectedRoute } from '@/components/ProtectedRoute'
+import { AlertModal, type AlertType } from '@/components/AlertModal'
 import { fetchOrders, fetchDashboardStats, fetchChartData } from '@/lib/api'
 import type {
     Order
@@ -62,6 +63,22 @@ interface FilterState {
 function RouteComponent() {
     const { user, signOut } = useUser()
     const navigate = useNavigate();
+
+    // Alert Modal State
+    const [alertModal, setAlertModal] = useState<{
+        isOpen: boolean;
+        message: string;
+        type: AlertType;
+        title?: string;
+    }>({ isOpen: false, message: '', type: 'info' })
+
+    const showAlert = (message: string, type: AlertType, title?: string) => {
+        setAlertModal({ isOpen: true, message, type, title })
+    }
+
+    const closeAlert = () => {
+        setAlertModal(prev => ({ ...prev, isOpen: false }))
+    }
 
     type TabType = 'New Orders' | 'In Process' | 'Completed'
     const tabs: TabType[] = ['New Orders', 'In Process', 'Completed']
@@ -1164,6 +1181,15 @@ function RouteComponent() {
 
             {/* Loading Spinner */}
             {isLoading && <LoadingSpinner />}
+
+            {/* Alert Modal */}
+            <AlertModal
+                isOpen={alertModal.isOpen}
+                onClose={closeAlert}
+                message={alertModal.message}
+                type={alertModal.type}
+                title={alertModal.title}
+            />
         </ProtectedRoute>
     )
 }

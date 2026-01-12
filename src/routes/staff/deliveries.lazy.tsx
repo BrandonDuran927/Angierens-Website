@@ -26,6 +26,7 @@ import { supabase } from '@/lib/supabaseClient'
 import { useUser } from '@/context/UserContext'
 import { useNavigate } from '@tanstack/react-router'
 import { ProtectedRoute } from '@/components/ProtectedRoute'
+import { AlertModal, type AlertType } from '@/components/AlertModal'
 
 
 // Route definition
@@ -61,6 +62,22 @@ function RouteComponent() {
     const [cancellationDetails, setCancellationDetails] = useState<any>(null)
     const [isRemoveRiderModalOpen, setIsRemoveRiderModalOpen] = useState(false)
     const [isRemovingRider, setIsRemovingRider] = useState(false)
+
+    // Alert Modal State
+    const [alertModal, setAlertModal] = useState<{
+        isOpen: boolean
+        title?: string
+        message: string
+        type: AlertType
+    }>({ isOpen: false, message: '', type: 'info' })
+
+    const showAlert = (message: string, type: AlertType = 'info', title?: string) => {
+        setAlertModal({ isOpen: true, message, type, title })
+    }
+
+    const closeAlert = () => {
+        setAlertModal(prev => ({ ...prev, isOpen: false }))
+    }
 
     // NEW: State for fetched data from Supabase
     const [deliveryOrders, setDeliveryOrders] = useState<any[]>([])
@@ -378,17 +395,17 @@ function RouteComponent() {
             setSelectedOrderForAssign(null)
             setSelectedRiderForModal('')
 
-            alert('Rider assigned successfully!')
+            showAlert('Rider assigned successfully!', 'success')
         } catch (error) {
             console.error('Error assigning rider:', error)
-            alert('Failed to assign rider. Please try again.')
+            showAlert('Failed to assign rider. Please try again.', 'error')
         }
     }
 
     // Remove rider from delivery
     const removeRiderFromDelivery = async () => {
         if (!selectedOrder?.deliveryId) {
-            alert('No delivery record found for this order.')
+            showAlert('No delivery record found for this order.', 'error')
             return
         }
 
@@ -397,7 +414,7 @@ function RouteComponent() {
         const allowedStatuses = ['Pending', 'Queueing', 'Preparing', 'Cooking', 'Ready']
 
         if (!allowedStatuses.includes(selectedOrder.status)) {
-            alert(`Cannot remove rider. Order status is "${selectedOrder.status}". Riders can only be removed from orders with status: Pending, Queueing, Preparing, Cooking, or Ready.`)
+            showAlert(`Cannot remove rider. Order status is "${selectedOrder.status}". Riders can only be removed from orders with status: Pending, Queueing, Preparing, Cooking, or Ready.`, 'warning')
             setIsRemoveRiderModalOpen(false)
             return
         }
@@ -416,7 +433,7 @@ function RouteComponent() {
 
             // Double-check status hasn't changed - only proceed if status is still allowed
             if (!allowedStatuses.includes(orderData.order_status)) {
-                alert(`Cannot remove rider. Order status has changed to "${orderData.order_status}".`)
+                showAlert(`Cannot remove rider. Order status has changed to "${orderData.order_status}".`, 'warning')
                 await fetchDeliveryOrders() // Refresh to show current status
                 setIsRemoveRiderModalOpen(false)
                 setIsOrderDetailsModalOpen(false)
@@ -442,10 +459,10 @@ function RouteComponent() {
             setIsOrderDetailsModalOpen(false)
             setSelectedOrder(null)
 
-            alert('Rider removed successfully!')
+            showAlert('Rider removed successfully!', 'success')
         } catch (error) {
             console.error('Error removing rider:', error)
-            alert('Failed to remove rider. Please try again.')
+            showAlert('Failed to remove rider. Please try again.', 'error')
         } finally {
             setIsRemovingRider(false)
         }
@@ -503,10 +520,10 @@ function RouteComponent() {
             setIsCancellationModalOpen(false)
             setCancellationDetails(null)
             closeOrderDetails()
-            alert('Cancellation approved successfully!')
+            showAlert('Cancellation approved successfully!', 'success')
         } catch (error) {
             console.error('Error approving cancellation:', error)
-            alert('Failed to approve cancellation. Please try again.')
+            showAlert('Failed to approve cancellation. Please try again.', 'error')
         }
     }
 
@@ -527,10 +544,10 @@ function RouteComponent() {
             await fetchDeliveryOrders()
             setIsCancellationModalOpen(false)
             setCancellationDetails(null)
-            alert('Cancellation rejected successfully!')
+            showAlert('Cancellation rejected successfully!', 'success')
         } catch (error) {
             console.error('Error rejecting cancellation:', error)
-            alert('Failed to reject cancellation. Please try again.')
+            showAlert('Failed to reject cancellation. Please try again.', 'error')
         }
     }
 
@@ -1526,6 +1543,15 @@ function RouteComponent() {
                                 </div>
                             </div>
                         )}
+
+                        {/* Alert Modal */}
+                        <AlertModal
+                            isOpen={alertModal.isOpen}
+                            onClose={closeAlert}
+                            title={alertModal.title}
+                            message={alertModal.message}
+                            type={alertModal.type}
+                        />
                     </main>
                 </div>
             </div >

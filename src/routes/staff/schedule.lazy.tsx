@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabaseClient'
 import { useNavigate } from '@tanstack/react-router'
 import { useUser } from '@/context/UserContext'
 import { ProtectedRoute } from '@/components/ProtectedRoute'
+import { AlertModal, type AlertType } from '@/components/AlertModal'
 
 export const Route = createLazyFileRoute('/staff/schedule')({
   component: RouteComponent,
@@ -139,6 +140,22 @@ function RouteComponent() {
   const [scheduleData, setScheduleData] = useState<ScheduleData[]>([])
   const [ordersForSelectedDate, setOrdersForSelectedDate] = useState<Order[]>([])
   const [saving, setSaving] = useState(false)
+
+  // Alert Modal State
+  const [alertModal, setAlertModal] = useState<{
+    isOpen: boolean
+    title?: string
+    message: string
+    type: AlertType
+  }>({ isOpen: false, message: '', type: 'info' })
+
+  const showAlert = (message: string, type: AlertType = 'info', title?: string) => {
+    setAlertModal({ isOpen: true, message, type, title })
+  }
+
+  const closeAlert = () => {
+    setAlertModal(prev => ({ ...prev, isOpen: false }))
+  }
 
   const colors = [
     'bg-red-400', 'bg-blue-400', 'bg-green-400', 'bg-purple-400',
@@ -276,7 +293,7 @@ function RouteComponent() {
 
       // Check if selected date is in the past
       if (isDateInPast(year, month, selectedDate)) {
-        alert('Cannot modify availability for past dates')
+        showAlert('Cannot modify availability for past dates', 'warning')
         return
       }
 
@@ -300,13 +317,13 @@ function RouteComponent() {
 
         setIsAvailable(newStatus)
         await fetchScheduleData(year, month)
-        alert(`Date marked as ${newStatus ? 'available' : 'unavailable'}`)
+        showAlert(`Date marked as ${newStatus ? 'available' : 'unavailable'}`, 'success')
       } else {
-        alert('No schedules exist for this date. Please add time slots first.')
+        showAlert('No schedules exist for this date. Please add time slots first.', 'warning')
       }
     } catch (error) {
       console.error('Error updating availability:', error)
-      alert('Failed to update availability')
+      showAlert('Failed to update availability', 'error')
     } finally {
       setSaving(false)
     }
@@ -320,7 +337,7 @@ function RouteComponent() {
 
       // Check if selected date is in the past
       if (isDateInPast(year, month, selectedDate)) {
-        alert('Cannot modify order limit for past dates')
+        showAlert('Cannot modify order limit for past dates', 'warning')
         return
       }
 
@@ -340,13 +357,13 @@ function RouteComponent() {
 
         setOrderLimit(newLimit)
         await fetchScheduleData(year, month)
-        alert(`Order limit updated to ${newLimit}`)
+        showAlert(`Order limit updated to ${newLimit}`, 'success')
       } else {
-        alert('No schedules exist for this date. Please add time slots first.')
+        showAlert('No schedules exist for this date. Please add time slots first.', 'warning')
       }
     } catch (error) {
       console.error('Error updating order limit:', error)
-      alert('Failed to update order limit')
+      showAlert('Failed to update order limit', 'error')
     } finally {
       setSaving(false)
     }
@@ -360,7 +377,7 @@ function RouteComponent() {
 
       // Check if the time slot is in the past
       if (isTimeSlotInPast(year, month, selectedDate, hour)) {
-        alert('Cannot add time slots in the past')
+        showAlert('Cannot add time slots in the past', 'warning')
         return
       }
 
@@ -374,7 +391,7 @@ function RouteComponent() {
       )
 
       if (existingSlot) {
-        alert('This time slot already exists')
+        showAlert('This time slot already exists', 'warning')
         return
       }
 
@@ -390,10 +407,10 @@ function RouteComponent() {
       if (error) throw error
 
       await fetchScheduleData(year, month)
-      alert('Time slot added successfully')
+      showAlert('Time slot added successfully', 'success')
     } catch (error) {
       console.error('Error adding time slot:', error)
-      alert('Failed to add time slot')
+      showAlert('Failed to add time slot', 'error')
     } finally {
       setSaving(false)
     }
@@ -408,7 +425,7 @@ function RouteComponent() {
         const scheduleDate = new Date(schedule.schedule_date + 'T' + schedule.schedule_time)
         const now = new Date()
         if (scheduleDate < now) {
-          alert('Cannot modify time slots in the past')
+          showAlert('Cannot modify time slots in the past', 'warning')
           return
         }
       }
@@ -426,7 +443,7 @@ function RouteComponent() {
       await fetchScheduleData(year, month)
     } catch (error) {
       console.error('Error toggling time slot:', error)
-      alert('Failed to update time slot')
+      showAlert('Failed to update time slot', 'error')
     } finally {
       setSaving(false)
     }
@@ -440,7 +457,7 @@ function RouteComponent() {
       const scheduleDate = new Date(schedule.schedule_date + 'T' + schedule.schedule_time)
       const now = new Date()
       if (scheduleDate < now) {
-        alert('Cannot delete time slots in the past')
+        showAlert('Cannot delete time slots in the past', 'warning')
         return
       }
     }
@@ -459,10 +476,10 @@ function RouteComponent() {
       const year = currentDate.getFullYear()
       const month = currentDate.getMonth()
       await fetchScheduleData(year, month)
-      alert('Time slot deleted successfully')
+      showAlert('Time slot deleted successfully', 'success')
     } catch (error) {
       console.error('Error deleting time slot:', error)
-      alert('Failed to delete time slot')
+      showAlert('Failed to delete time slot', 'error')
     } finally {
       setSaving(false)
     }
@@ -1094,6 +1111,15 @@ function RouteComponent() {
             </div>
           </div>
         </div>
+
+        {/* Alert Modal */}
+        <AlertModal
+          isOpen={alertModal.isOpen}
+          onClose={closeAlert}
+          title={alertModal.title}
+          message={alertModal.message}
+          type={alertModal.type}
+        />
       </div>
     </ProtectedRoute>
   )

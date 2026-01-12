@@ -5,6 +5,7 @@ import { useUser } from '@/context/UserContext'
 import { useNavigate } from '@tanstack/react-router'
 import { ProtectedRoute } from '@/components/ProtectedRoute'
 import { supabase } from '@/lib/supabaseClient'
+import { AlertModal, type AlertType } from '@/components/AlertModal'
 
 
 export const Route = createLazyFileRoute('/customer-interface/order')({
@@ -83,6 +84,24 @@ function RouteComponent() {
     const [showViewReceiptModal, setShowViewReceiptModal] = useState(false)
     const [viewReceiptUrl, setViewReceiptUrl] = useState<string>('')
     const [isVisible, setIsVisible] = useState(false)
+    const [alertModal, setAlertModal] = useState<{
+        isOpen: boolean
+        message: string
+        type: AlertType
+        title?: string
+    }>({
+        isOpen: false,
+        message: '',
+        type: 'info'
+    })
+
+    const showAlert = (message: string, type: AlertType = 'info', title?: string) => {
+        setAlertModal({ isOpen: true, message, type, title })
+    }
+
+    const closeAlert = () => {
+        setAlertModal(prev => ({ ...prev, isOpen: false }))
+    }
 
     // Trigger entrance animation
     useEffect(() => {
@@ -311,13 +330,13 @@ function RouteComponent() {
         if (file) {
             // Validate file type
             if (!file.type.startsWith('image/')) {
-                alert('Please select an image file')
+                showAlert('Please select an image file', 'warning')
                 return
             }
 
             // Validate file size (max 5MB)
             if (file.size > 5 * 1024 * 1024) {
-                alert('File size must be less than 5MB')
+                showAlert('File size must be less than 5MB', 'warning')
                 return
             }
 
@@ -377,12 +396,12 @@ function RouteComponent() {
 
             if (paymentError) throw paymentError
 
-            alert('Proof of payment uploaded successfully! Waiting for staff verification.')
+            showAlert('Proof of payment uploaded successfully! Waiting for staff verification.', 'success')
             handleCloseUploadModal()
             await fetchOrders() // Refresh orders
         } catch (error) {
             console.error('Error uploading proof:', error)
-            alert('Failed to upload proof of payment. Please try again.')
+            showAlert('Failed to upload proof of payment. Please try again.', 'error')
         } finally {
             setIsUploading(false)
         }
@@ -430,12 +449,12 @@ function RouteComponent() {
 
             if (paymentError) throw paymentError
 
-            alert('Proof of payment removed successfully. You can now upload a new one.')
+            showAlert('Proof of payment removed successfully. You can now upload a new one.', 'success')
             handleCloseViewReceipt()
             await fetchOrders() // Refresh orders
         } catch (error) {
             console.error('Error removing proof:', error)
-            alert('Failed to remove proof of payment. Please try again.')
+            showAlert('Failed to remove proof of payment. Please try again.', 'error')
         } finally {
             setIsUploading(false)
         }
@@ -543,7 +562,7 @@ function RouteComponent() {
 
             // Only allow refund for Pending or Queueing status
             if (orderData.order_status !== 'Pending' && orderData.order_status !== 'Queueing') {
-                alert(`Cannot request refund. This order is already in "${orderData.order_status}" status and cannot be cancelled.`)
+                showAlert(`Cannot request refund. This order is already in "${orderData.order_status}" status and cannot be cancelled.`, 'warning')
                 // Refresh orders to show current status
                 await fetchOrders()
                 return
@@ -558,7 +577,7 @@ function RouteComponent() {
             setConfirmGcashNumber('')
         } catch (error) {
             console.error('Error checking order status:', error)
-            alert('Failed to verify order status. Please try again.')
+            showAlert('Failed to verify order status. Please try again.', 'error')
         }
     }
 
@@ -580,7 +599,7 @@ function RouteComponent() {
 
     const handleGcashSubmit = async () => {
         if (gcashNumber !== confirmGcashNumber) {
-            alert('GCash numbers do not match')
+            showAlert('GCash numbers do not match', 'warning')
             return
         }
 
@@ -612,7 +631,7 @@ function RouteComponent() {
             setRefundStep(4)
         } catch (error) {
             console.error('Error submitting refund:', error)
-            alert('Failed to submit refund request')
+            showAlert('Failed to submit refund request', 'error')
         }
     }
 
@@ -1790,6 +1809,15 @@ function RouteComponent() {
                     </div>
                 </div>
             )}
+
+            {/* Alert Modal */}
+            <AlertModal
+                isOpen={alertModal.isOpen}
+                onClose={closeAlert}
+                title={alertModal.title}
+                message={alertModal.message}
+                type={alertModal.type}
+            />
         </ProtectedRoute>
     )
 }

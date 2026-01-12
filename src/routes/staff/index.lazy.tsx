@@ -17,6 +17,7 @@ import type { Order } from '@/lib/api'
 import { supabase } from '@/lib/supabaseClient'
 import { useNavigate } from '@tanstack/react-router'
 import { ProtectedRoute } from '@/components/ProtectedRoute'
+import { AlertModal, type AlertType } from '@/components/AlertModal'
 
 export const Route = createLazyFileRoute('/staff/')({
     component: RouteComponent,
@@ -146,6 +147,24 @@ function RouteComponent() {
     const [showRejectionDetailsModal, setShowRejectionDetailsModal] = useState(false)
     const [availableSchedules, setAvailableSchedules] = useState<any[]>([])
     const [selectedScheduleId, setSelectedScheduleId] = useState<string>('')
+    const [isStatusModalOpen, setIsStatusModalOpen] = useState(false)
+    const [selectedOrderForStatus, setSelectedOrderForStatus] = useState<OrderDisplay | null>(null)
+
+    // Alert Modal State
+    const [alertModal, setAlertModal] = useState<{
+        isOpen: boolean
+        title?: string
+        message: string
+        type: AlertType
+    }>({ isOpen: false, message: '', type: 'info' })
+
+    const showAlert = (message: string, type: AlertType = 'info', title?: string) => {
+        setAlertModal({ isOpen: true, message, type, title })
+    }
+
+    const closeAlert = () => {
+        setAlertModal(prev => ({ ...prev, isOpen: false }))
+    }
 
 
     const statusGroups = {
@@ -167,13 +186,13 @@ function RouteComponent() {
 
         // Validate that return payment proof is uploaded
         if (!returnPaymentProof) {
-            alert('Please upload return payment proof before rejecting the order. This is required to show proof that the customer\'s payment has been returned.');
+            showAlert('Please upload return payment proof before rejecting the order. This is required to show proof that the customer\'s payment has been returned.', 'warning');
             return;
         }
 
         // Validate that rejection reason is provided
         if (!rejectionReason.trim()) {
-            alert('Please provide a reason for rejecting the order.');
+            showAlert('Please provide a reason for rejecting the order.', 'warning');
             return;
         }
 
@@ -252,10 +271,10 @@ function RouteComponent() {
             setRejectionReason('')
             setIsOrderDetailsModalOpen(false)
             loadOrders()
-            alert('Order rejected successfully!')
+            showAlert('Order rejected successfully!', 'success')
         } catch (error) {
             console.error('Error rejecting order:', error)
-            alert('Failed to reject order')
+            showAlert('Failed to reject order', 'error')
         }
     }
 
@@ -523,10 +542,10 @@ function RouteComponent() {
             if (error) throw error
 
             await loadOrders()
-            alert('Order accepted successfully!')
+            showAlert('Order accepted successfully!', 'success')
         } catch (error) {
             console.error('Error accepting order:', error)
-            alert('Failed to accept order')
+            showAlert('Failed to accept order', 'error')
         }
     }
 
@@ -733,10 +752,10 @@ function RouteComponent() {
 
             await loadOrders()
             closeOrderDetails()
-            alert('Customer has been notified! Order status updated to "Claim Order".')
+            showAlert('Customer has been notified! Order status updated to "Claim Order".', 'success')
         } catch (error) {
             console.error('Error updating order status:', error)
-            alert('Failed to notify customer')
+            showAlert('Failed to notify customer', 'error')
         }
     }
 
@@ -745,13 +764,13 @@ function RouteComponent() {
         setLoading(true)
         try {
             if (!orderForm.fullName || !orderForm.email || !orderForm.phone || !orderForm.fulfillmentType) {
-                alert('Please fill in all customer information fields')
+                showAlert('Please fill in all customer information fields', 'warning')
                 setLoading(false)
                 return
             }
 
             if (orderForm.selectedMenuItems.length === 0) {
-                alert('Please add at least one menu item to the order')
+                showAlert('Please add at least one menu item to the order', 'warning')
                 setLoading(false)
                 return
             }
@@ -806,7 +825,7 @@ function RouteComponent() {
             }
 
             if (!selectedScheduleId) {
-                alert('Please select a schedule')
+                showAlert('Please select a schedule', 'warning')
                 setLoading(false)
                 return
             }
@@ -814,7 +833,7 @@ function RouteComponent() {
             // Use the selected schedule
             const schedule = availableSchedules.find(s => s.schedule_id === selectedScheduleId)
             if (!schedule) {
-                alert('Invalid schedule selected')
+                showAlert('Invalid schedule selected', 'warning')
                 setLoading(false)
                 return
             }
@@ -859,7 +878,7 @@ function RouteComponent() {
                     !orderForm.deliveryAddress.city ||
                     !orderForm.deliveryAddress.region ||
                     !orderForm.deliveryAddress.postalCode) {
-                    alert('Please fill in all delivery address fields')
+                    showAlert('Please fill in all delivery address fields', 'warning')
                     setLoading(false)
                     return
                 }
@@ -948,7 +967,7 @@ function RouteComponent() {
                 }
             }
 
-            alert('Order created successfully!')
+            showAlert('Order created successfully!', 'success')
             setIsAddOrderModalOpen(false)
             setOrderForm({
                 fullName: '',
@@ -973,7 +992,7 @@ function RouteComponent() {
         } catch (error) {
             setLoading(false)
             console.error('Error creating order:', error)
-            alert('Failed to create order')
+            showAlert('Failed to create order', 'error')
         }
     }
 
@@ -1062,6 +1081,30 @@ function RouteComponent() {
     const handleCloseViewReceipt = () => {
         setShowViewReceiptModal(false)
         setViewReceiptUrl('')
+    }
+
+    const updateOrderStatus = async (newStatus: 'Preparing' | 'Cooking' | 'Ready') => {
+        if (!selectedOrderForStatus?.orderData) return
+
+        try {
+            const { error } = await supabase
+                .from('order')
+                .update({
+                    order_status: newStatus,
+                    status_updated_at: new Date().toISOString()
+                })
+                .eq('order_id', selectedOrderForStatus.orderData.order_id)
+
+            if (error) throw error
+
+            await loadOrders()
+            setIsStatusModalOpen(false)
+            setSelectedOrderForStatus(null)
+            showAlert(`Order status updated to ${newStatus}!`, 'success')
+        } catch (error) {
+            console.error('Error updating order status:', error)
+            showAlert('Failed to update order status', 'error')
+        }
     }
 
     return (
@@ -1485,6 +1528,25 @@ function RouteComponent() {
                                                                                 Accept
                                                                             </button>
                                                                         </>
+                                                                    )}
+
+                                                                    {['Queueing', 'Preparing', 'Cooking', 'Ready'].includes(order.order_status) && (
+                                                                        <button
+                                                                            onClick={() => {
+                                                                                setSelectedOrderForStatus(order)
+                                                                                setIsStatusModalOpen(true)
+                                                                            }}
+                                                                            className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors flex items-center gap-1 ${order.order_status === 'Queueing' ? 'bg-orange-100 text-orange-700 hover:bg-orange-200' :
+                                                                                order.order_status === 'Preparing' ? 'bg-blue-100 text-blue-700 hover:bg-blue-200' :
+                                                                                    order.order_status === 'Cooking' ? 'bg-yellow-100 text-yellow-700 hover:bg-yellow-200' :
+                                                                                        'bg-green-100 text-green-700 hover:bg-green-200'
+                                                                                }`}
+                                                                        >
+                                                                            {order.order_status}
+                                                                            <svg className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                                                                                <path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L7.5 21H3v-4.5L16.732 3.732z" />
+                                                                            </svg>
+                                                                        </button>
                                                                     )}
 
                                                                     <button
@@ -2106,6 +2168,9 @@ function RouteComponent() {
                                                         <div className="grid grid-cols-3 gap-4 items-start">
                                                             <div>
                                                                 <p className="font-medium text-gray-800">{item.menu.name}</p>
+                                                                {item.size && (
+                                                                    <p className="text-sm text-amber-700 font-medium mb-1">Size: {item.size}</p>
+                                                                )}
                                                                 {item.menu.inclusion && (
                                                                     <p className="text-sm text-gray-600 mb-1.5">inclusions: {item.menu.inclusion}</p>
                                                                 )}
@@ -2599,6 +2664,89 @@ function RouteComponent() {
                         </div>
                     </div>
                 )}
+
+                {/* Status Update Modal */}
+                {isStatusModalOpen && selectedOrderForStatus && (
+                    <div className="fixed inset-0 flex items-center justify-center bg-black/50 z-50 p-4">
+                        <div className="bg-white rounded-2xl shadow-xl p-4 md:p-6 w-full max-w-sm">
+                            {/* Header */}
+                            <h2 className="text-lg md:text-xl font-bold text-gray-800 mb-2">
+                                Update Status
+                            </h2>
+                            <p className="text-xs md:text-sm text-gray-500 mb-4 md:mb-6">
+                                Choose the new status for order <span className="font-semibold">{selectedOrderForStatus.id}</span> ({selectedOrderForStatus.order_status}).
+                            </p>
+
+                            {/* Status Options */}
+                            <div className="space-y-2 md:space-y-3">
+                                {(['Preparing', 'Cooking', 'Ready'] as const).map((status) => {
+                                    const colors: Record<typeof status, string> = {
+                                        Preparing: 'bg-blue-100 text-blue-700 hover:bg-blue-200',
+                                        Cooking: 'bg-yellow-100 text-yellow-700 hover:bg-yellow-200',
+                                        Ready: 'bg-green-100 text-green-700 hover:bg-green-200',
+                                    };
+
+                                    const icons: Record<typeof status, React.ReactNode> = {
+                                        Preparing: (
+                                            <svg className="h-4 w-4 md:h-5 md:w-5" fill="none" stroke="currentColor" strokeWidth="2"
+                                                viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round"
+                                                    d="M12 8v4l3 3" />
+                                            </svg>
+                                        ),
+                                        Cooking: (
+                                            <svg className="h-4 w-4 md:h-5 md:w-5" fill="none" stroke="currentColor" strokeWidth="2"
+                                                viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round"
+                                                    d="M12 6v6h4" />
+                                            </svg>
+                                        ),
+                                        Ready: (
+                                            <svg className="h-4 w-4 md:h-5 md:w-5" fill="none" stroke="currentColor" strokeWidth="2"
+                                                viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round"
+                                                    d="M5 13l4 4L19 7" />
+                                            </svg>
+                                        ),
+                                    };
+
+                                    return (
+                                        <button
+                                            key={status}
+                                            onClick={() => updateOrderStatus(status)}
+                                            className={`w-full flex items-center gap-2 md:gap-3 px-3 md:px-4 py-2 md:py-3 rounded-lg font-medium transition text-sm md:text-base ${colors[status]}`}
+                                        >
+                                            {icons[status]}
+                                            {status}
+                                        </button>
+                                    );
+                                })}
+                            </div>
+
+                            {/* Footer */}
+                            <div className="mt-4 md:mt-6 flex justify-end">
+                                <button
+                                    onClick={() => {
+                                        setIsStatusModalOpen(false)
+                                        setSelectedOrderForStatus(null)
+                                    }}
+                                    className="px-4 py-2 rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-100 transition text-sm md:text-base"
+                                >
+                                    Cancel
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* Alert Modal */}
+                <AlertModal
+                    isOpen={alertModal.isOpen}
+                    onClose={closeAlert}
+                    title={alertModal.title}
+                    message={alertModal.message}
+                    type={alertModal.type}
+                />
             </div>
         </ProtectedRoute>
     )

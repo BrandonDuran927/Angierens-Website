@@ -24,6 +24,7 @@ import type { Review } from '@/lib/api'
 import { useNavigate } from '@tanstack/react-router'
 import { useUser } from '@/context/UserContext'
 import { ProtectedRoute } from '@/components/ProtectedRoute'
+import { AlertModal, type AlertType } from '@/components/AlertModal'
 
 export const Route = createLazyFileRoute('/staff/reviews')({
   component: RouteComponent,
@@ -53,6 +54,22 @@ function RouteComponent() {
   const [loading, setLoading] = useState(true)
   const [processingReviewId, setProcessingReviewId] = useState<string | null>(null)
   const location = useLocation()
+
+  // Alert Modal State
+  const [alertModal, setAlertModal] = useState<{
+    isOpen: boolean
+    title?: string
+    message: string
+    type: AlertType
+  }>({ isOpen: false, message: '', type: 'info' })
+
+  const showAlert = (message: string, type: AlertType = 'info', title?: string) => {
+    setAlertModal({ isOpen: true, message, type, title })
+  }
+
+  const closeAlert = () => {
+    setAlertModal(prev => ({ ...prev, isOpen: false }))
+  }
 
   useEffect(() => {
     fetchReviews()
@@ -131,7 +148,7 @@ function RouteComponent() {
 
       if (error) {
         console.error('Error updating review visibility:', error)
-        alert('Failed to update review visibility. Please try again.')
+        showAlert('Failed to update review visibility. Please try again.', 'error')
         return
       }
 
@@ -150,7 +167,7 @@ function RouteComponent() {
       setIsViewModalOpen(false)
     } catch (error) {
       console.error('Error toggling review visibility:', error)
-      alert('An error occurred. Please try again.')
+      showAlert('An error occurred. Please try again.', 'error')
       setIsViewModalOpen(false)
     } finally {
       setProcessingReviewId(null)
@@ -656,6 +673,15 @@ function RouteComponent() {
           </div>
         )}
         {loading && <LoadingSpinner />}
+
+        {/* Alert Modal */}
+        <AlertModal
+          isOpen={alertModal.isOpen}
+          onClose={closeAlert}
+          title={alertModal.title}
+          message={alertModal.message}
+          type={alertModal.type}
+        />
       </div>
     </ProtectedRoute>
   )

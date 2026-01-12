@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabaseClient'
 import { useUser } from '@/context/UserContext'
 import { ProtectedRoute } from '@/components/ProtectedRoute'
 import { useNavigate } from '@tanstack/react-router'
+import { AlertModal, type AlertType } from '@/components/AlertModal'
 
 export const Route = createLazyFileRoute('/customer-interface/specific-order/$orderId')({
   component: SpecificOrder,
@@ -37,6 +38,7 @@ interface OrderItem {
   unitPrice: number
   inclusions: string[]
   addOns: string
+  size: string | null
 }
 
 interface OrderData {
@@ -102,6 +104,24 @@ function SpecificOrder() {
   const [showRefundDetailsModal, setShowRefundDetailsModal] = useState(false)
   const [showTrackRiderModal, setShowTrackRiderModal] = useState(false)
   const [riderLocation, setRiderLocation] = useState<RiderLocation | null>(null)
+  const [alertModal, setAlertModal] = useState<{
+    isOpen: boolean
+    message: string
+    type: AlertType
+    title?: string
+  }>({
+    isOpen: false,
+    message: '',
+    type: 'info'
+  })
+
+  const showAlert = (message: string, type: AlertType = 'info', title?: string) => {
+    setAlertModal({ isOpen: true, message, type, title })
+  }
+
+  const closeAlert = () => {
+    setAlertModal(prev => ({ ...prev, isOpen: false }))
+  }
 
   const { orderId } = Route.useParams()
 
@@ -177,6 +197,7 @@ function SpecificOrder() {
           schedule (*),
           order_item (
             *,
+            size,
             menu (*),
             order_item_add_on (
               *,
@@ -232,7 +253,8 @@ function SpecificOrder() {
           price: itemSubtotal + addOnsTotal, // Total price for this item including add-ons
           unitPrice: unitPrice, // Original unit price of the menu item
           inclusions: inclusions,
-          addOns: addOns.length > 0 ? addOns.join(', ') : 'None'
+          addOns: addOns.length > 0 ? addOns.join(', ') : 'None',
+          size: item.size || null
         }
       })
 
@@ -491,7 +513,7 @@ function SpecificOrder() {
         setRefundStep(4)
       } catch (error) {
         console.error('Error submitting refund:', error)
-        alert('Failed to submit refund request')
+        showAlert('Failed to submit refund request', 'error')
       }
     }
   }
@@ -564,17 +586,17 @@ function SpecificOrder() {
         if (deliveryError) throw deliveryError
       }
 
-      alert('Order confirmed as completed!')
+      showAlert('Order confirmed as completed!', 'success')
       await fetchOrderData() // Refresh the order data
     } catch (error) {
       console.error('Error confirming pickup:', error)
-      alert('Failed to confirm pickup. Please try again.')
+      showAlert('Failed to confirm pickup. Please try again.', 'error')
     }
   }
 
   const handleOpenTrackRider = async () => {
     if (!orderData?.riderId) {
-      alert('Rider information not available')
+      showAlert('Rider information not available', 'warning')
       return
     }
 
@@ -600,7 +622,7 @@ function SpecificOrder() {
       setShowTrackRiderModal(true)
     } catch (error) {
       console.error('Error fetching rider location:', error)
-      alert('Unable to fetch rider location. Please try again.')
+      showAlert('Unable to fetch rider location. Please try again.', 'error')
     }
   }
 
@@ -1341,7 +1363,7 @@ function SpecificOrder() {
                                 Confirm Received
                               </button>
                               <button
-                                onClick={() => alert('Report feature - to be implemented')}
+                                onClick={() => showAlert('Report feature - to be implemented', 'info')}
                                 className="bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 text-xs rounded-lg font-semibold transition-all"
                               >
                                 Report Issue
@@ -1453,6 +1475,11 @@ function SpecificOrder() {
                               </div>
 
                               <div className="mt-2 space-y-1">
+                                {item.size && (
+                                  <p className="text-sm text-gray-600">
+                                    <span className="font-medium">Size:</span> {item.size}
+                                  </p>
+                                )}
                                 {item.inclusions.length > 0 && (
                                   <p className="text-sm text-gray-600">
                                     <span className="font-medium">Includes:</span> {item.inclusions.join(', ')}
@@ -2036,6 +2063,15 @@ function SpecificOrder() {
 
         {/* Loading Spinner */}
         {isLoading && <LoadingSpinner />}
+
+        {/* Alert Modal */}
+        <AlertModal
+          isOpen={alertModal.isOpen}
+          onClose={closeAlert}
+          message={alertModal.message}
+          type={alertModal.type}
+          title={alertModal.title}
+        />
       </div>
     </ProtectedRoute>
   )
