@@ -495,7 +495,7 @@ function RouteComponent() {
                                                 <th className="px-6 py-4 text-left text-sm font-bold text-yellow-400 uppercase tracking-wider w-[10%]">
                                                     Size
                                                 </th>
-                                                <th className="px-6 py-4 text-left text-sm font-bold text-yellow-400 uppercase tracking-wider w-[15%]">
+                                                <th className="px-6 py-4 text-center text-sm font-bold text-yellow-400 uppercase tracking-wider w-[15%]">
                                                     Availability
                                                 </th>
                                                 <th className="px-6 py-4 text-center text-sm font-bold text-yellow-400 uppercase tracking-wider w-[10%]">

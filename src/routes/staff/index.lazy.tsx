@@ -1498,7 +1498,7 @@ function RouteComponent() {
                                                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Price</th>
                                                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fulfillment</th>
                                                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Payment</th>
-                                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Action</th>
+                                                        <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Action</th>
                                                     </tr>
                                                 </thead>
                                                 <tbody className="bg-white divide-y divide-gray-200">
@@ -1512,8 +1512,8 @@ function RouteComponent() {
                                                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{order.fulfillmentType}</td>
                                                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{order.paymentMethod}</td>
                                                             <td className="px-6 py-4 whitespace-nowrap text-sm">
-                                                                <div className="flex gap-2">
-                                                                    {order.order_status === 'Pending' && (
+                                                                <div className="flex gap-2 justify-center">
+                                                                    {/* {order.order_status === 'Pending' && (
                                                                         <>
                                                                             <button
                                                                                 onClick={() => handleRejectOrder(order.id)}
@@ -1528,9 +1528,9 @@ function RouteComponent() {
                                                                                 Accept
                                                                             </button>
                                                                         </>
-                                                                    )}
+                                                                    )} */}
 
-                                                                    {['Queueing', 'Preparing', 'Cooking', 'Ready'].includes(order.order_status) && (
+                                                                    {['Queueing', 'Preparing', 'Cooking'].includes(order.order_status) && (
                                                                         <button
                                                                             onClick={() => {
                                                                                 setSelectedOrderForStatus(order)
@@ -1538,8 +1538,7 @@ function RouteComponent() {
                                                                             }}
                                                                             className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors flex items-center gap-1 ${order.order_status === 'Queueing' ? 'bg-orange-100 text-orange-700 hover:bg-orange-200' :
                                                                                 order.order_status === 'Preparing' ? 'bg-blue-100 text-blue-700 hover:bg-blue-200' :
-                                                                                    order.order_status === 'Cooking' ? 'bg-yellow-100 text-yellow-700 hover:bg-yellow-200' :
-                                                                                        'bg-green-100 text-green-700 hover:bg-green-200'
+                                                                                    'bg-yellow-100 text-yellow-700 hover:bg-yellow-200'
                                                                                 }`}
                                                                         >
                                                                             {order.order_status}
@@ -1547,6 +1546,12 @@ function RouteComponent() {
                                                                                 <path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L7.5 21H3v-4.5L16.732 3.732z" />
                                                                             </svg>
                                                                         </button>
+                                                                    )}
+
+                                                                    {order.order_status === 'Ready' && (
+                                                                        <span className="px-3 py-1.5 text-xs font-medium rounded-lg bg-green-100 text-green-700">
+                                                                            {order.order_status}
+                                                                        </span>
                                                                     )}
 
                                                                     <button
@@ -2680,6 +2685,22 @@ function RouteComponent() {
                             {/* Status Options */}
                             <div className="space-y-2 md:space-y-3">
                                 {(['Preparing', 'Cooking', 'Ready'] as const).map((status) => {
+                                    // Determine if this status option should be shown
+                                    const currentStatus = selectedOrderForStatus.order_status;
+                                    let shouldShow = false;
+
+                                    if (currentStatus === 'Queueing') {
+                                        shouldShow = status === 'Preparing'; // Can update to any status
+                                    } else if (currentStatus === 'Preparing') {
+                                        shouldShow = status === 'Cooking'; // Can't go back to Queueing
+                                    } else if (currentStatus === 'Cooking') {
+                                        shouldShow = status === 'Ready'; // Can only go to Ready
+                                    } else if (currentStatus === 'Ready') {
+                                        shouldShow = false; // Can't update from Ready
+                                    }
+
+                                    if (!shouldShow) return null;
+
                                     const colors: Record<typeof status, string> = {
                                         Preparing: 'bg-blue-100 text-blue-700 hover:bg-blue-200',
                                         Cooking: 'bg-yellow-100 text-yellow-700 hover:bg-yellow-200',
