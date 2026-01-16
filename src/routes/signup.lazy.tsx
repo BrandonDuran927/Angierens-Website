@@ -644,10 +644,7 @@ function Signup() {
     // Check if email is already registered and determine registration flow
     try {
       const { data: existingUser, error } = await supabase
-        .from('users')
-        .select('user_uid, email, user_role')
-        .eq('email', trimmedEmail)
-        .limit(1);
+        .rpc('check_email_for_signup', { p_email: trimmedEmail });
 
       if (error) {
         console.error('Error checking email:', error);
@@ -657,13 +654,9 @@ function Signup() {
 
       if (existingUser && existingUser.length > 0) {
         const userRecord = existingUser[0];
-        const currentRoles = (userRecord.user_role || '')
-          .split(',')
-          .map((r: string) => r.trim().toLowerCase())
-          .filter((r: string) => r);
 
         // Check if user already has customer role
-        if (currentRoles.includes('customer')) {
+        if (userRecord.has_customer_role) {
           setErrors({ email: 'You already have a customer account' });
           setValidationMessage({
             type: 'error',
@@ -740,9 +733,15 @@ function Signup() {
   const sendOtp = async () => {
     const formattedPhone = formatPhoneNumber(form.phone_number)
 
+    // MOCK IMPLEMENTATION - Generate a fake OTP for testing
+    const mockOtp = '123456'; // In production, this comes from Twilio
+    setSentCode(mockOtp);
+    console.log('MOCK OTP (for testing only):', mockOtp);
+
     setOtpSent(true)
     setValidationMessage({ type: 'success', message: `OTP sent to ${formattedPhone}` })
 
+    // PRODUCTION IMPLEMENTATION (commented out to save credits):
     // try {
     //   setIsSendingOtp(true)
     //   setOtpError('')
@@ -775,10 +774,37 @@ function Signup() {
   }
 
   const verifyOtp = async () => {
-    await signUpNewUser();
-    closeOtpModal();
-    // Navigate to login with success message and pre-filled email
-    navigate({ to: `/login?signup=success&email=${encodeURIComponent(form.email.trim().toLowerCase())}` });
+    // MOCK IMPLEMENTATION - Validate against the mock OTP
+    try {
+      setIsLoading(true);
+      setOtpError('');
+
+      // Validate OTP code
+      if (!otpCode || otpCode.length !== 6) {
+        setOtpError('Please enter a valid 6-digit OTP code');
+        setIsLoading(false);
+        return;
+      }
+
+      // Check against mock OTP (in production, Twilio handles this)
+      if (otpCode !== sentCode) {
+        setOtpError('Invalid OTP code. Please try again. (Hint: Use 123456 for testing)');
+        setIsLoading(false);
+        return;
+      }
+
+      // OTP verified successfully, proceed with user registration
+      await signUpNewUser();
+      closeOtpModal();
+      // Navigate to login with success message and pre-filled email
+      navigate({ to: `/login?signup=success&email=${encodeURIComponent(form.email.trim().toLowerCase())}` });
+    } catch (error) {
+      console.error('Error verifying OTP or signing up:', error);
+      setOtpError('An error occurred. Please try again.');
+      setIsLoading(false);
+    }
+
+    // PRODUCTION IMPLEMENTATION (commented out to save credits):
     // try {
     //   setIsLoading(true);
     //   setOtpError('');
@@ -813,7 +839,7 @@ function Signup() {
     //     // OTP verified successfully, proceed with user registration
     //     await signUpNewUser();
     //     closeOtpModal();
-    //     navigate({ to: "/login" });
+    //     navigate({ to: `/login?signup=success&email=${encodeURIComponent(form.email.trim().toLowerCase())}` });
     //   } else {
     //     setOtpError(data.message || 'Invalid OTP code. Please try again.');
     //     setIsLoading(false);
@@ -897,25 +923,19 @@ function Signup() {
           throw new Error("Auth signup failed, no user ID returned.");
         }
 
-        const { data: userData, error: userError } = await supabase
-          .from("users")
-          .insert([
-            {
-              user_uid: userAuthId,
-              first_name: sanitizedFirstName,
-              middle_name: sanitizedMiddleName,
-              last_name: sanitizedLastName,
-              email: sanitizedEmail,
-              phone_number: sanitizedPhone,
-              is_active: true,
-              user_role: "customer",
-              date_hired: null,
-              birth_date: formattedBirthDate,
-              gender: form.gender,
-              other_contact: sanitizedOtherContact,
-            },
-          ])
-          .select("user_uid")
+        await supabase.auth.signOut();
+
+        const { data, error: userError } = await supabase.rpc('create_user_profile', {
+          p_user_uid: userAuthId,
+          p_first_name: sanitizedFirstName,
+          p_middle_name: sanitizedMiddleName,
+          p_last_name: sanitizedLastName,
+          p_email: sanitizedEmail,
+          p_phone_number: sanitizedPhone,
+          p_birth_date: formattedBirthDate,
+          p_gender: form.gender,
+          p_other_contact: sanitizedOtherContact
+        });
 
         if (userError) {
           console.error("Error inserting user:", userError);
@@ -923,7 +943,7 @@ function Signup() {
           throw userError;
         }
 
-        userId = userData[0].user_uid;
+        userId = userAuthId; // Function returns the UUID
       }
 
       // Geocode the address to get coordinates
