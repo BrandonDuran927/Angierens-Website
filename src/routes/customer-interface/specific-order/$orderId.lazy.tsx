@@ -708,11 +708,13 @@ function SpecificOrder() {
         // Fetch and draw routes
         const fetchAndDrawRoutes = async () => {
           try {
+            const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001';
+
             // If rider location exists, show rider to customer route
             if (riderLocation) {
               const riderLoc = { lat: riderLocation.latitude, lng: riderLocation.longitude }
               const riderToCustomerResponse = await fetch(
-                `http://localhost:3001/api/directions?origin=${riderLoc.lat},${riderLoc.lng}&destination=${customerLocation.lat},${customerLocation.lng}`
+                `${backendUrl}/api/directions?origin=${riderLoc.lat},${riderLoc.lng}&destination=${customerLocation.lat},${customerLocation.lng}`
               )
               const riderToCustomerData = await riderToCustomerResponse.json()
 
@@ -733,7 +735,7 @@ function SpecificOrder() {
             } else {
               // If no rider location yet, show the planned store to customer route
               const storeToCustomerResponse = await fetch(
-                `http://localhost:3001/api/directions?origin=${storeLocation.lat},${storeLocation.lng}&destination=${customerLocation.lat},${customerLocation.lng}`
+                `${backendUrl}/api/directions?origin=${storeLocation.lat},${storeLocation.lng}&destination=${customerLocation.lat},${customerLocation.lng}`
               )
               const storeToCustomerData = await storeToCustomerResponse.json()
 

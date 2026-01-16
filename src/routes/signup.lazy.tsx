@@ -224,7 +224,7 @@ function Signup() {
       const fullAddress = `${form.address_line}, ${form.barangay}, ${form.city}, ${form.province}, Philippines ${form.postalCode}`;
 
       // Use production backend URL, fallback to localhost for local dev
-      const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001';
+      const backendUrl = import.meta.env.VITE_BACKEND_URL;
 
       const response = await fetch(
         `${backendUrl}/api/geocode?address=${encodeURIComponent(fullAddress)}`
@@ -877,20 +877,12 @@ function Signup() {
 
       // Check if this is an existing employee adding customer role
       if (existingEmployeeData) {
-        console.log('Adding customer role to existing employee:', existingEmployeeData.user_uid);
-
-        // Update the existing user's role to include customer
-        const newRole = `${existingEmployeeData.user_role},customer`;
-
-        const { error: updateError } = await supabase
-          .from('users')
-          .update({
-            user_role: newRole,
-            // Optionally update phone if they provided a new one
-            phone_number: sanitizedPhone,
-            other_contact: sanitizedOtherContact
-          })
-          .eq('user_uid', existingEmployeeData.user_uid);
+        // Use database function to add customer role (bypasses RLS)
+        const { data: newRole, error: updateError } = await supabase.rpc('add_customer_role_to_employee', {
+          p_user_uid: existingEmployeeData.user_uid,
+          p_phone_number: sanitizedPhone,
+          p_other_contact: sanitizedOtherContact
+        });
 
         if (updateError) {
           console.error('Error updating user role:', updateError);
