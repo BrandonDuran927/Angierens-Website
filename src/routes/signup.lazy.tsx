@@ -223,8 +223,11 @@ function Signup() {
     try {
       const fullAddress = `${form.address_line}, ${form.barangay}, ${form.city}, ${form.province}, Philippines ${form.postalCode}`;
 
+      // Use production backend URL, fallback to localhost for local dev
+      const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001';
+
       const response = await fetch(
-        `http://localhost:3001/api/geocode?address=${encodeURIComponent(fullAddress)}`
+        `${backendUrl}/api/geocode?address=${encodeURIComponent(fullAddress)}`
       );
 
       if (!response.ok) {
