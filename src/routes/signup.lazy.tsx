@@ -899,7 +899,7 @@ function Signup() {
           email: sanitizedEmail,
           password: form.password,
           options: {
-            emailRedirectTo: `${window.location.origin}/login?verified=true`,
+            emailRedirectTo: `https://walrus-app-wpkax.ondigitalocean.app/login?verified=true`,
           },
         })
 
