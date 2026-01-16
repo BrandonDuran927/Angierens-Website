@@ -8,10 +8,17 @@ dotenv.config()
 const app = express()
 const PORT = process.env.PORT || 3001
 
-// CORS configuration
+// CORS configuration - allow local dev and production origins
+const allowedOrigins = [
+  'http://localhost:3000',
+  'http://localhost:5173',
+  'https://walrus-app-wpkax.ondigitalocean.app',
+  // Add any other production frontend URLs here
+]
+
 app.use(
   cors({
-    origin: ['http://localhost:3000', 'http://localhost:5173'],
+    origin: allowedOrigins,
     methods: ['GET', 'POST', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
   }),
