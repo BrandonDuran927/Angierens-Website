@@ -1513,6 +1513,14 @@ function RouteComponent() {
                                                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{order.paymentMethod}</td>
                                                             <td className="px-6 py-4 whitespace-nowrap text-sm">
                                                                 <div className="flex gap-2 justify-center">
+                                                                    <button
+                                                                        onClick={() => openOrderDetails(order)}
+                                                                        className="text-gray-600 hover:text-gray-800 transition-colors p-1"
+                                                                        aria-label="View order details"
+                                                                    >
+                                                                        <Eye className="h-5 w-5" />
+                                                                    </button>
+
                                                                     {/* {order.order_status === 'Pending' && (
                                                                         <>
                                                                             <button
@@ -1553,14 +1561,6 @@ function RouteComponent() {
                                                                             {order.order_status}
                                                                         </span>
                                                                     )}
-
-                                                                    <button
-                                                                        onClick={() => openOrderDetails(order)}
-                                                                        className="text-gray-600 hover:text-gray-800 transition-colors p-1"
-                                                                        aria-label="View order details"
-                                                                    >
-                                                                        <Eye className="h-5 w-5" />
-                                                                    </button>
                                                                 </div>
                                                             </td>
                                                         </tr>
