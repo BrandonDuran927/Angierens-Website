@@ -2237,7 +2237,7 @@ function Signup() {
               <p className="text-gray-600 text-sm">
                 {otpSent
                   ? `Code sent to ${formatPhoneNumber(form.phone_number)}`
-                  : 'We will send a 6-digit code to your phone'}
+                  : 'We will send a 6-digit code to your phone...'}
               </p>
             </div>
 
@@ -2248,43 +2248,32 @@ function Signup() {
               </div>
             )}
 
-            {!otpSent ? (
+
+            <div className="mb-6">
+              <label className="block text-sm font-semibold text-gray-700 mb-3 text-center">Enter OTP Code</label>
+              <input
+                type="text"
+                value={otpCode}
+                onChange={(e) => {
+                  setOtpCode(e.target.value.replace(/\D/g, '').slice(0, 6));
+                  setOtpError('');
+                }}
+                className="w-full px-4 py-4 border-2 border-gray-200 rounded-xl focus:border-[#964B00] focus:ring-2 focus:ring-amber-200 transition-all outline-none text-center text-2xl tracking-[0.5em] font-bold"
+                placeholder="000000"
+                maxLength={6}
+                onKeyDown={(e) => e.key === 'Enter' && otpCode.length === 6 && verifyOtp()}
+              />
+            </div>
+
+            <div className="text-center mb-6">
               <button
                 onClick={sendOtp}
                 disabled={isSendingOtp}
-                className="w-full px-6 py-3 bg-gradient-to-r from-[#964B00] to-amber-700 text-yellow-400 rounded-xl hover:from-amber-700 hover:to-[#964B00] transition-all font-semibold shadow-lg disabled:opacity-50 disabled:cursor-not-allowed mb-4"
+                className="text-[#964B00] text-sm font-semibold hover:underline transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {isSendingOtp ? 'Sending OTP...' : 'Send OTP'}
+                {isSendingOtp ? 'Sending...' : "Didn't receive the code? Resend"}
               </button>
-            ) : (
-              <>
-                <div className="mb-6">
-                  <label className="block text-sm font-semibold text-gray-700 mb-3 text-center">Enter OTP Code</label>
-                  <input
-                    type="text"
-                    value={otpCode}
-                    onChange={(e) => {
-                      setOtpCode(e.target.value.replace(/\D/g, '').slice(0, 6));
-                      setOtpError('');
-                    }}
-                    className="w-full px-4 py-4 border-2 border-gray-200 rounded-xl focus:border-[#964B00] focus:ring-2 focus:ring-amber-200 transition-all outline-none text-center text-2xl tracking-[0.5em] font-bold"
-                    placeholder="000000"
-                    maxLength={6}
-                    onKeyDown={(e) => e.key === 'Enter' && otpCode.length === 6 && verifyOtp()}
-                  />
-                </div>
-
-                <div className="text-center mb-6">
-                  <button
-                    onClick={sendOtp}
-                    disabled={isSendingOtp}
-                    className="text-[#964B00] text-sm font-semibold hover:underline transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {isSendingOtp ? 'Sending...' : "Didn't receive the code? Resend"}
-                  </button>
-                </div>
-              </>
-            )}
+            </div>
 
             <div className="flex gap-3">
               <button
