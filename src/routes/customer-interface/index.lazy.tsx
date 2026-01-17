@@ -1008,7 +1008,7 @@ function RouteComponent() {
           <>
             {/* Menu Items Grid with max height and scroll */}
             <div className="max-h-[calc(100vh-250px)] overflow-y-auto pr-2 custom-scrollbar">
-              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-4 md:gap-6 lg:gap-8">
+              <div className="grid grid-cols-2 sm:grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-4 md:gap-6 lg:gap-8">
                 {filteredItems.map((item) => {
                   const inclusions = parseInclusions(item.inclusion)
                   return (
