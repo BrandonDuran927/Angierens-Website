@@ -1,10 +1,11 @@
 import { createLazyFileRoute, Link } from '@tanstack/react-router'
 import { useState, useEffect } from 'react'
-import { Search, ShoppingCart, Bell, ChevronDown, X, Plus, Minus, Heart, MessageSquare, Star, Menu, ArrowRight, Tag, Facebook, Instagram, Mail, Phone, MapPin } from 'lucide-react'
+import { Search, ShoppingCart, Bell, ChevronDown, X, Plus, Minus, Heart, MessageSquare, Star, Menu, ArrowRight, Tag } from 'lucide-react'
 import { useUser } from '@/context/UserContext'
 import { useNavigate } from '@tanstack/react-router'
 import { supabase } from '@/lib/supabaseClient'
 import { AlertModal, type AlertType } from '@/components/AlertModal'
+import { CustomerFooter } from '@/components/CustomerFooter'
 
 
 // Type definitions
@@ -57,6 +58,8 @@ function RouteComponent() {
     navigate({ to: "/login" });
   }
 
+  const [showTCModal, setShowTCModal] = useState(false)
+  const [showPrivacyModal, setShowPrivacyModal] = useState(false)
   const [isNotificationOpen, setIsNotificationOpen] = useState(false)
   const [notificationCount, setNotificationCount] = useState(3)
   const [isOrderDropdownOpen, setIsOrderDropdownOpen] = useState(false);
@@ -1077,7 +1080,7 @@ function RouteComponent() {
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-in fade-in duration-200">
           <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-hidden shadow-2xl animate-in zoom-in-95 duration-200">
             {/* Header with close button */}
-            <div className="sticky top-0 bg-white border-b border-gray-100 px-6 py-4 flex justify-between items-center">
+            <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex justify-between items-center">
               <h2 className="text-2xl font-bold text-gray-900">{selectedItem.name}</h2>
               <button
                 onClick={closeModal}
@@ -1155,7 +1158,7 @@ function RouteComponent() {
             </div>
 
             {/* Footer - sticky at bottom */}
-            <div className="sticky bottom-0 bg-white border-t border-gray-100 px-6 py-4 shadow-lg">
+            <div className="sticky bottom-0 bg-white border-t border-gray-200 px-6 py-4 shadow-lg">
               <div className="flex flex-col gap-4">
                 <div className="text-center">
                   <p className="text-sm text-gray-500 mb-1">Total Price</p>
@@ -1312,100 +1315,8 @@ function RouteComponent() {
         </div>
       )}
 
-      {/* FOOTER */}
-      <footer id="contact" className="bg-gradient-to-br from-amber-900 via-amber-950 to-black text-white py-12 sm:py-16">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8 lg:gap-12">
-            {/* Brand Column */}
-            <div className="sm:col-span-2 lg:col-span-1">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="w-12 h-12 bg-[url('/angierens-logo.png')] bg-cover bg-center rounded-full" />
-                <h3 className="text-xl font-bold">Angieren's</h3>
-              </div>
-              <p className="text-amber-200/80 text-sm leading-relaxed">
-                Authentic Filipino home-cooked meals delivered to your doorstep. Taste the tradition, feel the love.
-              </p>
-              {/* Social Links */}
-              <div className="flex gap-3 mt-6">
-                <a href="#" className="w-10 h-10 bg-white/10 hover:bg-yellow-400 hover:text-amber-900 rounded-full flex items-center justify-center transition-all duration-300">
-                  <Facebook className="h-5 w-5" />
-                </a>
-                <a href="#" className="w-10 h-10 bg-white/10 hover:bg-yellow-400 hover:text-amber-900 rounded-full flex items-center justify-center transition-all duration-300">
-                  <Instagram className="h-5 w-5" />
-                </a>
-              </div>
-            </div>
-
-            {/* Quick Links */}
-            <div>
-              <h4 className="text-lg font-semibold mb-4 text-yellow-400">Quick Links</h4>
-              <ul className="space-y-3 text-sm">
-                <li><Link to="/" className="text-amber-200/80 hover:text-yellow-400 transition-colors flex items-center gap-2"><ArrowRight className="h-4 w-4" />Home</Link></li>
-                <li><Link to="/customer-interface" className="text-amber-200/80 hover:text-yellow-400 transition-colors flex items-center gap-2"><ArrowRight className="h-4 w-4" />Menu</Link></li>
-                <li><a href="#about" className="text-amber-200/80 hover:text-yellow-400 transition-colors flex items-center gap-2"><ArrowRight className="h-4 w-4" />About Us</a></li>
-                <li><a href="#contact" className="text-amber-200/80 hover:text-yellow-400 transition-colors flex items-center gap-2"><ArrowRight className="h-4 w-4" />Contact</a></li>
-              </ul>
-            </div>
-
-            {/* Support */}
-            <div>
-              <h4 className="text-lg font-semibold mb-4 text-yellow-400">Support</h4>
-              <ul className="space-y-3 text-sm">
-                <li><Link to="/" className="text-amber-200/80 hover:text-yellow-400 transition-colors flex items-center gap-2"><ArrowRight className="h-4 w-4" />FAQ</Link></li>
-                <li><Link to="/" className="text-amber-200/80 hover:text-yellow-400 transition-colors flex items-center gap-2"><ArrowRight className="h-4 w-4" />Help Center</Link></li>
-                <li><Link to="/" className="text-amber-200/80 hover:text-yellow-400 transition-colors flex items-center gap-2"><ArrowRight className="h-4 w-4" />Terms & Conditions</Link></li>
-                <li><Link to="/" className="text-amber-200/80 hover:text-yellow-400 transition-colors flex items-center gap-2"><ArrowRight className="h-4 w-4" />Privacy Policy</Link></li>
-              </ul>
-            </div>
-
-            {/* Contact Info */}
-            <div>
-              <h4 className="text-lg font-semibold mb-4 text-yellow-400">Contact Us</h4>
-              <div className="space-y-4 text-sm">
-                <div className="flex items-start gap-3">
-                  <div className="w-8 h-8 bg-white/10 rounded-lg flex items-center justify-center flex-shrink-0">
-                    <Mail className="h-4 w-4 text-yellow-400" />
-                  </div>
-                  <div>
-                    <p className="text-amber-200/60 text-xs mb-1">Email</p>
-                    <p className="text-amber-100">info@angierens.com</p>
-                  </div>
-                </div>
-                <div className="flex items-start gap-3">
-                  <div className="w-8 h-8 bg-white/10 rounded-lg flex items-center justify-center flex-shrink-0">
-                    <Phone className="h-4 w-4 text-yellow-400" />
-                  </div>
-                  <div>
-                    <p className="text-amber-200/60 text-xs mb-1">Phone</p>
-                    <p className="text-amber-100">+63 912 345 6789</p>
-                  </div>
-                </div>
-                <div className="flex items-start gap-3">
-                  <div className="w-8 h-8 bg-white/10 rounded-lg flex items-center justify-center flex-shrink-0">
-                    <MapPin className="h-4 w-4 text-yellow-400" />
-                  </div>
-                  <div>
-                    <p className="text-amber-200/60 text-xs mb-1">Location</p>
-                    <p className="text-amber-100">Bulacan, Philippines</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Copyright */}
-          <div className="border-t border-white/10 mt-10 pt-8">
-            <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-              <p className="text-amber-200/60 text-sm">
-                © 2024 Angieren's Lutong Bahay. All rights reserved.
-              </p>
-              <p className="text-amber-200/40 text-xs">
-                Made with 💛 in Bulacan, Philippines
-              </p>
-            </div>
-          </div>
-        </div>
-      </footer>
+      {/* Footer, Privacy Policy, and Terms & Conditions */}
+      <CustomerFooter />
 
       {/* Alert Modal */}
       <AlertModal

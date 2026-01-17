@@ -5,6 +5,8 @@ import { useUser } from '@/context/UserContext'
 import { ProtectedRoute } from '@/components/ProtectedRoute'
 import { useNavigate } from '@tanstack/react-router'
 import { supabase } from '@/lib/supabaseClient'
+import { CustomerFooter } from '@/components/CustomerFooter'
+
 
 export const Route = createLazyFileRoute('/customer-interface/home')({
   component: RouteComponent,
@@ -822,51 +824,8 @@ function RouteComponent() {
             </div>
           </div>
 
-          {/* FOOTER */}
-          <footer id="contact" className="py-6 sm:py-8" style={{ backgroundColor: "#F9ECD9" }}>
-            <div className="max-w-5xl mx-auto px-4">
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 md:gap-8">
-                <div className="sm:col-span-2 lg:col-span-1">
-                  <h3 className="text-lg font-bold mb-4 text-gray-800">Angieren's Lutong Bahay</h3>
-                  <p className="text-gray-600 text-sm">
-                    Authentic Filipino home-cooked meals delivered to your doorstep.
-                  </p>
-                </div>
-                <div>
-                  <h4 className="text-md font-semibold mb-3 text-gray-800">Quick Links</h4>
-                  <ul className="space-y-2 text-sm">
-                    <li><Link to="/customer-interface/home" className="text-gray-600 hover:text-gray-800">Home</Link></li>
-                    <li><Link to="/" className="text-gray-600 hover:text-gray-800">Menu</Link></li>
-                    <li><Link to="/" className="text-gray-600 hover:text-gray-800">About Us</Link></li>
-                    <li><Link to="/" className="text-gray-600 hover:text-gray-800">Contact</Link></li>
-                  </ul>
-                </div>
-                <div>
-                  <h4 className="text-md font-semibold mb-3 text-gray-800">Support</h4>
-                  <ul className="space-y-2 text-sm">
-                    <li><Link to="/" className="text-gray-600 hover:text-gray-800">FAQ</Link></li>
-                    <li><Link to="/" className="text-gray-600 hover:text-gray-800">Help Center</Link></li>
-                    <li><Link to="/" className="text-gray-600 hover:text-gray-800">Terms & Conditions</Link></li>
-                    <li><Link to="/" className="text-gray-600 hover:text-gray-800">Privacy Policy</Link></li>
-                  </ul>
-                </div>
-                <div>
-                  <h4 className="text-md font-semibold mb-3 text-gray-800">Connect With Us</h4>
-                  <div className="space-y-2 text-sm">
-                    <p className="text-gray-600">Email: info@angierens.com</p>
-                    <p className="text-gray-600">Phone: +63 912 345 6789</p>
-                    <div className="flex space-x-4 mt-4">
-                      <a href="#" className="text-gray-600 hover:text-gray-800">Facebook</a>
-                      <a href="#" className="text-gray-600 hover:text-gray-800">Instagram</a>
-                    </div>
-                  </div>
-                </div>
-              </div>
-              <div className="border-t border-gray-400 mt-6 sm:mt-8 pt-4 text-center text-sm text-gray-600">
-                <p>&copy; 2024 Angieren's Lutong Bahay. All rights reserved.</p>
-              </div>
-            </div>
-          </footer>
+          < CustomerFooter />
+
         </div>
       </div>
     </ProtectedRoute>
