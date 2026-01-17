@@ -10,7 +10,9 @@ type UserContextType = {
     userRole: string | null;
     userRoles: string[]; // Parsed array of roles
     loading: boolean;
+    isPasswordRecovery: boolean; // True when user is in password recovery flow
     setUser: (user: User | null) => void;
+    setIsPasswordRecovery: (value: boolean) => void;
     signOut: () => Promise<void>;
     hasRole: (role: string) => boolean; // Helper to check if user has a specific role
 };
@@ -35,6 +37,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
     const [userRoles, setUserRoles] = useState<string[]>([]);
     const [loading, setLoading] = useState(true);
     const [initialCheckDone, setInitialCheckDone] = useState(false);
+    const [isPasswordRecovery, setIsPasswordRecovery] = useState(false);
 
     // Helper function to check if user has a specific role
     const hasRole = (role: string): boolean => {
@@ -108,6 +111,13 @@ export function UserProvider({ children }: { children: ReactNode }) {
         const { data: { subscription } } = supabase.auth.onAuthStateChange(
             (event, session) => {
                 console.log("Auth state changed:", event, session?.user?.id || "no user");
+
+                // Detect password recovery flow
+                if (event === 'PASSWORD_RECOVERY') {
+                    console.log("🔴 PASSWORD_RECOVERY event detected - setting flag");
+                    setIsPasswordRecovery(true);
+                }
+
                 setUser(session?.user ?? null);
                 // If user signs out, set loading to false
                 if (!session?.user) {
@@ -132,7 +142,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
     };
 
     return (
-        <UserContext.Provider value={{ user, userRole, userRoles, loading, setUser, signOut, hasRole }}>
+        <UserContext.Provider value={{ user, userRole, userRoles, loading, isPasswordRecovery, setUser, setIsPasswordRecovery, signOut, hasRole }}>
             {children}
         </UserContext.Provider>
     );

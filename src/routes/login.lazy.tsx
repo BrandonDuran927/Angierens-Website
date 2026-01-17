@@ -21,20 +21,30 @@ export const Route = createLazyFileRoute('/login')({
 })
 
 function RouteComponent() {
-  const { setUser, user } = useUser();
+  const { setUser, user, isPasswordRecovery, setIsPasswordRecovery } = useUser();
 
   const navigate = useNavigate()
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [emailToReset, setEmailToReset] = useState("");
 
-  // For password reset flow
+  // For password reset flow - initialize based on isPasswordRecovery from context
   const [showResetPasswordModal, setShowResetPasswordModal] = useState(false);
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [isResettingPassword, setIsResettingPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
+  // Show reset password modal when isPasswordRecovery is detected from UserContext
+  useEffect(() => {
+    if (isPasswordRecovery) {
+      console.log("🔴 isPasswordRecovery detected from UserContext - showing modal");
+      setShowResetPasswordModal(true);
+      setIsResettingPassword(true);
+    }
+  }, [isPasswordRecovery]);
+
+  console.log("🔵 Component rendering, isPasswordRecovery:", isPasswordRecovery);
 
   const [showForgotModal, setShowForgotModal] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -126,7 +136,15 @@ function RouteComponent() {
     setShowForgotModal(false);
     setEmailToReset("");
   };
-  const handleCloseResetModal = () => {
+  const handleCloseResetModal = async () => {
+    // If user closes the modal without resetting password, sign them out
+    // (they were auto-signed in by the recovery token)
+    if (isResettingPassword || isPasswordRecovery) {
+      await supabase.auth.signOut();
+      setUser(null);
+      setIsResettingPassword(false);
+      setIsPasswordRecovery(false);
+    }
     setShowResetPasswordModal(false);
     setNewPassword("");
     setConfirmPassword("");
@@ -199,21 +217,39 @@ function RouteComponent() {
     handleEmailVerification();
   }, []);
 
-  // Check if user is coming from password reset email
+  // Check if user is coming from password reset email - clean up URL hash
   useEffect(() => {
-    // Check for the hash fragment that Supabase adds
+    // States are already initialized via isRecoveryMode(), just clean up the URL
     const hashParams = new URLSearchParams(window.location.hash.substring(1));
-    const accessToken = hashParams.get('access_token');
     const type = hashParams.get('type');
 
-    if (accessToken && type === 'recovery') {
-      setIsResettingPassword(true);
-      setShowResetPasswordModal(true);
+    if (type === 'recovery') {
+      // Clean up the URL hash (states already set during initialization)
+      window.history.replaceState({}, '', window.location.pathname);
     }
   }, []);
 
   useEffect(() => {
     async function checkUserAndRedirect() {
+      // CRITICAL: Always check URL hash first - this is the source of truth
+      const hashParams = new URLSearchParams(window.location.hash.substring(1));
+      const type = hashParams.get('type');
+
+      // CRITICAL: Check if user is in password recovery mode (from UserContext)
+      if (isPasswordRecovery) {
+        return;
+      }
+
+      if (type === 'recovery') {
+        return;
+      }
+
+      // Check if we're in password reset mode
+      if (isResettingPassword || showResetPasswordModal) {
+        console.log("🟢 Password reset in progress - SKIPPING REDIRECT");
+        return;
+      }
+
       // Check URL params first - if verified=true, don't redirect (let the verification handler deal with it)
       const urlParams = new URLSearchParams(window.location.search);
       const verified = urlParams.get('verified');
@@ -224,8 +260,8 @@ function RouteComponent() {
         return;
       }
 
-      // Don't redirect if user is resetting password, role selection modal is open, or showing verification modals
-      if (isResettingPassword || showRoleSelectionModal || showEmailVerificationModal || showVerifiedModal) {
+      // Don't redirect if role selection modal is open or showing verification modals
+      if (showRoleSelectionModal || showEmailVerificationModal || showVerifiedModal) {
         return;
       }
 
@@ -268,7 +304,7 @@ function RouteComponent() {
     }
 
     checkUserAndRedirect();
-  }, [user, navigate, isResettingPassword, showRoleSelectionModal, showEmailVerificationModal, showVerifiedModal]);
+  }, [user, navigate, isPasswordRecovery, isResettingPassword, showResetPasswordModal, showRoleSelectionModal, showEmailVerificationModal, showVerifiedModal]);
 
 
 
@@ -407,7 +443,7 @@ function RouteComponent() {
 
     if (userError || !userData) {
       console.error("Error fetching user role:", userError);
-      showAlert('Error fetching user. Please contact support.', 'error')
+      showAlert(`Error fetching user. ${userError?.message || ''}.`, 'error')
       return;
     }
 
@@ -458,7 +494,7 @@ function RouteComponent() {
     setIsLoading(false);
 
     if (error) {
-      showAlert('Error sending reset email. Please make sure the email is valid.', 'error')
+      showAlert(`Error sending reset email. ${error.message || ''}.`, 'error')
       console.error("Reset error:", error);
     } else {
       showAlert('Password reset email sent! Please check your inbox.', 'success')
@@ -501,8 +537,12 @@ function RouteComponent() {
       await supabase.auth.signOut();
       setUser(null);
 
-      handleCloseResetModal();
+      // Clear recovery mode flag
+      setIsPasswordRecovery(false);
+      setShowResetPasswordModal(false);
       setIsResettingPassword(false);
+      setNewPassword("");
+      setConfirmPassword("");
       window.history.replaceState(null, '', window.location.pathname);
     }
   }
