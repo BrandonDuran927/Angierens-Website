@@ -61,7 +61,7 @@ function RouteComponent() {
   const [showTCModal, setShowTCModal] = useState(false)
   const [showPrivacyModal, setShowPrivacyModal] = useState(false)
   const [isNotificationOpen, setIsNotificationOpen] = useState(false)
-  const [notificationCount, setNotificationCount] = useState(3)
+  const [notificationCount, setNotificationCount] = useState(0)
   const [isOrderDropdownOpen, setIsOrderDropdownOpen] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState('All Categories')
   const [searchQuery, setSearchQuery] = useState('')

@@ -66,7 +66,7 @@ function RouteComponent() {
   const [isNotificationOpen, setIsNotificationOpen] = useState(false)
   const [isReviewsModalOpen, setIsReviewsModalOpen] = useState(false);
   const [cartCount] = useState(0);
-  const [notificationCount] = useState(3);
+  const [notificationCount] = useState(0);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const [reviews, setReviews] = useState<Review[]>([])
   const [featuredMenuItems, setFeaturedMenuItems] = useState<MenuItem[]>([])

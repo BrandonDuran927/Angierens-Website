@@ -16,7 +16,7 @@ export const Route = createLazyFileRoute('/customer-interface/specific-order/$or
 const navigationItems = [
   { name: 'HOME', route: '/customer-interface/home', active: false },
   { name: 'MENU', route: '/customer-interface/', active: false },
-  { name: 'ORDER', route: '/customer-interface/order', active: false },
+  { name: 'ORDER', route: '/customer-interface/order', active: true },
   { name: 'REVIEW', route: '/customer-interface/feedback', active: false },
   { name: 'MY INFO', route: '/customer-interface/my-info', active: false },
 ]
@@ -126,8 +126,8 @@ function SpecificOrder() {
 
   const { orderId } = Route.useParams()
 
-  const cartCount = 3
-  const notificationCount = 1
+  const cartCount = 0
+  const notificationCount = 0
 
   const [notifications, setNotifications] = useState<Notification[]>([
     {

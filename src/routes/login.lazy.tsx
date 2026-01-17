@@ -900,7 +900,13 @@ function RouteComponent() {
                   <p className="text-amber-700/70 text-sm">Enter your credentials to access your account</p>
                 </div>
 
-                <form className="flex flex-col gap-5">
+                <form
+                  className="flex flex-col gap-5"
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    signInWithEmail();
+                  }}
+                >
                   {/* Email Input */}
                   <div className="group">
                     <label className="block text-sm font-medium text-amber-800 mb-2 ml-1">Email Address</label>

@@ -61,8 +61,8 @@ function RouteComponent() {
   }
 
   const [isNotificationOpen, setIsNotificationOpen] = useState(false)
-  const [cartCount] = useState(2)
-  const [notificationCount] = useState(3)
+  const [cartCount] = useState(0)
+  const [notificationCount] = useState(0)
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const [alertModal, setAlertModal] = useState<{
     isOpen: boolean

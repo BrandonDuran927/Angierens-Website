@@ -57,8 +57,8 @@ function RouteComponent() {
     navigate({ to: "/login" });
   }
 
-  const [cartCount] = useState(2)
-  const [notificationCount] = useState(3)
+  const [cartCount] = useState(0)
+  const [notificationCount] = useState(0)
   const { feedbackId } = useParams({ from: '/customer-interface/feedback/$feedbackId' })
   const [activeTab, setActiveTab] = useState('delivery')
   const [isEditing, setIsEditing] = useState(false)

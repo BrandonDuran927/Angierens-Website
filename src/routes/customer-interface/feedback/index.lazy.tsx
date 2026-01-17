@@ -49,8 +49,8 @@ function RouteComponent() {
     navigate({ to: "/login" });
   }
 
-  const [cartCount] = useState(2)
-  const [notificationCount] = useState(3)
+  const [cartCount] = useState(0)
+  const [notificationCount] = useState(0)
   const [searchQuery, setSearchQuery] = useState('')
   const [isFilterModalOpen, setIsFilterModalOpen] = useState(false)
   const [isNotificationOpen, setIsNotificationOpen] = useState(false)

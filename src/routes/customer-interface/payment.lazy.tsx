@@ -86,7 +86,7 @@ function RouteComponent() {
     });
     const [autocompleteInput, setAutocompleteInput] = useState('');
     const [cartCount, setCartCount] = useState(0);
-    const [notificationCount, setNotificationCount] = useState(3);
+    const [notificationCount, setNotificationCount] = useState(0);
     const [deliveryOption, setDeliveryOption] = useState('Delivery');
     const [fulfillmentType, setFulfillmentType] = useState('scheduled');
     const [selectedTime, setSelectedTime] = useState('2:00 PM');
