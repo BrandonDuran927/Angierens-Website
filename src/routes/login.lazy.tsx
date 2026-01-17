@@ -969,8 +969,7 @@ function RouteComponent() {
 
                   {/* Login Button */}
                   <button
-                    onClick={signInWithEmail}
-                    type="button"
+                    type="submit"
                     className="group relative mt-2 bg-gradient-to-r from-amber-600 to-amber-700 text-white font-semibold py-4 rounded-xl shadow-lg hover:shadow-xl hover:from-amber-700 hover:to-amber-800 transition-all duration-300 transform hover:scale-[1.02] overflow-hidden"
                   >
                     <span className="relative z-10 flex items-center justify-center gap-2">
