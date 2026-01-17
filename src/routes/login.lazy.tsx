@@ -491,7 +491,8 @@ function RouteComponent() {
     setIsLoading(false);
 
     if (error) {
-      showAlert('Error updating password. Please try again.', 'error')
+      const errorMessage = error.message || 'Error updating password. Please try again.';
+      showAlert(errorMessage, 'error')
       console.error("Update password error:", error);
     } else {
       showAlert('Password updated successfully! You can now log in with your new password.', 'success')
