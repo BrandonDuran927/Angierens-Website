@@ -991,6 +991,7 @@ function RouteComponent() {
             <ChevronDown className="absolute right-2 sm:right-3 top-1/2 transform -translate-y-1/2 text-black h-4 w-4 sm:h-5 sm:w-5 pointer-events-none" />
           </div>
         </div>
+
         {/* Loading State */}
         {loading ? (
           <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex justify-center items-center z-[60] animate-fade-in">
@@ -1008,64 +1009,140 @@ function RouteComponent() {
           <>
             {/* Menu Items Grid with max height and scroll */}
             <div className="max-h-[calc(100vh-250px)] overflow-y-auto pr-2 custom-scrollbar">
-              <div className="grid grid-cols-2 sm:grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-4 md:gap-6 lg:gap-8">
-                {filteredItems.map((item) => {
-                  const inclusions = parseInclusions(item.inclusion)
-                  return (
-                    <div key={item.menu_id} className="bg-white rounded-2xl shadow-lg overflow-hidden hover:shadow-xl transition-shadow duration-300">
-                      {/* Price Tag */}
-                      <div className="relative">
-                        <div className="absolute top-4 left-4 bg-yellow-400 text-black px-3 sm:px-4 py-1 sm:py-2 rounded-full font-bold text-base sm:text-lg z-10">
-                          ₱ {getDisplayPrice(item)}
-                        </div>
-
-                        {/* Food Image Container */}
-                        <div className="relative h-48 sm:h-64 overflow-hidden">
-                          <img
-                            src={getImageUrl(item.image_url)}
-                            alt={item.name}
-                            className="w-full h-full object-cover"
-                          />
-                          <div className="absolute inset-0 bg-black/10"></div>
-                        </div>
-                      </div>
-
-                      {/* Content */}
-                      <div className="p-4 sm:p-6">
-                        <h3 className="text-lg sm:text-xl font-bold text-gray-900 mb-3">{item.name}</h3>
-
-                        {/* Description */}
-                        {item.description && (
-                          <p className="text-sm text-gray-600 mb-3">{item.description}</p>
-                        )}
-
-                        {/* Inclusions */}
-                        {inclusions.length > 0 && (
-                          <div className="mb-4">
-                            <p className="text-sm font-semibold text-gray-700 mb-2">Inclusion:</p>
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-1 text-xs text-gray-600">
-                              {inclusions.map((inclusion, index) => (
-                                <p key={index}>{inclusion}</p>
-                              ))}
-                            </div>
+              
+              {searchQuery || selectedCategory !== 'All Categories' ? (
+                // Search Results or Specific Category View
+                <div className="grid grid-cols-2 sm:grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-4 md:gap-6 lg:gap-8">
+                  {filteredItems.map((item) => {
+                    const inclusions = parseInclusions(item.inclusion)
+                    return (
+                      <div key={item.menu_id} className="bg-white rounded-2xl shadow-lg overflow-hidden hover:shadow-xl transition-shadow duration-300">
+                        {/* Price Tag */}
+                        <div className="relative">
+                          <div className="absolute top-4 left-4 bg-yellow-400 text-black px-3 sm:px-4 py-1 sm:py-2 rounded-full font-bold text-base sm:text-lg z-10">
+                            ₱ {getDisplayPrice(item)}
                           </div>
-                        )}
 
-                        {/* Order Button */}
-                        <button
-                          onClick={() => openOrderModal(item)}
-                          className="w-full bg-yellow-400 text-black px-4 sm:px-6 py-2 sm:py-3 rounded-lg font-bold hover:bg-yellow-500 transition-colors duration-200 shadow-md text-sm sm:text-base"
-                        >
-                          ORDER NOW
-                        </button>
+                          {/* Food Image Container */}
+                          <div className="relative h-48 sm:h-64 overflow-hidden">
+                            <img
+                              src={getImageUrl(item.image_url)}
+                              alt={item.name}
+                              className="w-full h-full object-cover"
+                            />
+                            <div className="absolute inset-0 bg-black/10"></div>
+                          </div>
+                        </div>
+
+                        {/* Content */}
+                        <div className="p-4 sm:p-6">
+                          <h3 className="text-lg sm:text-xl font-bold text-gray-900 mb-3">{item.name}</h3>
+
+                          {/* Description */}
+                          {item.description && (
+                            <p className="text-sm text-gray-600 mb-3">{item.description}</p>
+                          )}
+
+                          {/* Inclusions */}
+                          {inclusions.length > 0 && (
+                            <div className="mb-4">
+                              <p className="text-sm font-semibold text-gray-700 mb-2">Inclusion:</p>
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-1 text-xs text-gray-600">
+                                {inclusions.map((inclusion, index) => (
+                                  <p key={index}>{inclusion}</p>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Order Button */}
+                          <button
+                            onClick={() => openOrderModal(item)}
+                            className="w-full bg-yellow-400 text-black px-4 sm:px-6 py-2 sm:py-3 rounded-lg font-bold hover:bg-yellow-500 transition-colors duration-200 shadow-md text-sm sm:text-base"
+                          >
+                            ORDER NOW
+                          </button>
+                        </div>
                       </div>
-                    </div>
-                  )
-                })}
-              </div>
+                    )
+                  })}
+                </div>
+              ) : (
+                // Categorized View
+                <div className="space-y-12">
+                  {categories.filter(c => c !== 'All Categories').map(category => {
+                    const categoryItems = menuItems.filter(item => item.category === category);
+                    if (categoryItems.length === 0) return null;
+                    
+                    return (
+                      <div key={category}>
+                        <h3 className="text-xl sm:text-2xl font-bold text-gray-900 mb-6 flex items-center gap-3 sticky top-0 bg-white/5 backdrop-blur-sm py-2 z-10">
+                           <div className="h-8 w-2 bg-yellow-400 rounded-full"></div>
+                           {category}
+                        </h3>
+                        <div className="grid grid-cols-2 sm:grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-4 md:gap-6 lg:gap-8">
+                          {categoryItems.map((item) => {
+                            const inclusions = parseInclusions(item.inclusion)
+                            return (
+                              <div key={item.menu_id} className="bg-white rounded-2xl shadow-lg overflow-hidden hover:shadow-xl transition-shadow duration-300">
+                                {/* Price Tag */}
+                                <div className="relative">
+                                  <div className="absolute top-4 left-4 bg-yellow-400 text-black px-3 sm:px-4 py-1 sm:py-2 rounded-full font-bold text-base sm:text-lg z-10">
+                                    ₱ {getDisplayPrice(item)}
+                                  </div>
+
+                                  {/* Food Image Container */}
+                                  <div className="relative h-48 sm:h-64 overflow-hidden">
+                                    <img
+                                      src={getImageUrl(item.image_url)}
+                                      alt={item.name}
+                                      className="w-full h-full object-cover"
+                                    />
+                                    <div className="absolute inset-0 bg-black/10"></div>
+                                  </div>
+                                </div>
+
+                                {/* Content */}
+                                <div className="p-4 sm:p-6">
+                                  <h3 className="text-lg sm:text-xl font-bold text-gray-900 mb-3">{item.name}</h3>
+
+                                  {/* Description */}
+                                  {item.description && (
+                                    <p className="text-sm text-gray-600 mb-3">{item.description}</p>
+                                  )}
+
+                                  {/* Inclusions */}
+                                  {inclusions.length > 0 && (
+                                    <div className="mb-4">
+                                      <p className="text-sm font-semibold text-gray-700 mb-2">Inclusion:</p>
+                                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-1 text-xs text-gray-600">
+                                        {inclusions.map((inclusion, index) => (
+                                          <p key={index}>{inclusion}</p>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  )}
+
+                                  {/* Order Button */}
+                                  <button
+                                    onClick={() => openOrderModal(item)}
+                                    className="w-full bg-yellow-400 text-black px-4 sm:px-6 py-2 sm:py-3 rounded-lg font-bold hover:bg-yellow-500 transition-colors duration-200 shadow-md text-sm sm:text-base"
+                                  >
+                                    ORDER NOW
+                                  </button>
+                                </div>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
 
               {/* No Results */}
-              {filteredItems.length === 0 && (
+              {searchQuery && filteredItems.length === 0 && (
                 <div className="text-center py-12">
                   <p className="text-gray-500 text-lg">No items found matching your search.</p>
                 </div>
