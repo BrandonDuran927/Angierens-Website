@@ -164,9 +164,14 @@ function RouteComponent() {
   useEffect(() => {
     const handleEmailVerification = async () => {
       const urlParams = new URLSearchParams(window.location.search);
+      const hashParams = new URLSearchParams(window.location.hash.substring(1));
+      
       const verified = urlParams.get('verified');
+      const accessToken = hashParams.get('access_token');
+      const type = hashParams.get('type');
 
-      if (verified === 'true') {
+      // Check if this is an email confirmation callback
+      if (verified === 'true' || (accessToken && type === 'signup')) {
         // Get current session to check if user was auto-logged in
         const { data: { session } } = await supabase.auth.getSession();
 
@@ -186,7 +191,7 @@ function RouteComponent() {
           setShowVerifiedModal(true);
         }
 
-        // Clean up URL without refreshing
+        // Clean up URL without refreshing (remove both query and hash)
         window.history.replaceState({}, '', window.location.pathname);
       }
     };
