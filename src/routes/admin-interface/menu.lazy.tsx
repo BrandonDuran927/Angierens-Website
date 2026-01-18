@@ -1012,8 +1012,8 @@ function RouteComponent() {
                                                     </td>
 
                                                     {/* Price */}
-                                                    <td className="px-6 py-4 whitespace-nowrap">
-                                                        <div className="text-sm font-bold text-amber-600 overflow-hidden text-ellipsis truncate">
+                                                    <td className="px-6 py-4">
+                                                        <div className="text-sm font-bold text-amber-600">
                                                             {item.price
                                                                 .split(",")
                                                                 .map((p: string) => `₱${p.trim()}`)
@@ -1023,9 +1023,9 @@ function RouteComponent() {
                                                     </td>
 
                                                     {/* Category */}
-                                                    <td className="px-6 py-4 whitespace-nowrap">
+                                                    <td className="px-6 py-4">
                                                         {item.category ? (
-                                                            <span className="px-2 py-1 inline-block text-xs font-semibold rounded-full bg-amber-100 text-amber-800 max-w-[100px] truncate">
+                                                            <span className="px-2 py-1 inline-block text-xs font-semibold rounded-full bg-amber-100 text-amber-800">
                                                                 {item.category}
                                                             </span>
                                                         ) : (
@@ -1034,9 +1034,9 @@ function RouteComponent() {
                                                     </td>
 
                                                     {/* Size */}
-                                                    <td className="px-6 py-4 whitespace-nowrap">
+                                                    <td className="px-6 py-4">
                                                         {item.size ? (
-                                                            <span className="px-2 py-1 inline-block text-xs font-semibold rounded-full bg-blue-100 text-blue-800 max-w-[80px] truncate">
+                                                            <span className="px-2 py-1 inline-block text-xs font-semibold rounded-full bg-blue-100 text-blue-800">
                                                                 {item.size}
                                                             </span>
                                                         ) : (
