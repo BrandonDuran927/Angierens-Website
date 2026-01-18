@@ -1,6 +1,6 @@
 import { createLazyFileRoute, Link } from '@tanstack/react-router'
 import { useState, useEffect } from 'react'
-import { Search, ShoppingCart, Bell, ChevronDown, X, Plus, Minus, Heart, MessageSquare, Star, Menu, ArrowRight, Tag } from 'lucide-react'
+import { Search, ShoppingCart, Bell, ChevronDown, X, Plus, Minus, Heart, MessageSquare, Star, Menu, ArrowRight, Tag, LogIn } from 'lucide-react'
 import { useUser } from '@/context/UserContext'
 import { useNavigate } from '@tanstack/react-router'
 import { supabase } from '@/lib/supabaseClient'
@@ -586,8 +586,8 @@ function RouteComponent() {
     
     @media (max-width: 410px) {
       .dynamic-logo {
-        width: calc(max(80px, 140px - (410px - 100vw))) !important;
-        height: calc(max(80px, 140px - (410px - 100vw))) !important;
+        width: calc(max(70px, 110px - (410px - 100vw))) !important;
+        height: calc(max(70px, 110px - (410px - 100vw))) !important;
       }
     }
     
@@ -894,12 +894,14 @@ function RouteComponent() {
                     <span className="sm:hidden">OUT</span>
                   </button>
                 ) : (
-                  <Link to="/login">
-                    <button className="btn-primary text-amber-900 font-semibold py-2 px-3 sm:px-5 text-xs sm:text-sm rounded-full shadow-md whitespace-nowrap hover:scale-105">
-                      <span className="hidden sm:inline">SIGN IN</span>
-                      <span className="sm:hidden">IN</span>
-                    </button>
-                  </Link>
+                  <div className="flex gap-2">
+                     <Link to="/login">
+                      <button className="btn-primary text-amber-900 font-semibold py-2 px-3 sm:px-5 text-xs sm:text-sm rounded-full shadow-md whitespace-nowrap hover:scale-105 flex items-center justify-center h-full">
+                        <span className="hidden sm:inline">LOG IN</span>
+                        <LogIn className="h-4 w-4 sm:hidden" />
+                      </button>
+                    </Link>
+                  </div>
                 )}
               </div>
             </div>
@@ -953,7 +955,8 @@ function RouteComponent() {
       )}
 
       {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-3 sm:px-4 md:px-6 lg:px-8 py-6 sm:py-8 mb-[50px]">
+    {/* Added padding top on mobile to clear the absolute positioned logo */}
+      <main className="max-w-7xl mx-auto px-3 sm:px-4 md:px-6 lg:px-8 py-6 sm:py-8 mb-[50px] mt-10 sm:mt-0">
         {/* Page Header */}
         <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-6 sm:mb-8 gap-4">
           <div className="flex-1">
@@ -1016,7 +1019,7 @@ function RouteComponent() {
                   {filteredItems.map((item) => {
                     const inclusions = parseInclusions(item.inclusion)
                     return (
-                      <div key={item.menu_id} className="bg-white rounded-2xl shadow-lg overflow-hidden hover:shadow-xl transition-shadow duration-300">
+                      <div key={item.menu_id} className="bg-white rounded-2xl shadow-lg overflow-hidden hover:shadow-xl transition-shadow duration-300 flex flex-col">
                         {/* Price Tag */}
                         <div className="relative">
                           <div className="absolute top-4 left-4 bg-yellow-400 text-black px-3 sm:px-4 py-1 sm:py-2 rounded-full font-bold text-base sm:text-lg z-10">
@@ -1035,7 +1038,7 @@ function RouteComponent() {
                         </div>
 
                         {/* Content */}
-                        <div className="p-4 sm:p-6">
+                        <div className="p-4 sm:p-6 flex flex-col flex-1">
                           <h3 className="text-lg sm:text-xl font-bold text-gray-900 mb-3">{item.name}</h3>
 
                           {/* Description */}
@@ -1058,7 +1061,7 @@ function RouteComponent() {
                           {/* Order Button */}
                           <button
                             onClick={() => openOrderModal(item)}
-                            className="w-full bg-yellow-400 text-black px-4 sm:px-6 py-2 sm:py-3 rounded-lg font-bold hover:bg-yellow-500 transition-colors duration-200 shadow-md text-sm sm:text-base"
+                            className="w-full bg-yellow-400 text-black px-4 sm:px-6 py-2 sm:py-3 rounded-lg font-bold hover:bg-yellow-500 transition-colors duration-200 shadow-md text-sm sm:text-base mt-auto"
                           >
                             ORDER NOW
                           </button>
@@ -1084,7 +1087,7 @@ function RouteComponent() {
                           {categoryItems.map((item) => {
                             const inclusions = parseInclusions(item.inclusion)
                             return (
-                              <div key={item.menu_id} className="bg-white rounded-2xl shadow-lg overflow-hidden hover:shadow-xl transition-shadow duration-300">
+                              <div key={item.menu_id} className="bg-white rounded-2xl shadow-lg overflow-hidden hover:shadow-xl transition-shadow duration-300 flex flex-col">
                                 {/* Price Tag */}
                                 <div className="relative">
                                   <div className="absolute top-4 left-4 bg-yellow-400 text-black px-3 sm:px-4 py-1 sm:py-2 rounded-full font-bold text-base sm:text-lg z-10">
@@ -1103,7 +1106,7 @@ function RouteComponent() {
                                 </div>
 
                                 {/* Content */}
-                                <div className="p-4 sm:p-6">
+                                <div className="p-4 sm:p-6 flex flex-col flex-1">
                                   <h3 className="text-lg sm:text-xl font-bold text-gray-900 mb-3">{item.name}</h3>
 
                                   {/* Description */}
@@ -1126,7 +1129,7 @@ function RouteComponent() {
                                   {/* Order Button */}
                                   <button
                                     onClick={() => openOrderModal(item)}
-                                    className="w-full bg-yellow-400 text-black px-4 sm:px-6 py-2 sm:py-3 rounded-lg font-bold hover:bg-yellow-500 transition-colors duration-200 shadow-md text-sm sm:text-base"
+                                    className="w-full bg-yellow-400 text-black px-4 sm:px-6 py-2 sm:py-3 rounded-lg font-bold hover:bg-yellow-500 transition-colors duration-200 shadow-md text-sm sm:text-base mt-auto"
                                   >
                                     ORDER NOW
                                   </button>
