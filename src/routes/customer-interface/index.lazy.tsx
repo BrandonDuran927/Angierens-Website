@@ -1009,7 +1009,7 @@ function RouteComponent() {
           <>
             {/* Menu Items Grid with max height and scroll */}
             <div className="max-h-[calc(100vh-250px)] overflow-y-auto pr-2 custom-scrollbar">
-              
+
               {searchQuery || selectedCategory !== 'All Categories' ? (
                 // Search Results or Specific Category View
                 <div className="grid grid-cols-2 sm:grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-4 md:gap-6 lg:gap-8">
@@ -1073,12 +1073,12 @@ function RouteComponent() {
                   {categories.filter(c => c !== 'All Categories').map(category => {
                     const categoryItems = menuItems.filter(item => item.category === category);
                     if (categoryItems.length === 0) return null;
-                    
+
                     return (
                       <div key={category}>
-                        <h3 className="text-xl sm:text-2xl font-bold text-gray-900 mb-6 flex items-center gap-3 sticky top-0 bg-white/5 backdrop-blur-sm py-2 z-10">
-                           <div className="h-8 w-2 bg-yellow-400 rounded-full"></div>
-                           {category}
+                        <h3 className="text-xl sm:text-2xl font-bold text-gray-900 mb-6 flex items-center gap-3 sticky top-0 bg-white/5 backdrop-blur-sm py-2 z-60">
+                          <div className="h-8 w-2 bg-yellow-400 rounded-full"></div>
+                          {category}
                         </h3>
                         <div className="grid grid-cols-2 sm:grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-4 md:gap-6 lg:gap-8">
                           {categoryItems.map((item) => {
