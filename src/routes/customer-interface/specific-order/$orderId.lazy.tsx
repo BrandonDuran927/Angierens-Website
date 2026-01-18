@@ -1341,7 +1341,7 @@ function SpecificOrder() {
                           {step.key === 'queuing' && orderData.status === 'Queueing' && (
                             <button
                               onClick={handleRefundClick}
-                              className="mt-3 bg-red-500 hover:bg-red-600 text-white px-4 py-2 text-xs rounded-lg font-semibold transition-all shadow-md hover:shadow-lg"
+                              className="mt-3 bg-gray-200 hover:bg-gray-300 text-gray-700 px-4 py-2 text-xs rounded-lg font-semibold transition-all shadow-md hover:shadow-lg"
                             >
                               Request Refund
                             </button>
