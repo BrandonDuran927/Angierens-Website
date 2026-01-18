@@ -1,6 +1,6 @@
 import { createLazyFileRoute, Link } from '@tanstack/react-router'
 import { useState, useEffect } from 'react'
-import { ShoppingCart, Bell, Search, Filter, Star, Heart, MessageSquare, Menu, X, Facebook, Instagram, Mail, Phone, MapPin, ArrowRight } from 'lucide-react'
+import { ShoppingCart, Bell, Search, Filter, Star, Heart, MessageSquare, Menu, X, Facebook, Instagram, Mail, Phone, MapPin, ArrowRight, LogIn, LogOut } from 'lucide-react'
 import { useUser } from '@/context/UserContext'
 import { useNavigate } from '@tanstack/react-router'
 import { ProtectedRoute } from '@/components/ProtectedRoute'
@@ -689,8 +689,8 @@ function RouteComponent() {
     
     @media (max-width: 410px) {
       .dynamic-logo {
-        width: calc(max(80px, 140px - (410px - 100vw))) !important;
-        height: calc(max(80px, 140px - (410px - 100vw))) !important;
+        width: calc(max(70px, 110px - (410px - 100vw))) !important;
+        height: calc(max(70px, 110px - (410px - 100vw))) !important;
       }
     }
     
@@ -987,18 +987,20 @@ function RouteComponent() {
                                     {user ? (
                                         <button
                                             onClick={handleLogout}
-                                            className="bg-transparent text-yellow-400 font-semibold py-2 px-3 sm:px-4 text-xs sm:text-sm rounded-full border-2 border-yellow-400 hover:bg-yellow-400 hover:text-amber-900 transition-all duration-300 whitespace-nowrap hover:scale-105"
+                                            className="bg-transparent text-yellow-400 font-semibold py-2 px-3 sm:px-4 text-xs sm:text-sm rounded-full border-2 border-yellow-400 hover:bg-yellow-400 hover:text-amber-900 transition-all duration-300 whitespace-nowrap hover:scale-105 flex items-center justify-center gap-2"
                                         >
                                             <span className="hidden sm:inline">SIGN OUT</span>
-                                            <span className="sm:hidden">OUT</span>
+                                            <LogOut className="h-4 w-4 sm:hidden" />
                                         </button>
                                     ) : (
-                                        <Link to="/login">
-                                            <button className="btn-primary text-amber-900 font-semibold py-2 px-3 sm:px-5 text-xs sm:text-sm rounded-full shadow-md whitespace-nowrap hover:scale-105">
-                                                <span className="hidden sm:inline">SIGN IN</span>
-                                                <span className="sm:hidden">IN</span>
-                                            </button>
-                                        </Link>
+                                        <div className="flex gap-2">
+                                            <Link to="/login">
+                                                <button className="btn-primary text-amber-900 font-semibold py-2 px-3 sm:px-5 text-xs sm:text-sm rounded-full shadow-md whitespace-nowrap hover:scale-105 flex items-center justify-center h-full">
+                                                    <span className="hidden sm:inline">LOG IN</span>
+                                                    <LogIn className="h-4 w-4 sm:hidden" />
+                                                </button>
+                                            </Link>
+                                        </div>
                                     )}
                                 </div>
                             </div>
@@ -1052,7 +1054,7 @@ function RouteComponent() {
                 )}
 
                 {/* Main */}
-                <div className="max-w-6xl mx-auto p-3 sm:p-8">
+                <div className="max-w-6xl mx-auto p-3 sm:p-8 mt-10 sm:mt-0">
                     <h1 className="text-2xl sm:text-5xl font-bold text-gray-800 mb-4 sm:mb-6">My orders</h1>
 
                     {/* Search */}

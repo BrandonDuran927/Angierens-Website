@@ -1,6 +1,6 @@
 import { createLazyFileRoute, Link } from '@tanstack/react-router'
 import { useState, useEffect } from 'react'
-import { Search, ShoppingCart, Bell, ChevronDown, X, Plus, Minus, Heart, MessageSquare, Star, Menu, ArrowRight, Tag, LogIn } from 'lucide-react'
+import { Search, ShoppingCart, Bell, ChevronDown, X, Plus, Minus, Heart, MessageSquare, Star, Menu, ArrowRight, Tag, LogIn, LogOut } from 'lucide-react'
 import { useUser } from '@/context/UserContext'
 import { useNavigate } from '@tanstack/react-router'
 import { supabase } from '@/lib/supabaseClient'
@@ -888,10 +888,10 @@ function RouteComponent() {
                 {user ? (
                   <button
                     onClick={handleLogout}
-                    className="bg-transparent text-yellow-400 font-semibold py-2 px-3 sm:px-4 text-xs sm:text-sm rounded-full border-2 border-yellow-400 hover:bg-yellow-400 hover:text-amber-900 transition-all duration-300 whitespace-nowrap hover:scale-105"
+                    className="bg-transparent text-yellow-400 font-semibold py-2 px-3 sm:px-4 text-xs sm:text-sm rounded-full border-2 border-yellow-400 hover:bg-yellow-400 hover:text-amber-900 transition-all duration-300 whitespace-nowrap hover:scale-105 flex items-center justify-center gap-2"
                   >
+                    <LogOut className="h-4 w-4 sm:hidden" />
                     <span className="hidden sm:inline">SIGN OUT</span>
-                    <span className="sm:hidden">OUT</span>
                   </button>
                 ) : (
                   <div className="flex gap-2">
