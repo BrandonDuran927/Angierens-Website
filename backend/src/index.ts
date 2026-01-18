@@ -10,6 +10,7 @@ const PORT = process.env.PORT || 3001
 
 // CORS configuration - allow local dev and production origins
 const allowedOrigins = [
+  'https://angierenslutongbahay.tech',
   'http://localhost:3000',
   'http://localhost:5173',
   'https://walrus-app-wpkax.ondigitalocean.app',
