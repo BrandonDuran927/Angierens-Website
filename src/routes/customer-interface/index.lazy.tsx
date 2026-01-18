@@ -1076,7 +1076,7 @@ function RouteComponent() {
 
                     return (
                       <div key={category}>
-                        <h3 className="text-xl sm:text-2xl font-bold text-gray-900 mb-6 flex items-center gap-3 sticky top-0 bg-white/5 backdrop-blur-sm py-2 z-60">
+                        <h3 className="text-xl sm:text-2xl font-bold text-gray-900 mb-6 flex items-center gap-3 sticky top-0 bg-white/5 backdrop-blur-sm py-2 z-20">
                           <div className="h-8 w-2 bg-yellow-400 rounded-full"></div>
                           {category}
                         </h3>
