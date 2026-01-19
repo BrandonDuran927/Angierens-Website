@@ -58,6 +58,8 @@ interface RefundRequest {
   gcashFees: number
   total: number
   refundId: string
+  response: string | null
+  proofOfRefundUrl: string | null
 }
 
 function RouteComponent() {
@@ -96,6 +98,12 @@ function RouteComponent() {
   })
   const [refundRequests, setRefundRequests] = useState<RefundRequest[]>([])
   const [loading, setLoading] = useState(true)
+  const [isProcessing, setIsProcessing] = useState(false)
+  const [isApproveModalOpen, setIsApproveModalOpen] = useState(false)
+  const [isRejectModalOpen, setIsRejectModalOpen] = useState(false)
+  const [refundResponse, setRefundResponse] = useState('')
+  const [proofOfRefundFile, setProofOfRefundFile] = useState<File | null>(null)
+  const [proofOfRefundPreview, setProofOfRefundPreview] = useState<string | null>(null)
 
   const sidebarItems = [
     {
@@ -178,6 +186,8 @@ function RouteComponent() {
           status,
           request_date,
           gcash_number,
+          response,
+          proof_of_refund_url,
           order_id,
           order:order_id (
             order_id,
@@ -248,7 +258,7 @@ function RouteComponent() {
         if (payment && payment.payment_method === 'GCash') {
           const totalAmount = priceOfFood + deliveryFee
           const percentage = totalAmount > 0 ? ((amountPaid / totalAmount) * 100).toFixed(0) : '0'
-          paymentMethodDisplay = `GCash`
+          paymentMethodDisplay = `GCash ${percentage}%`
         }
 
         // Format dates and times
@@ -298,7 +308,9 @@ function RouteComponent() {
           deliveryFee,
           downPayment: amountPaid,
           gcashFees: parseFloat(gcashFees.toFixed(2)),
-          total: parseFloat(totalRefund.toFixed(2))
+          total: parseFloat(totalRefund.toFixed(2)),
+          response: refund.response || null,
+          proofOfRefundUrl: refund.proof_of_refund_url || null
         }
       })
 
@@ -328,46 +340,187 @@ function RouteComponent() {
     }
   }
 
-  // const handleConfirmationChange = async (refundId: string, newStatus: 'Approved' | 'Rejected') => {
-  //   try {
-  //     const { error } = await supabase
-  //       .from('refund')
-  //       .update({ status: newStatus })
-  //       .eq('refund_id', refundId)
+  const handleConfirmationChange = async (
+    refundId: string,
+    newStatus: 'Approved' | 'Rejected',
+    response: string,
+    proofUrl?: string
+  ) => {
+    try {
+      setIsProcessing(true);
 
-  //     if (error) throw error
+      // 1. Update refund table with status, response, and proof URL
+      const updateData: any = {
+        status: newStatus,
+        response: response
+      };
 
-  //     // Update local state
-  //     setRefundRequests(prev =>
-  //       prev.map(request =>
-  //         request.refundId === refundId
-  //           ? { ...request, confirmation: newStatus }
-  //           : request
-  //       )
-  //     )
-  //   } catch (error) {
-  //     console.error('Error updating refund status:', error)
-  //   }
-  // }
+      if (proofUrl) {
+        updateData.proof_of_refund_url = proofUrl;
+      }
+
+      const { error: refundError, data: refundData } = await supabase
+        .from('refund')
+        .update(updateData)
+        .eq('refund_id', refundId)
+        .select('order_id')
+        .single();
+
+      if (refundError) throw refundError;
+
+      // 2. Update order status based on refund decision
+      if (refundData?.order_id) {
+        const newOrderStatus = newStatus === 'Approved' ? 'Refund' : 'Rejected';
+        const { error: orderError } = await supabase
+          .from('order')
+          .update({
+            order_status: newOrderStatus,
+            status_updated_at: new Date().toISOString(),
+          })
+          .eq('order_id', refundData.order_id);
+
+        if (orderError) throw orderError;
+      }
+
+      // 3. Update local UI state
+      setRefundRequests(prev =>
+        prev.map(request =>
+          request.refundId === refundId
+            ? {
+              ...request,
+              confirmation: newStatus,
+              response: response,
+              proofOfRefundUrl: proofUrl || null
+            }
+            : request
+        )
+      );
+
+      if (selectedRefund && selectedRefund.refundId === refundId) {
+        setSelectedRefund({
+          ...selectedRefund,
+          confirmation: newStatus,
+          response: response,
+          proofOfRefundUrl: proofUrl || null
+        });
+      }
+
+      // 4. Notify user
+      showAlert(
+        newStatus === 'Approved'
+          ? 'Refund approved and order status updated to Refund.'
+          : 'Refund request rejected successfully.',
+        'success'
+      );
+    } catch (error) {
+      console.error('Error updating refund status:', error);
+      showAlert('Failed to update refund status. Please try again.', 'error');
+    } finally {
+      setIsProcessing(false);
+    }
+  };
 
   const handleOpenReviewModal = (request: RefundRequest) => {
     setSelectedRefund(request)
     setIsReviewModalOpen(true)
   }
 
-  // const handleApproveRefund = () => {
-  //   if (selectedRefund) {
-  //     handleConfirmationChange(selectedRefund.refundId, 'Approved')
-  //     setIsReviewModalOpen(false)
-  //   }
-  // }
+  const handleOpenApproveModal = () => {
+    setRefundResponse('')
+    setProofOfRefundFile(null)
+    setProofOfRefundPreview(null)
+    setIsApproveModalOpen(true)
+  }
 
-  // const handleRejectRefund = () => {
-  //   if (selectedRefund) {
-  //     handleConfirmationChange(selectedRefund.refundId, 'Rejected')
-  //     setIsReviewModalOpen(false)
-  //   }
-  // }
+  const handleOpenRejectModal = () => {
+    setRefundResponse('')
+    setIsRejectModalOpen(true)
+  }
+
+  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      if (!file.type.startsWith('image/')) {
+        showAlert('Please select an image file', 'warning');
+        return;
+      }
+
+      if (file.size > 5 * 1024 * 1024) {
+        showAlert('File size must be less than 5MB', 'warning');
+        return;
+      }
+
+      setProofOfRefundFile(file);
+
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setProofOfRefundPreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleApproveRefund = async () => {
+    if (!selectedRefund) return;
+
+    if (!refundResponse.trim()) {
+      showAlert('Please provide a response message', 'warning');
+      return;
+    }
+
+    if (!proofOfRefundFile) {
+      showAlert('Please upload proof of refund image', 'warning');
+      return;
+    }
+
+    try {
+      setIsProcessing(true);
+
+      // Upload proof of refund image to Supabase storage
+      const fileExt = proofOfRefundFile.name.split('.').pop();
+      const fileName = `refund-${selectedRefund.refundId}-${Date.now()}.${fileExt}`;
+      const filePath = `refund-proofs/${fileName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('payment-receipts')
+        .upload(filePath, proofOfRefundFile);
+
+      if (uploadError) throw uploadError;
+
+      // Get public URL
+      const { data: { publicUrl } } = supabase.storage
+        .from('payment-receipts')
+        .getPublicUrl(filePath);
+
+      // Update refund with response and proof URL
+      await handleConfirmationChange(selectedRefund.refundId, 'Approved', refundResponse, publicUrl);
+
+      setIsApproveModalOpen(false);
+      setIsReviewModalOpen(false);
+      setRefundResponse('');
+      setProofOfRefundFile(null);
+      setProofOfRefundPreview(null);
+    } catch (error) {
+      console.error('Error approving refund:', error);
+      showAlert('Failed to approve refund. Please try again.', 'error');
+    } finally {
+      setIsProcessing(false);
+    }
+  }
+
+  const handleRejectRefund = async () => {
+    if (!selectedRefund) return;
+
+    if (!refundResponse.trim()) {
+      showAlert('Please provide a reason for rejection', 'warning');
+      return;
+    }
+
+    await handleConfirmationChange(selectedRefund.refundId, 'Rejected', refundResponse);
+    setIsRejectModalOpen(false);
+    setIsReviewModalOpen(false);
+    setRefundResponse('');
+  }
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -571,7 +724,7 @@ function RouteComponent() {
                       <th className="px-4 py-3 text-left text-sm font-medium tracking-wider">DATE</th>
                       <th className="px-4 py-3 text-left text-sm font-medium tracking-wider">TIME</th>
                       <th className="px-4 py-3 text-left text-sm font-medium tracking-wider">CONFIRMATION</th>
-                      <th className="px-4 py-3 text-left text-sm font-medium tracking-wider">REFUND BUTTON</th>
+                      <th className="px-4 py-3 text-center text-sm font-medium tracking-wider">REFUND BUTTON</th>
                     </tr>
                   </thead>
 
@@ -633,8 +786,8 @@ function RouteComponent() {
 
         {/* Review Modal */}
         {isReviewModalOpen && selectedRefund && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-lg p-6 max-w-lg w-full mx-4 shadow-xl">
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-lg p-6 max-w-lg w-full mx-4 shadow-xl max-h-[90vh] overflow-y-auto">
               {/* Header */}
               <div className="flex justify-between items-center mb-6 pb-4 border-b border-yellow-400">
                 <h3 className="text-xl font-bold text-gray-800">Refund Details</h3>
@@ -714,13 +867,228 @@ function RouteComponent() {
                 </div>
               </div>
 
+              {/* Admin Response Section - Show when refund is processed */}
+              {selectedRefund.confirmation !== 'Pending' && selectedRefund.response && (
+                <div className="mb-6 p-4 rounded-lg border bg-gray-50">
+                  <h4 className="font-semibold text-gray-800 mb-2">Response</h4>
+                  <p className="text-gray-700 text-sm whitespace-pre-wrap">{selectedRefund.response}</p>
+                </div>
+              )}
+
+              {/* Proof of Refund Image - Show when refund is approved */}
+              {selectedRefund.confirmation === 'Approved' && selectedRefund.proofOfRefundUrl && (
+                <div className="mb-6">
+                  <h4 className="font-semibold text-gray-800 mb-2">Proof of Refund</h4>
+                  <div className="border rounded-lg overflow-hidden">
+                    <img
+                      src={selectedRefund.proofOfRefundUrl}
+                      alt="Proof of refund"
+                      className="w-full max-h-64 object-contain bg-gray-100 cursor-pointer hover:opacity-90 transition-opacity"
+                      onClick={() => window.open(selectedRefund.proofOfRefundUrl!, '_blank')}
+                    />
+                    <p className="text-xs text-gray-500 text-center py-2">Click image to view full size</p>
+                  </div>
+                </div>
+              )}
+
               {/* Action Buttons */}
               <div className="flex gap-3 pt-4">
+                {selectedRefund.confirmation === 'Pending' ? (
+                  <>
+                    <button
+                      onClick={handleOpenRejectModal}
+                      disabled={isProcessing}
+                      className="flex-1 bg-red-500 text-white py-3 rounded-lg font-medium hover:bg-red-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      Reject
+                    </button>
+                    <button
+                      onClick={handleOpenApproveModal}
+                      disabled={isProcessing}
+                      className="flex-1 bg-green-500 text-white py-3 rounded-lg font-medium hover:bg-green-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      Approve
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    onClick={() => setIsReviewModalOpen(false)}
+                    className="flex-1 bg-gray-300 text-gray-700 py-3 rounded-lg font-medium hover:bg-gray-400 transition-colors"
+                  >
+                    Close
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Approve Refund Modal */}
+        {isApproveModalOpen && selectedRefund && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60] p-4">
+            <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4 shadow-xl">
+              <div className="flex justify-between items-center mb-6 pb-4 border-b border-green-400">
+                <h3 className="text-xl font-bold text-gray-800">Approve Refund</h3>
                 <button
-                  onClick={() => setIsReviewModalOpen(false)}
-                  className="flex-1 bg-gray-300 text-gray-700 py-3 rounded-lg font-medium hover:bg-gray-400 transition-colors"
+                  onClick={() => setIsApproveModalOpen(false)}
+                  className="text-gray-500 hover:text-gray-700 text-2xl"
                 >
-                  Close
+                  ×
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <p className="text-gray-700 mb-2">
+                    Approving refund for <span className="font-semibold">{selectedRefund.customerName}</span> - {selectedRefund.orderNumber}
+                  </p>
+                  <p className="text-lg font-bold text-green-600">Amount: ₱ {selectedRefund.total.toFixed(2)}</p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Response Message <span className="text-red-500">*</span>
+                  </label>
+                  <textarea
+                    value={refundResponse}
+                    onChange={(e) => setRefundResponse(e.target.value)}
+                    placeholder="Enter your response to the customer..."
+                    rows={3}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-400 focus:border-transparent resize-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Proof of Refund <span className="text-red-500">*</span>
+                  </label>
+                  <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center hover:border-green-400 transition-colors">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleFileSelect}
+                      className="hidden"
+                      id="proofOfRefund"
+                    />
+                    <label htmlFor="proofOfRefund" className="cursor-pointer">
+                      {proofOfRefundPreview ? (
+                        <div className="space-y-2">
+                          <img
+                            src={proofOfRefundPreview}
+                            alt="Proof of refund"
+                            className="max-h-40 mx-auto rounded-lg"
+                          />
+                          <p className="text-sm text-green-600">Click to change image</p>
+                        </div>
+                      ) : (
+                        <div className="py-4">
+                          <div className="text-4xl text-gray-400 mb-2">📤</div>
+                          <p className="text-gray-600">Click to upload proof of refund</p>
+                          <p className="text-xs text-gray-500 mt-1">GCash screenshot, bank transfer confirmation, etc.</p>
+                        </div>
+                      )}
+                    </label>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex gap-3 pt-6">
+                <button
+                  onClick={() => {
+                    setIsApproveModalOpen(false);
+                    setRefundResponse('');
+                    setProofOfRefundFile(null);
+                    setProofOfRefundPreview(null);
+                  }}
+                  disabled={isProcessing}
+                  className="flex-1 bg-gray-300 text-gray-700 py-3 rounded-lg font-medium hover:bg-gray-400 transition-colors disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleApproveRefund}
+                  disabled={isProcessing}
+                  className="flex-1 bg-green-500 text-white py-3 rounded-lg font-medium hover:bg-green-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                >
+                  {isProcessing ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                      Processing...
+                    </>
+                  ) : (
+                    'Confirm Approval'
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Reject Refund Modal */}
+        {isRejectModalOpen && selectedRefund && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60] p-4">
+            <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4 shadow-xl">
+              <div className="flex justify-between items-center mb-6 pb-4 border-b border-red-400">
+                <h3 className="text-xl font-bold text-gray-800">Reject Refund</h3>
+                <button
+                  onClick={() => setIsRejectModalOpen(false)}
+                  className="text-gray-500 hover:text-gray-700 text-2xl"
+                >
+                  ×
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <p className="text-gray-700 mb-2">
+                    Rejecting refund for <span className="font-semibold">{selectedRefund.customerName}</span> - {selectedRefund.orderNumber}
+                  </p>
+                </div>
+
+                <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+                  <p className="text-red-700 text-sm">
+                    Please provide a clear reason for rejecting this refund request. This will be visible to the customer.
+                  </p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Reason for Rejection <span className="text-red-500">*</span>
+                  </label>
+                  <textarea
+                    value={refundResponse}
+                    onChange={(e) => setRefundResponse(e.target.value)}
+                    placeholder="Enter the reason for rejecting this refund..."
+                    rows={4}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-400 focus:border-transparent resize-none"
+                  />
+                </div>
+              </div>
+
+              <div className="flex gap-3 pt-6">
+                <button
+                  onClick={() => {
+                    setIsRejectModalOpen(false);
+                    setRefundResponse('');
+                  }}
+                  disabled={isProcessing}
+                  className="flex-1 bg-gray-300 text-gray-700 py-3 rounded-lg font-medium hover:bg-gray-400 transition-colors disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleRejectRefund}
+                  disabled={isProcessing}
+                  className="flex-1 bg-red-500 text-white py-3 rounded-lg font-medium hover:bg-red-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                >
+                  {isProcessing ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                      Processing...
+                    </>
+                  ) : (
+                    'Confirm Rejection'
+                  )}
                 </button>
               </div>
             </div>

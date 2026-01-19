@@ -37,6 +37,8 @@ import type {
     Order
 } from '@/lib/api'
 import { useQuery } from '@tanstack/react-query'
+import jsPDF from 'jspdf'
+import autoTable from 'jspdf-autotable'
 
 
 export const Route = createLazyFileRoute('/admin-interface/')({
@@ -135,6 +137,188 @@ function RouteComponent() {
         console.log("Navigated to /customer-interface")
         console.log("Current logged-in user:", user)
     }, [user])
+
+    const handleDownloadReport = () => {
+        const doc = new jsPDF()
+
+        // Helper to parse currency
+        const parseCurrency = (val: string | number) => typeof val === 'string' ? parseFloat(val.replace(/[^\d.-]/g, '')) : val
+
+        // Date calculations
+        const now = new Date()
+        const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+
+        // Start of Week (Sunday)
+        const startOfWeek = new Date(now)
+        startOfWeek.setDate(now.getDate() - now.getDay())
+        startOfWeek.setHours(0, 0, 0, 0)
+
+        // Start of Month
+        const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
+
+        // Start of Year
+        const startOfYear = new Date(now.getFullYear(), 0, 1)
+
+        // Filter functions
+        const isToday = (date: Date) => date >= startOfDay
+        const isThisWeek = (date: Date) => date >= startOfWeek
+        const isThisMonth = (date: Date) => date >= startOfMonth
+        const isThisYear = (date: Date) => date >= startOfYear
+
+        // Aggregators
+        let todayRevenue = 0, todayCount = 0
+        let weekRevenue = 0, weekCount = 0
+        let monthRevenue = 0, monthCount = 0
+        let yearRevenue = 0, yearCount = 0
+
+        // Item stats (Name -> {qty, revenue})
+        const itemStats: Record<string, { qty: number, revenue: number }> = {}
+        let pickupCount = 0
+        let deliveryCount = 0
+        let validOrdersCount = 0
+
+        orders.forEach(order => {
+            const date = new Date(order.created_at)
+            const amount = parseCurrency(order.total_price) || 0
+
+            // Exclude cancelled/rejected orders for sales stats
+            const isValid = order.order_status !== 'Cancelled' && order.order_status !== 'Rejected'
+
+            if (isValid) {
+                validOrdersCount++
+
+                if (isToday(date)) { todayRevenue += amount; todayCount++ }
+                if (isThisWeek(date)) { weekRevenue += amount; weekCount++ }
+                if (isThisMonth(date)) { monthRevenue += amount; monthCount++ }
+                if (isThisYear(date)) { yearRevenue += amount; yearCount++ }
+
+                // Fulfillment based on all valid orders
+                if (order.order_type === 'Pick-up') pickupCount++
+                else if (order.order_type === 'Delivery') deliveryCount++
+
+                // Item stats
+                if (order.order_item) {
+                    order.order_item.forEach(item => {
+                        const name = item.menu.name
+                        const qty = item.quantity
+                        const subtotal = item.subtotal_price
+
+                        if (!itemStats[name]) itemStats[name] = { qty: 0, revenue: 0 }
+                        itemStats[name].qty += qty
+                        itemStats[name].revenue += typeof subtotal === 'string' ? parseFloat(subtotal) : subtotal
+                    })
+                }
+            }
+        })
+
+        // Calculate Top/Bottom Items
+        const itemArray = Object.entries(itemStats).map(([name, stats]) => ({ name, ...stats }))
+        itemArray.sort((a, b) => b.qty - a.qty) // Sort by quantity sold
+
+        const bestItem = itemArray.length > 0 ? itemArray[0] : null
+        const leastItem = itemArray.length > 0 ? itemArray[itemArray.length - 1] : null
+
+        // Fulfillment percentages
+        const totalFulfillment = pickupCount + deliveryCount
+        const pickupPct = totalFulfillment ? ((pickupCount / totalFulfillment) * 100).toFixed(1) : '0'
+        const deliveryPct = totalFulfillment ? ((deliveryCount / totalFulfillment) * 100).toFixed(1) : '0'
+
+
+        // --- PDF GENERATION ---
+
+        // Header
+        doc.setFontSize(22)
+        doc.setTextColor(217, 119, 6) // Amber-600
+        doc.text("Angieren's Lutong Bahay", 14, 20)
+
+        doc.setFontSize(14)
+        doc.setTextColor(40, 40, 40)
+        doc.text("Business Performance Report", 14, 28)
+
+        doc.setFontSize(10)
+        doc.setTextColor(100, 100, 100)
+        doc.text(`Generated on: ${new Date().toLocaleString()}`, 14, 35)
+
+        // 1. Sales & Revenue Section
+        doc.setFontSize(14)
+        doc.setTextColor(40, 40, 40)
+        doc.text("Sales & Revenue Overview", 14, 48)
+
+        const salesData = [
+            ['Today', `P ${todayRevenue.toLocaleString(undefined, { minimumFractionDigits: 2 })}`, todayCount.toString()],
+            ['This Week', `P ${weekRevenue.toLocaleString(undefined, { minimumFractionDigits: 2 })}`, weekCount.toString()],
+            ['This Month', `P ${monthRevenue.toLocaleString(undefined, { minimumFractionDigits: 2 })}`, monthCount.toString()],
+            ['This Year', `P ${yearRevenue.toLocaleString(undefined, { minimumFractionDigits: 2 })}`, yearCount.toString()],
+        ]
+
+        autoTable(doc, {
+            startY: 52,
+            head: [['Period', 'Total Revenue', 'Total Orders']],
+            body: salesData,
+            theme: 'grid',
+            headStyles: { fillColor: [217, 119, 6] },
+            styles: { fontSize: 11, cellPadding: 3 },
+        })
+
+        let finalY = (doc as any).lastAutoTable?.finalY || 100
+
+        // 2. Operational Stats (Inventory & Employees)
+        doc.text("Operational Statistics", 14, finalY + 15)
+
+        const operationalData = [
+            ['Total Valid Orders (All Time)', `${validOrdersCount}`],
+            ['Total Menu Items', `${dashboardStats?.totalMenu || '0'}`],
+            ['Total Employees', `${dashboardStats?.totalEmployees || '0'}`]
+        ]
+
+        autoTable(doc, {
+            startY: finalY + 20,
+            head: [['Metric', 'Count']],
+            body: operationalData,
+            theme: 'striped',
+            headStyles: { fillColor: [60, 60, 60] },
+            columnStyles: { 0: { fontStyle: 'bold' } }
+        })
+
+        finalY = (doc as any).lastAutoTable?.finalY || finalY + 50
+
+        // 3. Product Performance
+        doc.text("Product Performance (Best & Least Selling)", 14, finalY + 15)
+
+        const productData = [
+            ['Best Selling Item', bestItem ? bestItem.name : 'N/A', bestItem ? `${bestItem.qty} sold` : '-'],
+            ['Least Selling Item', leastItem ? leastItem.name : 'N/A', leastItem ? `${leastItem.qty} sold` : '-']
+        ]
+
+        autoTable(doc, {
+            startY: finalY + 20,
+            head: [['Category', 'Item Name', 'Quantity Sold']],
+            body: productData,
+            theme: 'grid',
+            headStyles: { fillColor: [217, 119, 6] },
+            styles: { fontSize: 11 }
+        })
+
+        finalY = (doc as any).lastAutoTable?.finalY || finalY + 50
+
+        // 4. Order Fulfillment Analysis
+        doc.text("Order Fulfillment Analysis", 14, finalY + 15)
+
+        const fulfillmentData = [
+            ['Delivery', `${deliveryCount} orders`, `${deliveryPct}%`],
+            ['Pick-up', `${pickupCount} orders`, `${pickupPct}%`]
+        ]
+
+        autoTable(doc, {
+            startY: finalY + 20,
+            head: [['Method', 'Count', 'Percentage']],
+            body: fulfillmentData,
+            theme: 'striped',
+            headStyles: { fillColor: [60, 60, 60] },
+        })
+
+        doc.save(`angierens-full-report-${new Date().toISOString().split('T')[0]}.pdf`)
+    }
 
     async function handleLogout() {
         await signOut();
@@ -567,16 +751,20 @@ function RouteComponent() {
                                 </div>
                             </div>
 
-                            {/* <button className="bg-white rounded-xl p-6 shadow-sm border border-gray-200 hover:shadow-md hover:border-gray-300 transition-all duration-200 w-full text-left cursor-pointer">
+                            <button 
+                                onClick={handleDownloadReport}
+                                className="bg-white rounded-xl p-6 shadow-sm border border-gray-200 hover:shadow-md hover:border-gray-300 transition-all duration-200 w-full text-left cursor-pointer"
+                            >
                                 <div className="flex items-center gap-4">
                                     <div className="w-12 h-12 bg-amber-100 rounded-lg flex items-center justify-center">
                                         <Download className="h-6 w-6 text-amber-600" />
                                     </div>
                                     <div>
-                                        <p className="text-gray-600 text-sm">Download Report</p>
+                                        <p className="text-gray-600 text-sm">Generate Report</p>
+                                        <p className="text-xs text-amber-600 font-medium mt-1">Download PDF</p>
                                     </div>
                                 </div>
-                            </button> */}
+                            </button>
                         </div>
 
                         {/* Charts */}
